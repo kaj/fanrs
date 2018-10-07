@@ -2,3 +2,4 @@ max_width = 78
 
 reorder_imports = true
 report_fixme = "Always"
+ignore = ["src/schema.rs"]

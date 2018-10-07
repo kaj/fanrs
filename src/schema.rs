@@ -1,6 +1,17 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 
 table! {
+    episodes (id) {
+        id -> Int4,
+        title -> Int4,
+        episode -> Nullable<Varchar>,
+        teaser -> Nullable<Varchar>,
+        note -> Nullable<Varchar>,
+        copyright -> Nullable<Varchar>,
+    }
+}
+
+table! {
     issues (id) {
         id -> Int4,
         year -> Int2,
@@ -20,7 +31,10 @@ table! {
     }
 }
 
+joinable!(episodes -> titles (title));
+
 allow_tables_to_appear_in_same_query!(
+    episodes,
     issues,
     titles,
 );

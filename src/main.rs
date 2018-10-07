@@ -7,15 +7,15 @@ extern crate failure;
 extern crate slug;
 extern crate xmltree;
 
-mod schema;
 mod models;
+mod schema;
 
 use bigdecimal::BigDecimal;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::Error;
-use models::Title;
+use models::{Episode, Title};
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -52,7 +52,7 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                 .attributes
                 .get("price")
                 .and_then(|s| s.parse::<BigDecimal>().ok());
-            println!("Found issue {}/{} {:?} {:.2?}", nr, year, pages, price);
+            println!("Found issue {}/{}", nr, year);
             use diesel::insert_into;
             use schema::issues::dsl;
             insert_into(dsl::issues)
@@ -76,28 +76,24 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     });
                     println!("  -> omslag {:?} {:?}", by, best);
                 } else if c.name == "text" {
-                    let title =
-                        c.get_child("title").and_then(|e| e.text.as_ref());
-                    let subtitle =
-                        c.get_child("subtitle").and_then(|e| e.text.as_ref());
+                    let title = get_text(&c, "title");
+                    let subtitle = get_text(&c, "subtitle");
                     println!("  -> text {:?} {:?}", title, subtitle);
                 } else if c.name == "serie" {
                     let title = Title::get_or_create(
-                        c.get_child("title")
-                            .and_then(|e| e.text.as_ref())
-                            .ok_or(format_err!("title missing"))?,
+                        get_text(&c, "title").ok_or(format_err!("title missing"))?,
                         db,
                     )?;
-                    let episode =
-                        c.get_child("episode").and_then(|e| e.text.as_ref());
-                    let part = Part::of(&c);
-                    println!(
-                        "  -> serie {:?} {:?} {}",
-                        title,
-                        episode,
-                        part.map(|p| format!("({})", p))
-                            .unwrap_or_else(|| "".to_string())
-                    );
+                    let episode = get_text(&c, "episode");
+                    let teaser = get_text(&c, "teaser");
+                    let note = get_text(&c, "note");
+                    let copyright = get_text(&c, "copyright");
+                    let _episode = Episode::get(&title, episode, db)?
+                        .map(|episode| episode.set_details(teaser, note, copyright, db))
+                        .unwrap_or_else(|| {
+                            Episode::create(&title, episode, teaser, note, copyright, db)
+                        })?;
+                    let _part = Part::of(&c);
                 } else if c.name == "skick" {
                     // ignore
                 } else {
@@ -108,6 +104,12 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
         //println!("{:?}", c);
     }
     Ok(())
+}
+
+fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {
+    e
+        .get_child(name)
+        .and_then(|e| e.text.as_ref().map(|s| s.as_ref()))
 }
 
 #[derive(Debug)]
