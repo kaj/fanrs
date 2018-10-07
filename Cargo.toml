@@ -4,11 +4,18 @@ version = "0.1.0"
 authors = ["Rasmus Kaj <kaj@kth.se>"]
 description = "Rust version of fantomenindex.krats.se"
 
+build = "src/build.rs"
+
+[build-dependencies]
+ructe = { version = "0.4.0", features = ["sass", "mime03"] }
+
 [dependencies]
-bigdecimal = "0.0"
+bigdecimal = "0.0.11"
 diesel = { version = "1.3", features = ["numeric", "r2d2", "postgres"] }
 dotenv = "0.13"
 failure = "0.1"
+mime = "0.3"
 slug = "0.1"
 structopt = "0.2"
+warp = "*"
 xmltree = "0.7"

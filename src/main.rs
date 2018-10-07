@@ -4,14 +4,17 @@ extern crate diesel;
 extern crate dotenv;
 #[macro_use]
 extern crate failure;
+extern crate mime;
 extern crate slug;
 #[macro_use]
 extern crate structopt;
+extern crate warp;
 extern crate xmltree;
 
+mod listissues;
 mod models;
 mod schema;
-mod listissues;
+mod server;
 
 use bigdecimal::BigDecimal;
 use diesel::pg::PgConnection;
@@ -31,19 +34,21 @@ use xmltree::Element;
 enum Fanrs {
     #[structopt(name = "readfiles")]
     /// Read data from xml content files.
-    ReadFiles {
-        year: u16,
-    },
-    /// List known comic book issues (in compact format).
+    ReadFiles { year: u16 },
     #[structopt(name = "listissues")]
+    /// List known comic book issues (in compact format).
     ListIssues,
+
+    #[structopt(name = "runserver")]
+    /// Run the web server.
+    RunServer,
 }
 
 fn main() {
     dotenv().ok();
+    let db_url = env::var("DATABASE_URL").unwrap();
     let opt = Fanrs::from_args();
-    let db =
-        PgConnection::establish(&env::var("DATABASE_URL").unwrap()).unwrap();
+    let db = PgConnection::establish(&db_url).unwrap();
 
     match opt {
         Fanrs::ReadFiles { year } => {
@@ -51,6 +56,9 @@ fn main() {
         }
         Fanrs::ListIssues => {
             list_issues(&db).expect("List issues");
+        }
+        Fanrs::RunServer => {
+            server::run(&db_url).expect("Run server");
         }
     }
 }
@@ -105,7 +113,8 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     println!("  -> text {:?} {:?}", title, subtitle);
                 } else if c.name == "serie" {
                     let title = Title::get_or_create(
-                        get_text(&c, "title").ok_or(format_err!("title missing"))?,
+                        get_text(&c, "title")
+                            .ok_or(format_err!("title missing"))?,
                         db,
                     )?;
                     let episode = get_text(&c, "episode");
@@ -113,9 +122,13 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     let note = get_text(&c, "note");
                     let copyright = get_text(&c, "copyright");
                     let _episode = Episode::get(&title, episode, db)?
-                        .map(|episode| episode.set_details(teaser, note, copyright, db))
+                        .map(|episode| {
+                            episode.set_details(teaser, note, copyright, db)
+                        })
                         .unwrap_or_else(|| {
-                            Episode::create(&title, episode, teaser, note, copyright, db)
+                            Episode::create(
+                                &title, episode, teaser, note, copyright, db,
+                            )
                         })?;
                     let _part = Part::of(&c);
                 } else if c.name == "skick" {
@@ -131,8 +144,7 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
 }
 
 fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {
-    e
-        .get_child(name)
+    e.get_child(name)
         .and_then(|e| e.text.as_ref().map(|s| s.as_ref()))
 }
 
@@ -165,3 +177,5 @@ impl fmt::Display for Part {
         Ok(())
     }
 }
+
+include!(concat!(env!("OUT_DIR"), "/templates.rs"));

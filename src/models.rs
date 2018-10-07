@@ -12,8 +12,8 @@ use slug::slugify;
 #[derive(Debug, Queryable)]
 pub struct Title {
     id: i32,
-    title: String,
-    slug: String,
+    pub title: String,
+    pub slug: String,
 }
 
 impl Title {

@@ -1,0 +1,13 @@
+@use models::Title;
+
+@(titles: &[Title])
+<html>
+  <body>
+    <h1>Serier</h1>
+    <ul>
+      @for title in titles {
+      <li><a href="@title.slug">@title.title</a></li>
+      }
+    </ul>
+  </body>
+</html>
