@@ -1,19 +1,34 @@
-extern crate xmltree;
+extern crate bigdecimal;
+#[macro_use]
+extern crate diesel;
+extern crate dotenv;
 #[macro_use]
 extern crate failure;
+extern crate xmltree;
 
+mod schema;
+
+use bigdecimal::BigDecimal;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
+use dotenv::dotenv;
 use failure::Error;
+use std::env;
 use std::fmt;
 use std::fs::File;
 use xmltree::Element;
 
 fn main() {
-    for year in 1950..1959 {
-        load_year(year).expect("Load data");
+    dotenv().ok();
+    let db =
+        PgConnection::establish(&env::var("DATABASE_URL").unwrap()).unwrap();
+
+    for year in 1950..=1950 {
+        load_year(year, &db).expect("Load data");
     }
 }
 
-fn load_year(year: isize) -> Result<(), Error> {
+fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
     let file = File::open(format!("/home/kaj/proj/fantomen/{}.data", year))?;
     let data = Element::parse(file)?;
 
@@ -21,11 +36,33 @@ fn load_year(year: isize) -> Result<(), Error> {
         if i.name == "info" {
             // ignore
         } else if i.name == "issue" {
-            let nr = i
+            let nr_str = i
                 .attributes
                 .get("nr")
                 .ok_or_else(|| format_err!("nr missing"))?;
-            println!("Found issue {}/{}", nr, year);
+            let nr = nr_str.parse::<i16>()?;
+            let pages = i
+                .attributes
+                .get("pages")
+                .and_then(|s| s.parse::<i16>().ok());
+            let price = i
+                .attributes
+                .get("price")
+                .and_then(|s| s.parse::<BigDecimal>().ok());
+            println!("Found issue {}/{} {:?} {:.2?}", nr, year, pages, price);
+            use diesel::insert_into;
+            use schema::issues::dsl;
+            insert_into(dsl::issues)
+                .values((
+                    dsl::year.eq(year),
+                    dsl::number.eq(nr),
+                    dsl::number_str.eq(nr_str),
+                    dsl::pages.eq(pages),
+                    dsl::price.eq(price),
+                ))
+                .on_conflict((dsl::year, dsl::number))
+                .do_nothing() // TODO Update price etc!
+                .execute(db)?;
             for c in i.children {
                 if c.name == "omslag" {
                     let by = c.get_child("by").and_then(|e| e.text.as_ref());

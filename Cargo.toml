@@ -5,5 +5,8 @@ authors = ["Rasmus Kaj <kaj@kth.se>"]
 description = "Rust version of fantomenindex.krats.se"
 
 [dependencies]
+bigdecimal = "*"
+diesel = { version = "1.3", features = ["numeric", "r2d2", "postgres"] }
+dotenv = "*"
 failure = "0.1"
 xmltree = "0.7"
