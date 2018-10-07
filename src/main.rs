@@ -4,15 +4,18 @@ extern crate diesel;
 extern crate dotenv;
 #[macro_use]
 extern crate failure;
+extern crate slug;
 extern crate xmltree;
 
 mod schema;
+mod models;
 
 use bigdecimal::BigDecimal;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::Error;
+use models::Title;
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -79,8 +82,12 @@ fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                         c.get_child("subtitle").and_then(|e| e.text.as_ref());
                     println!("  -> text {:?} {:?}", title, subtitle);
                 } else if c.name == "serie" {
-                    let title =
-                        c.get_child("title").and_then(|e| e.text.as_ref());
+                    let title = Title::get_or_create(
+                        c.get_child("title")
+                            .and_then(|e| e.text.as_ref())
+                            .ok_or(format_err!("title missing"))?,
+                        db,
+                    )?;
                     let episode =
                         c.get_child("episode").and_then(|e| e.text.as_ref());
                     let part = Part::of(&c);
