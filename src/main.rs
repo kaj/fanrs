@@ -5,29 +5,53 @@ extern crate dotenv;
 #[macro_use]
 extern crate failure;
 extern crate slug;
+#[macro_use]
+extern crate structopt;
 extern crate xmltree;
 
 mod models;
 mod schema;
+mod listissues;
 
 use bigdecimal::BigDecimal;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::Error;
+use listissues::list_issues;
 use models::{Episode, Title};
 use std::env;
 use std::fmt;
 use std::fs::File;
+use structopt::StructOpt;
 use xmltree::Element;
+
+#[derive(StructOpt)]
+#[structopt(name = "fanrs", about = "Manage index of the Phantom comics")]
+enum Fanrs {
+    #[structopt(name = "readfiles")]
+    /// Read data from xml content files.
+    ReadFiles {
+        year: u16,
+    },
+    /// List known comic book issues (in compact format).
+    #[structopt(name = "listissues")]
+    ListIssues,
+}
 
 fn main() {
     dotenv().ok();
+    let opt = Fanrs::from_args();
     let db =
         PgConnection::establish(&env::var("DATABASE_URL").unwrap()).unwrap();
 
-    for year in 1950..=1950 {
-        load_year(year, &db).expect("Load data");
+    match opt {
+        Fanrs::ReadFiles { year } => {
+            load_year(year as i16, &db).expect("Load data");
+        }
+        Fanrs::ListIssues => {
+            list_issues(&db).expect("List issues");
+        }
     }
 }
 

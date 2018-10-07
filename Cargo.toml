@@ -10,4 +10,5 @@ diesel = { version = "1.3", features = ["numeric", "r2d2", "postgres"] }
 dotenv = "0.13"
 failure = "0.1"
 slug = "0.1"
+structopt = "0.2"
 xmltree = "0.7"
