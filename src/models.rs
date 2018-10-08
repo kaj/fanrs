@@ -86,12 +86,34 @@ impl Episode {
         db: &PgConnection,
     ) -> Result<Episode, Error> {
         use schema::episodes::dsl;
-        diesel::update(dsl::episodes.filter(dsl::id.eq(self.id)))
-            .set((
-                dsl::teaser.eq(teaser),
-                dsl::note.eq(note),
-                dsl::copyright.eq(copyright),
-            ))
-            .get_result(db)
+        let q = diesel::update(dsl::episodes.filter(dsl::id.eq(self.id)));
+        match (teaser, note, copyright) {
+            (Some(teaser), Some(note), Some(copyright)) => q
+                .set((
+                    dsl::teaser.eq(teaser),
+                    dsl::note.eq(note),
+                    dsl::copyright.eq(copyright),
+                ))
+                .get_result(db),
+            (Some(teaser), Some(note), None) => q
+                .set((dsl::teaser.eq(teaser), dsl::note.eq(note)))
+                .get_result(db),
+            (Some(teaser), None, Some(copyright)) => q
+                .set((dsl::teaser.eq(teaser), dsl::copyright.eq(copyright)))
+                .get_result(db),
+            (Some(teaser), None, None) => {
+                q.set(dsl::teaser.eq(teaser)).get_result(db)
+            }
+            (None, Some(note), Some(copyright)) => q
+                .set((dsl::note.eq(note), dsl::copyright.eq(copyright)))
+                .get_result(db),
+            (None, Some(note), None) => {
+                q.set(dsl::note.eq(note)).get_result(db)
+            }
+            (None, None, Some(copyright)) => {
+                q.set(dsl::copyright.eq(copyright)).get_result(db)
+            }
+            (None, None, None) => Ok(self),
+        }
     }
 }
