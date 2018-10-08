@@ -1,13 +1,12 @@
 @use models::Title;
+@use templates::page;
 
 @(titles: &[Title])
-<html>
-  <body>
-    <h1>Serier</h1>
-    <ul>
-      @for title in titles {
-      <li><a href="@title.slug">@title.title</a></li>
-      }
-    </ul>
-  </body>
-</html>
+@:page("Serier", {
+  <h1>Serier</h1>
+  <ul>
+    @for title in titles {
+    <li><a href="@title.slug">@title.title</a></li>
+    }
+  </ul>
+})

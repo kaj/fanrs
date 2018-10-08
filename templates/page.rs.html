@@ -1,0 +1,23 @@
+@(title: &str, content: Content)
+
+<!doctype html>
+<html>
+  <head>
+    <title>@title</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  </head>
+  <body>
+    <header>
+      <p><a href="/">Fantomenindex.krats.se</a></p>
+    </header>
+    <main>
+      @:content()
+    </main>
+    <footer>
+      <p>Managed by
+	<a href="https://github.com/kaj/fanrs">fanrs
+	@env!("CARGO_PKG_VERSION")</a>.</p>
+    </footer>
+  </body>
+</html>
