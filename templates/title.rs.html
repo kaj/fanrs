@@ -1,0 +1,14 @@
+@use models::{Episode, Title};
+
+@(title: &Title, episodes: &[Episode])
+<html>
+  <body>
+    <h1>@title.title</h1>
+    @for episode in episodes {
+    <h2>@if let Some(ref h) = episode.episode {@h} else {@title.title}</h2>
+    @if let Some(ref info) = episode.teaser { <p>@info</p> }
+    @if let Some(ref info) = episode.note { <p>@info</p> }
+    @if let Some(ref info) = episode.copyright { <p>@info</p> }
+    }
+  </body>
+</html>

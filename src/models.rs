@@ -11,7 +11,7 @@ use slug::slugify;
 /// May be recurring, such as "Fantomen" or "Spirit", or a one-shot.
 #[derive(Debug, Queryable)]
 pub struct Title {
-    id: i32,
+    pub id: i32,
     pub title: String,
     pub slug: String,
 }
@@ -40,10 +40,10 @@ impl Title {
 pub struct Episode {
     id: i32,
     title_id: i32,
-    episode: Option<String>,
-    teaser: Option<String>,
-    note: Option<String>,
-    copyright: Option<String>,
+    pub episode: Option<String>,
+    pub teaser: Option<String>,
+    pub note: Option<String>,
+    pub copyright: Option<String>,
 }
 
 impl Episode {
