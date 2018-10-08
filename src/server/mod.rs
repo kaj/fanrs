@@ -38,7 +38,12 @@ pub fn run(db_url: &str) -> Result<(), ()> {
             .and(s())
             .and(path::param())
             .and(index())
-            .and_then(one_title));
+            .and_then(one_title))
+        .or(get()
+            .and(s())
+            .and(path::param())
+            .and(index())
+            .and_then(list_year));
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
 }
@@ -48,6 +53,40 @@ fn pg_pool(database_url: &str) -> PgPool {
     Pool::new(manager).expect("Postgres connection pool could not be created")
 }
 
+fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
+    use models::{Episode, Issue, Part, Title};
+    use schema::issues::dsl;
+    let issues = dsl::issues
+        .filter(dsl::year.eq(year as i16))
+        .load(&db)
+        .map_err(ise)?
+        .into_iter()
+        .map(|issue: Issue| {
+            use schema::episode_parts::dsl as ep;
+            use schema::episodes::dsl as e;
+            use schema::publications::dsl as p;
+            use schema::titles::dsl as t;
+            let id = issue.id;
+            (
+                issue,
+                t::titles
+                    .inner_join(e::episodes.inner_join(
+                        ep::episode_parts.inner_join(p::publications),
+                    ))
+                    .select((
+                        t::titles::all_columns(),
+                        e::episodes::all_columns(),
+                        (ep::part_no, ep::part_name),
+                    ))
+                    .filter(p::issue.eq(id))
+                    .load::<(Title, Episode, Part)>(&db)
+                    .unwrap(),
+            )
+        })
+        .collect::<Vec<(Issue, Vec<_>)>>();
+
+    Response::builder().html(|o| templates::year(o, year, &issues))
+}
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use models::Title;
     use schema::titles::dsl;

@@ -1,0 +1,16 @@
+@use models::{Episode, Issue, Part, Title};
+@use templates::page;
+
+@(year: u16, issues: &[(Issue, Vec<(Title, Episode, Part)>)])
+@:page(&format!("Årgång {}", year), {
+  <h1>@year</h1>
+  @for (issue, content) in issues {
+  <h2>@issue</h2>
+  @for (title, episode, part) in content {
+  <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
+  @if let Some(ref teaser) = episode.teaser { <p>@teaser</p> }
+  @if let Some(ref note) = episode.note { <p>@note</p> }
+  @if let Some(ref copyright) = episode.copyright { <p>@copyright</p> }
+  }
+  }
+})

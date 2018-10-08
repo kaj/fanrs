@@ -1,6 +1,16 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 
 table! {
+    episode_parts (id) {
+        id -> Int4,
+        episode -> Int4,
+        part_no -> Nullable<Int2>,
+        part_name -> Nullable<Varchar>,
+        best_plac -> Nullable<Int2>,
+    }
+}
+
+table! {
     episodes (id) {
         id -> Int4,
         title -> Int4,
@@ -24,6 +34,15 @@ table! {
 }
 
 table! {
+    publications (id) {
+        id -> Int4,
+        issue -> Int4,
+        seqno -> Nullable<Int2>,
+        episode_part -> Nullable<Int4>,
+    }
+}
+
+table! {
     titles (id) {
         id -> Int4,
         title -> Varchar,
@@ -31,10 +50,15 @@ table! {
     }
 }
 
+joinable!(episode_parts -> episodes (episode));
 joinable!(episodes -> titles (title));
+joinable!(publications -> episode_parts (episode_part));
+joinable!(publications -> issues (issue));
 
 allow_tables_to_appear_in_same_query!(
+    episode_parts,
     episodes,
     issues,
+    publications,
     titles,
 );

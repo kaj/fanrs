@@ -1,9 +1,7 @@
 use bigdecimal::BigDecimal;
 use diesel::pg::PgConnection;
-use diesel::prelude::*;
 use failure::Error;
-use models::{Episode, Title};
-use std::fmt;
+use models::{Episode, Issue, Part, Title};
 use std::fs::File;
 use xmltree::Element;
 
@@ -28,20 +26,9 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                 .attributes
                 .get("price")
                 .and_then(|s| s.parse::<BigDecimal>().ok());
-            println!("Found issue {}/{}", nr, year);
-            use diesel::insert_into;
-            use schema::issues::dsl;
-            insert_into(dsl::issues)
-                .values((
-                    dsl::year.eq(year),
-                    dsl::number.eq(nr),
-                    dsl::number_str.eq(nr_str),
-                    dsl::pages.eq(pages),
-                    dsl::price.eq(price),
-                ))
-                .on_conflict((dsl::year, dsl::number))
-                .do_nothing() // TODO Update price etc!
-                .execute(db)?;
+            let issue =
+                Issue::get_or_create(year, nr, nr_str, pages, price, db)?;
+            println!("Found issue {}", issue);
             for c in i.children {
                 if c.name == "omslag" {
                     let by = c.get_child("by").and_then(|e| e.text.as_ref());
@@ -65,7 +52,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     let teaser = get_text(&c, "teaser");
                     let note = get_text(&c, "note");
                     let copyright = get_text(&c, "copyright");
-                    let _episode = Episode::get(&title, episode, db)?
+                    let episode = Episode::get(&title, episode, db)?
                         .map(|episode| {
                             episode.set_details(teaser, note, copyright, db)
                         })
@@ -74,7 +61,13 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                                 &title, episode, teaser, note, copyright, db,
                             )
                         })?;
-                    let _part = Part::of(&c);
+                    let part = Part::of(&c);
+                    episode.publish_part(
+                        part.as_ref(),
+                        issue.id,
+                        None,
+                        db,
+                    )?;
                 } else if c.name == "skick" {
                     // ignore
                 } else {
@@ -90,34 +83,4 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
 fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {
     e.get_child(name)
         .and_then(|e| e.text.as_ref().map(|s| s.as_ref()))
-}
-
-#[derive(Debug)]
-struct Part {
-    no: Option<u8>,
-    name: Option<String>,
-}
-
-impl Part {
-    fn of(e: &Element) -> Option<Self> {
-        e.get_child("part").map(|e| Part {
-            no: e.attributes.get("no").and_then(|n| n.parse::<u8>().ok()),
-            name: e.text.clone(),
-        })
-    }
-}
-
-impl fmt::Display for Part {
-    fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(no) = self.no {
-            write!(out, "del {}", no)?;
-            if self.name.is_some() {
-                write!(out, ":")?;
-            }
-        }
-        if let Some(ref name) = self.name {
-            write!(out, "{}", name)?;
-        }
-        Ok(())
-    }
 }
