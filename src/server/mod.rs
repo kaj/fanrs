@@ -4,6 +4,7 @@ use self::render_ructe::RenderRucte;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use failure::Error;
 use std::fmt::Display;
 use templates;
 use warp::http::Response;
@@ -12,7 +13,7 @@ use warp::{self, reject, Filter, Rejection, Reply};
 type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
 type PgPool = Pool<ConnectionManager<PgConnection>>;
 
-pub fn run(db_url: &str) -> Result<(), ()> {
+pub fn run(db_url: &str) -> Result<(), Error> {
     let pool = pg_pool(db_url);
     let s = warp::any()
         .and_then(move || match pool.get() {

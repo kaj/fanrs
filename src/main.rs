@@ -22,6 +22,7 @@ use diesel::prelude::*;
 use dotenv::dotenv;
 use listissues::list_issues;
 use std::env;
+use std::process::exit;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -40,20 +41,30 @@ enum Fanrs {
 }
 
 fn main() {
-    dotenv().ok();
+    match run() {
+        Ok(()) => (),
+        Err(error) => {
+            eprintln!("Error: {}", error);
+            exit(1);
+        }
+    }
+}
+
+fn run() -> Result<(), failure::Error> {
+    dotenv()?;
     let db_url = env::var("DATABASE_URL").unwrap();
     let opt = Fanrs::from_args();
-    let db = PgConnection::establish(&db_url).unwrap();
+    let db = PgConnection::establish(&db_url)?;
 
     match opt {
         Fanrs::ReadFiles { year } => {
-            readfiles::load_year(year as i16, &db).expect("Load data");
+            readfiles::load_year(year as i16, &db)
         }
         Fanrs::ListIssues => {
-            list_issues(&db).expect("List issues");
+            list_issues(&db)
         }
         Fanrs::RunServer => {
-            server::run(&db_url).expect("Run server");
+            server::run(&db_url)
         }
     }
 }
