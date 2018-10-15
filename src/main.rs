@@ -30,7 +30,11 @@ use structopt::StructOpt;
 enum Fanrs {
     #[structopt(name = "readfiles")]
     /// Read data from xml content files.
-    ReadFiles { year: u16 },
+    ReadFiles {
+        #[structopt(name = "year")]
+        /// Year(s) to read data for.
+        years: Vec<u32>,
+    },
     #[structopt(name = "listissues")]
     /// List known comic book issues (in compact format).
     ListIssues,
@@ -57,15 +61,19 @@ fn run() -> Result<(), failure::Error> {
     let db = PgConnection::establish(&db_url)?;
 
     match opt {
-        Fanrs::ReadFiles { year } => {
-            readfiles::load_year(year as i16, &db)
+        Fanrs::ReadFiles { years } => {
+            if years.is_empty() {
+                return Err(format_err!(
+                    "No year(s) to read files for given."
+                ));
+            }
+            for year in years {
+                readfiles::load_year(year as i16, &db)?;
+            }
+            Ok(())
         }
-        Fanrs::ListIssues => {
-            list_issues(&db)
-        }
-        Fanrs::RunServer => {
-            server::run(&db_url)
-        }
+        Fanrs::ListIssues => list_issues(&db),
+        Fanrs::RunServer => server::run(&db_url),
     }
 }
 
