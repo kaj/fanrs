@@ -12,12 +12,12 @@ use xmltree::Element;
 #[derive(Debug, Queryable)]
 pub struct Issue {
     pub id: i32,
-    year: i16,
-    number: i16,
-    number_str: String,
-    pages: Option<i16>,
-    price: Option<BigDecimal>,
-    cover_best: Option<i16>,
+    pub year: i16,
+    pub number: i16,
+    pub number_str: String,
+    pub pages: Option<i16>,
+    pub price: Option<BigDecimal>,
+    pub cover_best: Option<i16>,
 }
 
 impl Issue {

@@ -5,12 +5,22 @@
 @:page(&format!("Årgång {}", year), {
   <h1>@year</h1>
   @for (issue, content) in issues {
-  <h2>@issue</h2>
-  @for (title, episode, part) in content {
-  <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
-  @if let Some(ref teaser) = episode.teaser { <p>@teaser</p> }
-  @if let Some(ref note) = episode.note { <p>@note</p> }
-  @if let Some(ref copyright) = episode.copyright { <p>@copyright</p> }
-  }
+  <div class="issue" id="i@issue.number">
+    <header>
+      <h2>Nr @issue.number_str</h2>
+      @if let Some(ref pages) = issue.pages {<p class="pages">@pages sidor</p>}
+      @if let Some(ref price) = issue.price {<p class="price">Pris @price</p>}
+    </header>
+    <div class="content">
+      @for (title, episode, part) in content {
+      <div class="episode">
+	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
+	@if let Some(ref teaser) = episode.teaser { <p class="teaser">@teaser</p> }
+	@if let Some(ref note) = episode.note { <p class="info note">@note</p> }
+	@if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
+      </div>
+      }
+    </div>
+  </div>
   }
 })

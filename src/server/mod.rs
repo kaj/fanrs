@@ -8,6 +8,7 @@ use failure::Error;
 use std::fmt::Display;
 use templates;
 use warp::http::Response;
+use warp::path::Tail;
 use warp::{self, reject, Filter, Rejection, Reply};
 
 type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
@@ -27,13 +28,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
     let s = move || s.clone();
     use warp::{get2 as get, index, path};
     let routes = warp::any()
-        .and(
-            get()
-                .and(path("titles"))
-                .and(index())
-                .and(s())
-                .and_then(list_titles),
-        )
+        .and(get().and(path("s")).and(path::tail()).and_then(static_file))
+        .or(get()
+            .and(path("titles"))
+            .and(index())
+            .and(s())
+            .and_then(list_titles))
         .or(get()
             .and(path("titles"))
             .and(s())
@@ -47,6 +47,24 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and_then(list_year));
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
+}
+
+/// Handler for static files.
+/// Create a response from the file data with a correct content type
+/// and a far expires header (or a 404 if the file does not exist).
+fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
+    use templates::statics::StaticFile;
+    if let Some(data) = StaticFile::get(name.as_str()) {
+        // let _far_expires = SystemTime::now() + FAR;
+        Ok(Response::builder()
+            //.status(StatusCode::OK)
+            .header("content-type", data.mime.as_ref())
+            // TODO .header("expires", _far_expires)
+            .body(data.content))
+    } else {
+        println!("Static file {:?} not found", name);
+        Err(reject::not_found())
+    }
 }
 
 fn pg_pool(database_url: &str) -> PgPool {
