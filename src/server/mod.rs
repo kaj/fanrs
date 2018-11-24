@@ -5,11 +5,14 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use failure::Error;
-use std::fmt::Display;
 use templates;
 use warp::http::Response;
 use warp::path::Tail;
-use warp::{self, reject, Filter, Rejection, Reply};
+use warp::{
+    self,
+    reject::{custom, not_found},
+    Filter, Rejection, Reply,
+};
 
 type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
 type PgPool = Pool<ConnectionManager<PgConnection>>;
@@ -21,29 +24,29 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             Ok(conn) => Ok(conn),
             Err(e) => {
                 eprintln!("Failed to get a db connection: {}", e);
-                Err(reject::server_error())
+                Err(custom(e))
             }
         })
         .boxed();
     let s = move || s.clone();
-    use warp::{get2 as get, index, path};
+    use warp::{get2 as get, path, path::end};
     let routes = warp::any()
         .and(get().and(path("s")).and(path::tail()).and_then(static_file))
         .or(get()
             .and(path("titles"))
-            .and(index())
+            .and(end())
             .and(s())
             .and_then(list_titles))
         .or(get()
             .and(path("titles"))
             .and(s())
             .and(path::param())
-            .and(index())
+            .and(end())
             .and_then(one_title))
         .or(get()
             .and(s())
             .and(path::param())
-            .and(index())
+            .and(end())
             .and_then(list_year));
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
@@ -63,7 +66,7 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
             .body(data.content))
     } else {
         println!("Static file {:?} not found", name);
-        Err(reject::not_found())
+        Err(not_found())
     }
 }
 
@@ -78,7 +81,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     let issues = dsl::issues
         .filter(dsl::year.eq(year as i16))
         .load(&db)
-        .map_err(ise)?
+        .map_err(custom)?
         .into_iter()
         .map(|issue: Issue| {
             use schema::episode_parts::dsl as ep;
@@ -109,7 +112,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use models::Title;
     use schema::titles::dsl;
-    let all = dsl::titles.load::<Title>(&db).map_err(ise)?;
+    let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
@@ -120,18 +123,10 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
     let t = titles
         .filter(slug.eq(tslug))
         .first::<Title>(&db)
-        .map_err(ise)?;
+        .map_err(custom)?;
     let all = episodes
         .filter(title.eq(t.id))
         .load::<Episode>(&db)
-        .map_err(ise)?;
+        .map_err(custom)?;
     Response::builder().html(|o| templates::title(o, &t, &all))
-}
-
-/// Internal server error
-///
-/// Log and reject.
-fn ise<E: Display>(err: E) -> Rejection {
-    eprintln!("Internal server error: {}", err);
-    reject::server_error()
 }

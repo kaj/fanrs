@@ -7,7 +7,7 @@ description = "Rust version of fantomenindex.krats.se"
 build = "src/build.rs"
 
 [build-dependencies]
-ructe = { version = "0.4.0", features = ["sass", "mime03"] }
+ructe = { version = "0.5.2", features = ["sass", "mime03"] }
 
 [dependencies]
 bigdecimal = "0.0.11"
@@ -17,5 +17,5 @@ failure = "0.1"
 mime = "0.3"
 slug = "0.1"
 structopt = "0.2"
-warp = "*"
+warp = "0.1.9"
 xmltree = "0.7"

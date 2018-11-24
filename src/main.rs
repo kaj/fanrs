@@ -6,7 +6,6 @@ extern crate dotenv;
 extern crate failure;
 extern crate mime;
 extern crate slug;
-#[macro_use]
 extern crate structopt;
 extern crate warp;
 extern crate xmltree;
