@@ -5,6 +5,7 @@ use mime::TEXT_HTML_UTF_8;
 use std::io::{self, Write};
 use warp::http::response::Builder;
 use warp::http::Response;
+use warp::http::header::CONTENT_TYPE;
 use warp::{reject::custom, Rejection};
 
 pub trait RenderRucte {
@@ -20,7 +21,7 @@ impl RenderRucte for Builder {
     {
         let mut buf = Vec::new();
         f(&mut buf).map_err(custom)?;
-        self.header("content-type", TEXT_HTML_UTF_8.as_ref())
+        self.header(CONTENT_TYPE, TEXT_HTML_UTF_8.as_ref())
             .body(buf)
             .map_err(custom)
     }

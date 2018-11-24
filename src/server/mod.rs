@@ -1,6 +1,7 @@
 mod render_ructe;
 
 use self::render_ructe::RenderRucte;
+use chrono::{Duration, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
@@ -10,6 +11,7 @@ use warp::http::Response;
 use warp::path::Tail;
 use warp::{
     self,
+    http::header::{CONTENT_TYPE, EXPIRES},
     reject::{custom, not_found},
     Filter, Rejection, Reply,
 };
@@ -58,11 +60,11 @@ pub fn run(db_url: &str) -> Result<(), Error> {
 fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     use templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
-        // let _far_expires = SystemTime::now() + FAR;
+        let far_expires = Utc::now() + Duration::days(180);
         Ok(Response::builder()
             //.status(StatusCode::OK)
-            .header("content-type", data.mime.as_ref())
-            // TODO .header("expires", _far_expires)
+            .header(CONTENT_TYPE, data.mime.as_ref())
+            .header(EXPIRES, far_expires.to_rfc2822())
             .body(data.content))
     } else {
         println!("Static file {:?} not found", name);
