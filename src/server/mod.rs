@@ -4,6 +4,7 @@ use self::render_ructe::RenderRucte;
 use chrono::{Duration, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::QueryDsl;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use failure::Error;
 use templates;
@@ -34,6 +35,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
     use warp::{get2 as get, path, path::end};
     let routes = warp::any()
         .and(get().and(path("s")).and(path::tail()).and_then(static_file))
+        .or(get().and(end()).and(s()).and_then(frontpage))
         .or(get()
             .and(path("titles"))
             .and(end())
@@ -75,6 +77,18 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
 fn pg_pool(database_url: &str) -> PgPool {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::new(manager).expect("Postgres connection pool could not be created")
+}
+
+fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
+    use schema::issues::dsl;
+    let years = dsl::issues
+        .select(dsl::year)
+        .distinct()
+        .order(dsl::year)
+        .load(&db)
+        .map_err(custom)?;
+    eprintln!("Years: {:?}", years);
+    Response::builder().html(|o| templates::frontpage(o, &years))
 }
 
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {

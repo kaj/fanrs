@@ -1,0 +1,19 @@
+@use templates::page;
+
+@(years: &[i16])
+@:page("Fantomenindex.krats.se", {
+  <h1>Fantomenindex.krats.se</h1>
+
+  <section>
+    <h2>Årgångar</h2>
+    <ul>
+    @for year in years {
+      <li><a href="/@year">@year</a></li>
+    }
+    </ul>
+  </section>
+  <section>
+    <h1>Serier</h1>
+    <p><a href="/titles/">Alla förekommande serier</a></p>
+  </section>
+})
