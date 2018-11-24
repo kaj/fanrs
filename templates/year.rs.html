@@ -5,7 +5,7 @@
 @:page(&format!("Årgång {}", year), {
   <h1>@year</h1>
   @for (issue, content) in issues {
-  <div class="issue" id="i@issue.number">
+  <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>
       @if let Some(ref pages) = issue.pages {<p class="pages">@pages sidor</p>}
@@ -21,6 +21,6 @@
       </div>
       }
     </div>
-  </div>
+  </section>
   }
 })
