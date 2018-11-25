@@ -106,19 +106,7 @@ pub struct Episode {
 }
 
 impl Episode {
-    pub fn get(
-        title: &Title,
-        name: Option<&str>,
-        db: &PgConnection,
-    ) -> Result<Option<Episode>, Error> {
-        use schema::episodes::dsl;
-        dsl::episodes
-            .filter(dsl::title.eq(title.id))
-            .filter(dsl::episode.eq(name))
-            .first::<Episode>(db)
-            .optional()
-    }
-    pub fn create(
+    pub fn get_or_create(
         title: &Title,
         name: Option<&str>,
         teaser: Option<&str>,
@@ -127,17 +115,25 @@ impl Episode {
         db: &PgConnection,
     ) -> Result<Episode, Error> {
         use schema::episodes::dsl;
-        diesel::insert_into(dsl::episodes)
-            .values((
-                dsl::title.eq(title.id),
-                dsl::episode.eq(name),
-                dsl::teaser.eq(teaser),
-                dsl::note.eq(note),
-                dsl::copyright.eq(copyright),
-            ))
-            .get_result(db)
+        dsl::episodes
+            .filter(dsl::title.eq(title.id))
+            .filter(dsl::episode.eq(name))
+            .first::<Episode>(db)
+            .optional()?
+            .map(|episode| episode.set_details(teaser, note, copyright, db))
+            .unwrap_or_else(|| {
+                diesel::insert_into(dsl::episodes)
+                    .values((
+                        dsl::title.eq(title.id),
+                        dsl::episode.eq(name),
+                        dsl::teaser.eq(teaser),
+                        dsl::note.eq(note),
+                        dsl::copyright.eq(copyright),
+                    ))
+                    .get_result(db)
+            })
     }
-    pub fn set_details(
+    fn set_details(
         self,
         teaser: Option<&str>,
         note: Option<&str>,
