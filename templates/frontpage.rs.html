@@ -6,11 +6,11 @@
 
   <section>
     <h2>Årgångar</h2>
-    <ul>
-    @for year in years {
-      <li><a href="/@year">@year</a></li>
-    }
-    </ul>
+    <p>
+      @if let Some((last_year, years)) = years.split_last()
+      {@for year in years {<a href="/@year">@year</a>, }
+      <a href="@last_year">@last_year</a>.}
+    </p>
   </section>
   <section>
     <h1>Serier</h1>
