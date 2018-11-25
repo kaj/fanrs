@@ -180,12 +180,12 @@ impl Episode {
     }
     /// A specific part of this episode (None for the whole episode) is
     /// published in a specific issue.
-    /// TODO Handle best_plac
     pub fn publish_part(
         &self,
         part: Option<&Part>,
         issue: i32,
         seqno: Option<i16>,
+        best_plac: Option<i16>,
         db: &PgConnection,
     ) -> Result<(), Error> {
         use schema::episode_parts::dsl as e;
@@ -217,7 +217,8 @@ impl Episode {
                     e::part_no.eq(part_no),
                     e::part_name.eq(part_name),
                 ))
-                .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?.0
+                .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?
+                .0
         };
         use schema::publications::dsl as p;
         if let Some((id, old_seqno)) = p::publications
@@ -237,6 +238,7 @@ impl Episode {
                     p::issue.eq(issue),
                     p::episode_part.eq(part_id),
                     p::seqno.eq(seqno),
+                    p::best_plac.eq(best_plac),
                 ))
                 .execute(db)?;
             Ok(())

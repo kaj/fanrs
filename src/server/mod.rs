@@ -116,10 +116,13 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         e::episodes::all_columns(),
                         (ep::part_no, ep::part_name),
                         p::seqno,
+                        p::best_plac,
                     ))
                     .filter(p::issue.eq(id))
                     .order(p::seqno)
-                    .load::<(Title, Episode, Part, Option<i16>)>(&db)
+                    .load::<(Title, Episode, Part, Option<i16>, Option<i16>)>(
+                        &db,
+                    )
                     .unwrap(),
             )
         })
