@@ -27,8 +27,9 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                 db,
             )?;
             println!("Found issue {}", issue);
+            issue.clear(db)?;
 
-            for c in i.children {
+            for (seqno, c) in i.children.iter().enumerate() {
                 if c.name == "omslag" {
                     let by = c.get_child("by").and_then(|e| e.text.as_ref());
                     let best = c.get_child("best").and_then(|e| {
@@ -59,7 +60,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     episode.publish_part(
                         part.as_ref(),
                         issue.id,
-                        None,
+                        Some(seqno as i16),
                         db,
                     )?;
                 } else if c.name == "skick" {

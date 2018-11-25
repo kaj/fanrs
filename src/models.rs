@@ -50,7 +50,14 @@ impl Issue {
                 .get_result(db)?)
         }
     }
+    pub fn clear(&self, db: &PgConnection) -> Result<(), Error> {
+        use schema::publications::dsl as p;
+        diesel::delete(p::publications.filter(p::issue.eq(self.id)))
+            .execute(db)?;
+        Ok(())
+    }
 }
+
 impl fmt::Display for Issue {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         write!(out, "{}/{}", self.number_str, self.year)?;
