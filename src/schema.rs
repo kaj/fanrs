@@ -6,7 +6,6 @@ table! {
         episode -> Int4,
         part_no -> Nullable<Int2>,
         part_name -> Nullable<Varchar>,
-        best_plac -> Nullable<Int2>,
     }
 }
 
@@ -39,6 +38,7 @@ table! {
         issue -> Int4,
         seqno -> Nullable<Int2>,
         episode_part -> Nullable<Int4>,
+        best_plac -> Nullable<Int2>,
     }
 }
 

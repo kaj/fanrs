@@ -217,7 +217,7 @@ impl Episode {
                     e::part_no.eq(part_no),
                     e::part_name.eq(part_name),
                 ))
-                .get_result::<(i32, i32, Option<i16>, Option<String>, Option<i16>)>(db)?.0
+                .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?.0
         };
         use schema::publications::dsl as p;
         if let Some((id, old_seqno)) = p::publications
