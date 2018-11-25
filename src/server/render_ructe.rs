@@ -3,9 +3,9 @@
 /// If ructe gets a warp feature, this is probably it.
 use mime::TEXT_HTML_UTF_8;
 use std::io::{self, Write};
+use warp::http::header::CONTENT_TYPE;
 use warp::http::response::Builder;
 use warp::http::Response;
-use warp::http::header::CONTENT_TYPE;
 use warp::{reject::custom, Rejection};
 
 pub trait RenderRucte {

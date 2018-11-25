@@ -4,8 +4,8 @@ use self::render_ructe::RenderRucte;
 use chrono::{Duration, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::QueryDsl;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::QueryDsl;
 use failure::Error;
 use templates;
 use warp::http::Response;
@@ -115,9 +115,11 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         t::titles::all_columns(),
                         e::episodes::all_columns(),
                         (ep::part_no, ep::part_name),
+                        p::seqno,
                     ))
                     .filter(p::issue.eq(id))
-                    .load::<(Title, Episode, Part)>(&db)
+                    .order(p::seqno)
+                    .load::<(Title, Episode, Part, Option<i16>)>(&db)
                     .unwrap(),
             )
         })
