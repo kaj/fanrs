@@ -123,7 +123,13 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     .load::<(Title, Episode, Part, Option<i16>, Option<i16>)>(
                         &db,
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .into_iter()
+                    .map(|(t, e, p, s, b)| {
+                        let refkeys = e.load_refs(&db).unwrap();
+                        (t, e, refkeys, p, s, b)
+                    })
+                    .collect(),
             )
         })
         .collect::<Vec<(Issue, Vec<_>)>>();

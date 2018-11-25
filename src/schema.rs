@@ -10,6 +10,14 @@ table! {
 }
 
 table! {
+    episode_refkeys (id) {
+        id -> Int4,
+        episode_id -> Int4,
+        refkey_id -> Int4,
+    }
+}
+
+table! {
     episodes (id) {
         id -> Int4,
         title -> Int4,
@@ -43,6 +51,15 @@ table! {
 }
 
 table! {
+    refkeys (id) {
+        id -> Int4,
+        kind -> Int2,
+        title -> Nullable<Varchar>,
+        slug -> Varchar,
+    }
+}
+
+table! {
     titles (id) {
         id -> Int4,
         title -> Varchar,
@@ -51,14 +68,18 @@ table! {
 }
 
 joinable!(episode_parts -> episodes (episode));
+joinable!(episode_refkeys -> episodes (episode_id));
+joinable!(episode_refkeys -> refkeys (refkey_id));
 joinable!(episodes -> titles (title));
 joinable!(publications -> episode_parts (episode_part));
 joinable!(publications -> issues (issue));
 
 allow_tables_to_appear_in_same_query!(
     episode_parts,
+    episode_refkeys,
     episodes,
     issues,
     publications,
+    refkeys,
     titles,
 );
