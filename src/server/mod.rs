@@ -7,6 +7,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::QueryDsl;
 use failure::Error;
+use models::{Episode, Issue, Part, RefKey, Title};
 use templates;
 use warp::http::Response;
 use warp::path::Tail;
@@ -91,8 +92,19 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     Response::builder().html(|o| templates::frontpage(o, &years))
 }
 
+/// Information about an episode / part or article, as published in an issue.
+pub enum PublishedInfo {
+    EpisodePart {
+        title: Title,
+        episode: Episode,
+        refs: Vec<RefKey>,
+        part: Part,
+        seqno: Option<i16>,
+        best_plac: Option<i16>,
+    },
+}
+
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
-    use models::{Episode, Issue, Part, Title};
     use schema::issues::dsl;
     let issues = dsl::issues
         .filter(dsl::year.eq(year as i16))
@@ -127,7 +139,14 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     .into_iter()
                     .map(|(t, e, p, s, b)| {
                         let refkeys = e.load_refs(&db).unwrap();
-                        (t, e, refkeys, p, s, b)
+                        PublishedInfo::EpisodePart {
+                            title: t,
+                            episode: e,
+                            refs: refkeys,
+                            part: p,
+                            seqno: s,
+                            best_plac: b,
+                        }
                     })
                     .collect(),
             )
@@ -137,14 +156,12 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     Response::builder().html(|o| templates::year(o, year, &issues))
 }
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use models::Title;
     use schema::titles::dsl;
     let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
 fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
-    use models::{Episode, Title};
     use schema::episodes::dsl::{episodes, title};
     use schema::titles::dsl::{slug, titles};
     let t = titles

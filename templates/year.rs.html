@@ -1,10 +1,11 @@
-@use models::{Episode, Issue, Part, RefKey, Title};
+@use models::Issue;
 @use templates::page;
+@use server::PublishedInfo::{self, EpisodePart};
 
-@(year: u16, issues: &[(Issue, Vec<(Title, Episode, Vec<RefKey>, Part, Option<i16>, Option<i16>)>)])
+@(year: u16, issues: &[(Issue, Vec<PublishedInfo>)])
 @:page(&format!("Årgång {}", year), {
   <h1>@year</h1>
-  @for (issue, content) in issues {
+  @for (issue, contents) in issues {
   <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>
@@ -12,7 +13,7 @@
       @if let Some(ref price) = issue.price {<p class="price">Pris @price</p>}
     </header>
     <div class="content">
-      @for (title, episode, refs, part, seqno, best_plac) in content {
+      @for EpisodePart{title, episode, refs, part, seqno, best_plac} in contents {
       <div class="episode" @if let Some(seqno) = seqno {data-seq="@seqno"}>
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
 	@if let Some(ref teaser) = episode.teaser { <p class="teaser">@teaser</p> }
