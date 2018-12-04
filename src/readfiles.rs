@@ -150,8 +150,10 @@ fn get_best_plac(e: &Element) -> Option<i16> {
 fn get_creators(e: &Element) -> Vec<&str> {
     let c = &e.children;
     if c.is_empty() {
-        return vec![e.text.as_ref().unwrap()]
+        vec![e.text.as_ref().unwrap()]
     } else {
-        return c.iter().map(|e| e.text.as_ref().unwrap().as_ref()).collect()
+        c.iter()
+            .map(|e| e.text.as_ref().unwrap().as_ref())
+            .collect()
     }
 }

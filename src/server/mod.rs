@@ -180,12 +180,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                 classnames,
                             }
                         }
-                        (
-                            None,
-                            Some(a),
-                            seqno,
-                            None,
-                        ) => {
+                        (None, Some(a), seqno, None) => {
                             let refs = a.load_refs(&db).unwrap();
                             let Article {
                                 id: _,
@@ -194,14 +189,14 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                 note,
                             } = a;
                             PublishedInfo {
-                            content: PublishedContent::Text {
-                                title,
-                                subtitle,
-                                refs,
-                                note,
-                            },
-                            seqno,
-                            classnames: "article",
+                                content: PublishedContent::Text {
+                                    title,
+                                    subtitle,
+                                    refs,
+                                    note,
+                                },
+                                seqno,
+                                classnames: "article",
                             }
                         }
                         row => panic!("Strange row: {:?}", row),
