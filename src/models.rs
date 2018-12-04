@@ -315,13 +315,16 @@ pub enum RefKey {
     Key(String, String),
     /// Name, slug
     Who(String, String),
+    /// Name, slug
+    // Note; In some sense, this should actually reference a title by id,
+    // but this way it can be stored the same way as other refkeys.
+    Title(String, String),
 }
 
 impl RefKey {
     pub fn fa(slug: &str) -> RefKey {
         RefKey::Fa(slug.into())
     }
-
     pub fn key(name: &str) -> RefKey {
         match name {
             "Julie" => RefKey::fa("17j"),
@@ -332,9 +335,11 @@ impl RefKey {
             _ => RefKey::Key(name.into(), slugify(name)),
         }
     }
-
     pub fn who(name: &str) -> RefKey {
         RefKey::Who(name.into(), slugify(name))
+    }
+    pub fn title(name: &str) -> RefKey {
+        RefKey::Title(name.into(), slugify(name))
     }
 
     pub fn get_or_create_id(&self, db: &PgConnection) -> Result<i32, Error> {
@@ -342,6 +347,7 @@ impl RefKey {
             RefKey::Fa(s) => (2, "", s),
             RefKey::Key(t, s) => (1, t.as_ref(), s),
             RefKey::Who(n, s) => (3, n.as_ref(), s),
+            RefKey::Title(n, s) => (4, n.as_ref(), s),
         };
         use schema::refkeys::dsl;
         dsl::refkeys
@@ -369,6 +375,7 @@ impl RefKey {
             RefKey::Fa(slug) => format!("/fa/{}", slug),
             RefKey::Key(_, slug) => format!("/what/{}", slug),
             RefKey::Who(_, slug) => format!("/who/{}", slug),
+            RefKey::Title(_, slug) => format!("/titles/{}", slug),
         }
     }
 
@@ -384,6 +391,7 @@ impl RefKey {
             },
             RefKey::Key(name, _) => name.clone(),
             RefKey::Who(name, _) => name.clone(),
+            RefKey::Title(name, _) => name.clone(),
         }
     }
 }
@@ -414,9 +422,104 @@ impl ToHtml for RefKey {
                 RefKey::Fa(..) => "fa",
                 RefKey::Key(..) => "key",
                 RefKey::Who(..) => "who",
+                RefKey::Title(..) => "title",
             }
         )?;
         self.name().to_html(out)?;
         out.write_all(b"</a>")
+    }
+}
+
+#[derive(Debug, Queryable)]
+pub struct Article {
+    pub id: i32,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub note: Option<String>,
+}
+
+impl Article {
+    pub fn get_or_create(
+        title: &str,
+        subtitle: Option<&str>,
+        note: Option<&str>,
+        db: &PgConnection,
+    ) -> Result<Article, Error> {
+        use schema::articles::dsl;
+        if let Some(article) = dsl::articles
+            .filter(dsl::title.eq(title))
+            .filter(dsl::subtitle.eq(subtitle))
+            .filter(dsl::note.eq(note))
+            .first::<Article>(db)
+            .optional()?
+        {
+            Ok(article)
+        } else {
+            diesel::insert_into(dsl::articles)
+                .values((
+                    dsl::title.eq(title),
+                    dsl::subtitle.eq(subtitle),
+                    dsl::note.eq(note),
+                ))
+                .get_result(db)
+        }
+    }
+
+    /// This article is published in a specific issue.
+    pub fn publish(
+        &self,
+        issue: i32,
+        seqno: Option<i16>,
+        db: &PgConnection,
+    ) -> Result<(), Error> {
+        use schema::publications::dsl as p;
+        if let Some((id, old_seqno)) = p::publications
+            .filter(p::issue.eq(issue))
+            .filter(p::article_id.eq(self.id))
+            .select((p::id, p::seqno))
+            .first::<(i32, Option<i16>)>(db)
+            .optional()?
+        {
+            if seqno.is_some() && old_seqno != seqno {
+                eprintln!("TODO: Should update seqno for {}", id);
+            }
+            Ok(())
+        } else {
+            diesel::insert_into(p::publications)
+                .values((
+                    p::issue.eq(issue),
+                    p::article_id.eq(self.id),
+                    p::seqno.eq(seqno),
+                ))
+                .execute(db)?;
+            Ok(())
+        }
+    }
+
+    pub fn load_refs(&self, db: &PgConnection) -> Result<Vec<RefKey>, Error> {
+        use schema::article_refkeys::dsl as ar;
+        use schema::refkeys::{all_columns, dsl as r};
+        r::refkeys
+            .inner_join(ar::article_refkeys)
+            .select(all_columns)
+            .filter(ar::article_id.eq(self.id))
+            .order((r::title, r::slug))
+            .load::<RefKey>(db)
+    }
+
+    pub fn set_refs(
+        &self,
+        refs: &[RefKey],
+        db: &PgConnection,
+    ) -> Result<(), Error> {
+        for r in refs {
+            use schema::article_refkeys::dsl as ar;
+            let id = r.get_or_create_id(db)?;
+            diesel::insert_into(ar::article_refkeys)
+                .values((ar::article_id.eq(self.id), ar::refkey_id.eq(id)))
+                .on_conflict_do_nothing()
+                .execute(db)?;
+        }
+        Ok(())
     }
 }

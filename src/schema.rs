@@ -1,6 +1,23 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 
 table! {
+    article_refkeys (id) {
+        id -> Int4,
+        article_id -> Int4,
+        refkey_id -> Int4,
+    }
+}
+
+table! {
+    articles (id) {
+        id -> Int4,
+        title -> Varchar,
+        subtitle -> Nullable<Varchar>,
+        note -> Nullable<Text>,
+    }
+}
+
+table! {
     episode_parts (id) {
         id -> Int4,
         episode -> Int4,
@@ -47,6 +64,7 @@ table! {
         seqno -> Nullable<Int2>,
         episode_part -> Nullable<Int4>,
         best_plac -> Nullable<Int2>,
+        article_id -> Nullable<Int4>,
     }
 }
 
@@ -67,14 +85,19 @@ table! {
     }
 }
 
+joinable!(article_refkeys -> articles (article_id));
+joinable!(article_refkeys -> refkeys (refkey_id));
 joinable!(episode_parts -> episodes (episode));
 joinable!(episode_refkeys -> episodes (episode_id));
 joinable!(episode_refkeys -> refkeys (refkey_id));
 joinable!(episodes -> titles (title));
+joinable!(publications -> articles (article_id));
 joinable!(publications -> episode_parts (episode_part));
 joinable!(publications -> issues (issue));
 
 allow_tables_to_appear_in_same_query!(
+    article_refkeys,
+    articles,
     episode_parts,
     episode_refkeys,
     episodes,

@@ -1,6 +1,6 @@
 use diesel::pg::PgConnection;
 use failure::{Error, Fail};
-use models::{Episode, Issue, Part, RefKey, Title};
+use models::{Article, Episode, Issue, Part, RefKey, Title};
 use std::fs::File;
 use xmltree::Element;
 
@@ -35,15 +35,19 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     let best = get_best_plac(c);
                     println!("  -> omslag {:?} {:?}", by, best);
                 } else if c.name == "text" {
-                    let title = get_text(&c, "title");
-                    let subtitle = get_text(&c, "subtitle");
-                    println!("  -> text {:?} {:?}", title, subtitle);
-                } else if c.name == "serie" {
-                    let title = Title::get_or_create(
-                        get_text(&c, "title")
-                            .ok_or_else(|| format_err!("title missing"))?,
+                    let article = Article::get_or_create(
+                        get_req_text(&c, "title")?,
+                        get_text(&c, "subtitle"),
+                        get_text(&c, "note"),
                         db,
                     )?;
+                    if let Some(ref refs) = get_refs(c)? {
+                        article.set_refs(&refs, db)?;
+                    }
+                    article.publish(issue.id, Some(seqno as i16), db)?;
+                } else if c.name == "serie" {
+                    let title =
+                        Title::get_or_create(get_req_text(&c, "title")?, db)?;
                     let episode = Episode::get_or_create(
                         &title,
                         get_text(&c, "episode"),
@@ -60,12 +64,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                         get_best_plac(c),
                         db,
                     )?;
-                    if let Some(ref refs) = c.get_child("ref") {
-                        let refs = refs
-                            .children
-                            .iter()
-                            .map(parse_ref)
-                            .collect::<Result<Vec<RefKey>, _>>()?;
+                    if let Some(ref refs) = get_refs(c)? {
                         episode.set_refs(&refs, db)?;
                     }
                 } else if c.name == "skick" {
@@ -94,6 +93,19 @@ fn parse_nr(nr_str: &str) -> Result<(i16, &str), Error> {
     Ok((nr, nr_str))
 }
 
+fn get_refs(e: &Element) -> Result<Option<Vec<RefKey>>, Error> {
+    if let Some(ref refs) = e.get_child("ref") {
+        let refs = refs
+            .children
+            .iter()
+            .map(parse_ref)
+            .collect::<Result<Vec<RefKey>, _>>()?;
+        Ok(Some(refs))
+    } else {
+        Ok(None)
+    }
+}
+
 fn parse_ref(e: &Element) -> Result<RefKey, Error> {
     match e.name.as_ref() {
         "fa" => e
@@ -111,8 +123,18 @@ fn parse_ref(e: &Element) -> Result<RefKey, Error> {
             .as_ref()
             .map(|s| RefKey::who(s))
             .ok_or_else(|| format_err!("Who without name: {:?}", e)),
+        "serie" => e
+            .text
+            .as_ref()
+            .map(|s| RefKey::title(s))
+            .ok_or_else(|| format_err!("Serie without title: {:?}", e)),
         _ => Err(format_err!("Unknown refernce: {:?}", e)),
     }
+}
+
+fn get_req_text<'a>(e: &'a Element, name: &str) -> Result<&'a str, Error> {
+    get_text(e, name)
+        .ok_or_else(|| format_err!("{:?} missing child {}", e, name))
 }
 
 fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {

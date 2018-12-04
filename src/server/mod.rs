@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::QueryDsl;
 use failure::Error;
-use models::{Episode, Issue, Part, RefKey, Title};
+use models::{Article, Episode, Issue, Part, RefKey, Title};
 use templates;
 use warp::http::Response;
 use warp::path::Tail;
@@ -93,13 +93,24 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
 }
 
 /// Information about an episode / part or article, as published in an issue.
-pub enum PublishedInfo {
+pub struct PublishedInfo {
+    pub content: PublishedContent,
+    pub seqno: Option<i16>,
+    pub classnames: &'static str,
+}
+
+pub enum PublishedContent {
+    Text {
+        title: String,
+        subtitle: Option<String>,
+        refs: Vec<RefKey>,
+        note: Option<String>,
+    },
     EpisodePart {
         title: Title,
         episode: Episode,
         refs: Vec<RefKey>,
         part: Part,
-        seqno: Option<i16>,
         best_plac: Option<i16>,
     },
 }
@@ -112,6 +123,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .map_err(custom)?
         .into_iter()
         .map(|issue: Issue| {
+            use schema::articles::dsl as a;
             use schema::episode_parts::dsl as ep;
             use schema::episodes::dsl as e;
             use schema::publications::dsl as p;
@@ -119,34 +131,80 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
             let id = issue.id;
             (
                 issue,
-                t::titles
-                    .inner_join(e::episodes.inner_join(
-                        ep::episode_parts.inner_join(p::publications),
-                    ))
+                p::publications
+                    .left_outer_join(
+                        ep::episode_parts
+                            .inner_join(e::episodes.inner_join(t::titles)),
+                    )
+                    .left_outer_join(a::articles)
                     .select((
-                        t::titles::all_columns(),
-                        e::episodes::all_columns(),
-                        (ep::part_no, ep::part_name),
+                        (
+                            t::titles::all_columns(),
+                            e::episodes::all_columns(),
+                            (ep::part_no, ep::part_name),
+                        )
+                            .nullable(),
+                        a::articles::all_columns().nullable(),
                         p::seqno,
                         p::best_plac,
                     ))
                     .filter(p::issue.eq(id))
                     .order(p::seqno)
-                    .load::<(Title, Episode, Part, Option<i16>, Option<i16>)>(
-                        &db,
-                    )
+                    .load::<(
+                        Option<(Title, Episode, Part)>,
+                        Option<Article>,
+                        Option<i16>,
+                        Option<i16>,
+                    )>(&db)
                     .unwrap()
                     .into_iter()
-                    .map(|(t, e, p, s, b)| {
-                        let refkeys = e.load_refs(&db).unwrap();
-                        PublishedInfo::EpisodePart {
-                            title: t,
-                            episode: e,
-                            refs: refkeys,
-                            part: p,
-                            seqno: s,
-                            best_plac: b,
+                    .map(|row| match row {
+                        (Some((t, e, p)), None, seqno, b) => {
+                            let refkeys = e.load_refs(&db).unwrap();
+                            let classnames = if t.title == "Fantomen" {
+                                "episode main"
+                            } else if e.teaser.is_none() {
+                                "episode noteaser"
+                            } else {
+                                "episode"
+                            };
+                            PublishedInfo {
+                                content: PublishedContent::EpisodePart {
+                                    title: t,
+                                    episode: e,
+                                    refs: refkeys,
+                                    part: p,
+                                    best_plac: b,
+                                },
+                                seqno,
+                                classnames,
+                            }
                         }
+                        (
+                            None,
+                            Some(a),
+                            seqno,
+                            None,
+                        ) => {
+                            let refs = a.load_refs(&db).unwrap();
+                            let Article {
+                                id: _,
+                                title,
+                                subtitle,
+                                note,
+                            } = a;
+                            PublishedInfo {
+                            content: PublishedContent::Text {
+                                title,
+                                subtitle,
+                                refs,
+                                note,
+                            },
+                            seqno,
+                            classnames: "article",
+                            }
+                        }
+                        row => panic!("Strange row: {:?}", row),
                     })
                     .collect(),
             )

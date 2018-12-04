@@ -3,6 +3,15 @@ body {
     > footer { border-top: solid .5px black; }
 }
 
+section {
+    border-radius: .4em;
+    border: solid .5px black;
+    margin: .5em 0;
+    padding: .2em .2em 0;
+    background: #eee;
+    .content > * { background: white; }
+}
+
 .issue {
     display: flex;
     > header {
@@ -12,10 +21,12 @@ body {
     .content {
 	display: flex;
 	flex-flow: row wrap;
-	.episode {
+	flex-grow: 1;
+	div {
 	    flex-basis: 23em;
-	    flex-grow: 1;
+	    flex-grow: 2;
 	    border: solid .5px rgba(black, 0.5);
+	    border-radius: .2em;
 	    margin: 0 0 .2em .2em;
 	    padding: .2em;
 	    h3, p {
@@ -26,6 +37,19 @@ body {
 	    }
 	    p.info {
 		font-size: 80%;
+	    }
+	    &.episode.main {
+		flex-basis: 42em;
+		flex-grow: 5;
+	    }
+	    &.episode.noteaser {
+		flex-basis: 17em;
+		flex-grow: 1.5;
+	    }
+	    &.article {
+		flex-basis: 14em;
+		flex-grow: 1;
+		background: rgba(white, 0.7);
 	    }
 	}
     }
