@@ -31,7 +31,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
 
             for (seqno, c) in i.children.iter().enumerate() {
                 if c.name == "omslag" {
-                    let by = c.get_child("by").and_then(|e| e.text.as_ref());
+                    let by = c.get_child("by").map(get_creators);
                     let best = get_best_plac(c);
                     println!("  -> omslag {:?} {:?}", by, best);
                 } else if c.name == "text" {
@@ -145,4 +145,13 @@ fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {
 fn get_best_plac(e: &Element) -> Option<i16> {
     e.get_child("best")
         .and_then(|e| e.attributes.get("plac").and_then(|s| s.parse().ok()))
+}
+
+fn get_creators(e: &Element) -> Vec<&str> {
+    let c = &e.children;
+    if c.is_empty() {
+        return vec![e.text.as_ref().unwrap()]
+    } else {
+        return c.iter().map(|e| e.text.as_ref().unwrap().as_ref()).collect()
+    }
 }
