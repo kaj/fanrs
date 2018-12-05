@@ -215,15 +215,31 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
 }
 
 fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
-    use schema::episodes::dsl::{episodes, title};
     use schema::titles::dsl::{slug, titles};
-    let t = titles
+    let (title, articles, episodes) = titles
         .filter(slug.eq(tslug))
         .first::<Title>(&db)
-        .map_err(custom)?;
-    let all = episodes
-        .filter(title.eq(t.id))
-        .load::<Episode>(&db)
-        .map_err(custom)?;
-    Response::builder().html(|o| templates::title(o, &t, &all))
+        .and_then(|title| {
+            use schema::article_refkeys::dsl as ar;
+            use schema::articles::{all_columns, dsl as a};
+            use schema::episodes::dsl as e;
+            use schema::refkeys::dsl as r;
+            let title_kind = 4; // TODO Place constant some place sane.
+            let articles = a::articles
+                .select(all_columns)
+                .left_join(ar::article_refkeys.left_join(r::refkeys))
+                .filter(r::kind.eq(title_kind))
+                .filter(r::slug.eq(&title.slug))
+                .load::<Article>(&db)?;
+            let episodes = e::episodes
+                .filter(e::title.eq(title.id))
+                .load::<Episode>(&db)?;
+            Ok((title, articles, episodes))
+        })
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => not_found(),
+            e => custom(e),
+        })?;
+    Response::builder()
+        .html(|o| templates::title(o, &title, &articles, &episodes))
 }

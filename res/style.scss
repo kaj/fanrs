@@ -9,7 +9,23 @@ section {
     margin: .5em 0;
     padding: .2em .2em 0;
     background: #eee;
-    .content > * { background: white; }
+
+    .episode, .article {
+	background: white;
+	border: solid .5px rgba(black, 0.5);
+	border-radius: .2em;
+	margin: 0 0 .2em .2em;
+	padding: .2em;
+	h3, p {
+	    margin: 0 0 .2em 0;
+	}
+	p.teaser {
+	    font-style: italic;
+	}
+	p.info {
+	    font-size: 80%;
+	}
+    }
 }
 
 .issue {
@@ -25,19 +41,6 @@ section {
 	div {
 	    flex-basis: 23em;
 	    flex-grow: 2;
-	    border: solid .5px rgba(black, 0.5);
-	    border-radius: .2em;
-	    margin: 0 0 .2em .2em;
-	    padding: .2em;
-	    h3, p {
-		margin: 0 0 .2em 0;
-	    }
-	    p.teaser {
-		font-style: italic;
-	    }
-	    p.info {
-		font-size: 80%;
-	    }
 	    &.episode.main {
 		flex-basis: 42em;
 		flex-grow: 5;

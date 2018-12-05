@@ -104,6 +104,7 @@ impl Queryable<schema::refkeys::SqlType, Pg> for RefKey {
             (_, 1, Some(t), s) => RefKey::Key(t, s),
             (_, 2, _, s) => RefKey::Fa(s),
             (_, 3, Some(t), s) => RefKey::Who(t, s),
+            (_, 4, Some(t), s) => RefKey::Title(t, s),
             (id, k, t, s) => {
                 panic!("Bad refkey #{} kind {} ({:?}, {:?})", id, k, t, s)
             }
