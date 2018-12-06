@@ -5,13 +5,13 @@ use schema::issues::dsl;
 use std::collections::BTreeMap;
 
 pub fn list_issues(db: &PgConnection) -> Result<(), Error> {
-    let mut all = BTreeMap::new();
+    let mut all: BTreeMap<i16, Vec<i16>> = BTreeMap::new();
     for (year, number) in dsl::issues
         .select((dsl::year, dsl::number))
         .order((dsl::year, dsl::number))
         .load::<(i16, i16)>(db)?
     {
-        all.entry(year).or_insert(vec![]).push(number);
+        all.entry(year).or_default().push(number);
     }
     for (year, numbers) in &all {
         print!("{}: ", year);
