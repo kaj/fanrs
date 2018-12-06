@@ -4,6 +4,8 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
 use std::fmt;
+use std::io::{self, Write};
+use templates::ToHtml;
 
 #[derive(Debug, Queryable)]
 pub struct Issue {
@@ -14,6 +16,13 @@ pub struct Issue {
     pub pages: Option<i16>,
     pub price: Option<BigDecimal>,
     pub cover_best: Option<i16>,
+}
+
+#[derive(Debug, Queryable)]
+pub struct IssueRef {
+    pub year: i16,
+    pub number: i16,
+    pub number_str: String,
 }
 
 impl Issue {
@@ -65,5 +74,17 @@ impl fmt::Display for Issue {
             (None, Some(ref price)) => write!(out, " ({})", price),
             (None, None) => Ok(()),
         }
+    }
+}
+
+impl ToHtml for IssueRef {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        write!(
+            out,
+            "<a href='/{y}#i{n}'>Fa {ns}/{y}</a>",
+            y = self.year,
+            n = self.number,
+            ns = self.number_str,
+        )
     }
 }

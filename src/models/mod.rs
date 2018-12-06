@@ -9,7 +9,7 @@ mod title;
 
 pub use self::article::Article;
 pub use self::episode::Episode;
-pub use self::issue::Issue;
+pub use self::issue::{Issue, IssueRef};
 pub use self::part::Part;
 pub use self::refkey::RefKey;
 pub use self::title::Title;

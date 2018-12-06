@@ -3,6 +3,7 @@ use xmltree::Element;
 
 #[derive(Debug, Queryable)]
 pub struct Part {
+    pub id: i32,
     pub no: Option<i16>,
     pub name: Option<String>,
 }
@@ -10,6 +11,7 @@ pub struct Part {
 impl Part {
     pub fn of(elem: &Element) -> Option<Self> {
         elem.get_child("part").map(|e| Part {
+            id: 0, // unknown  TODO:  Should id be Option<i32> ?
             no: e.attributes.get("no").and_then(|n| n.parse().ok()),
             name: e.text.clone(),
         })

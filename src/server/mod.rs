@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::QueryDsl;
 use failure::Error;
-use models::{Article, Episode, Issue, Part, RefKey, Title};
+use models::{Article, Episode, Issue, IssueRef, Part, RefKey, Title};
 use templates;
 use warp::http::Response;
 use warp::path::Tail;
@@ -112,15 +112,16 @@ pub enum PublishedContent {
         episode: Episode,
         refs: Vec<RefKey>,
         part: Part,
+        published: Vec<IssueRef>,
         best_plac: Option<i16>,
     },
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
-    use schema::issues::dsl;
-    let issues = dsl::issues
-        .filter(dsl::year.eq(year as i16))
+    use schema::issues::dsl as i;
+    let issues = i::issues
+        .filter(i::year.eq(year as i16))
         .load(&db)
         .map_err(custom)?
         .into_iter()
@@ -143,7 +144,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         (
                             t::titles::all_columns(),
                             e::episodes::all_columns(),
-                            (ep::part_no, ep::part_name),
+                            (ep::id, ep::part_no, ep::part_name),
                         )
                             .nullable(),
                         a::articles::all_columns().nullable(),
@@ -161,7 +162,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     .unwrap()
                     .into_iter()
                     .map(|row| match row {
-                        (Some((t, e, p)), None, seqno, b) => {
+                        (Some((t, e, part)), None, seqno, b) => {
                             let refkeys = e.load_refs(&db).unwrap();
                             let classnames = if t.title == "Fantomen" {
                                 "episode main"
@@ -170,12 +171,20 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             } else {
                                 "episode"
                             };
+                            let published = i::issues
+                                .select((i::year, i::number, i::number_str))
+                                .inner_join(p::publications)
+                                .filter(p::episode_part.eq(part.id))
+                                .filter(i::id.ne(id))
+                                .load(&db)
+                                .unwrap();
                             PublishedInfo {
                                 content: PublishedContent::EpisodePart {
                                     title: t,
                                     episode: e,
                                     refs: refkeys,
-                                    part: p,
+                                    part,
+                                    published,
                                     best_plac: b,
                                 },
                                 seqno,

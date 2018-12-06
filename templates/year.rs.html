@@ -15,12 +15,14 @@
     <div class="content">
       @for PublishedInfo{content, seqno, classnames} in contents {
       <div class="@classnames" @if let Some(seqno) = seqno {data-seq="@seqno"}>
-	@if let EpisodePart{title, episode, refs, part, best_plac} = content {
+	@if let EpisodePart{title, episode, refs, part, published, best_plac} = content {
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
 	@if let Some(ref teaser) = episode.teaser { <p class="teaser">@teaser</p> }
 	@if let Some((last_ref, refs)) = refs.split_last()
 	{<p class="info refs">Referenser: @for r in refs {@r, }@last_ref.</p>}
 	@if let Some(ref note) = episode.note { <p class="info note">@note</p> }
+	@if let Some((last_pub, pubs)) = published.split_last()
+	{<p class="info refs">Även publicerad i: @for p in pubs {@p, }@last_pub.</p>}
 	@if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
