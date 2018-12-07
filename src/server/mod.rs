@@ -60,7 +60,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
 /// Handler for static files.
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     use templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
@@ -81,7 +81,7 @@ fn pg_pool(database_url: &str) -> PgPool {
     Pool::new(manager).expect("Postgres connection pool could not be created")
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use schema::issues::dsl;
     let years = dsl::issues
@@ -117,7 +117,7 @@ pub enum PublishedContent {
     },
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     use schema::issues::dsl as i;
     let issues = i::issues
@@ -220,14 +220,14 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     Response::builder().html(|o| templates::year(o, year, &issues))
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use schema::titles::dsl;
     let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
     use schema::titles::dsl::{slug, titles};
     let (title, articles, episodes) = titles
