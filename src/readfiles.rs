@@ -1,6 +1,6 @@
-use diesel::pg::PgConnection;
+use diesel::prelude::*;
 use failure::{Error, Fail};
-use models::{Article, Episode, Issue, Part, RefKey, Title};
+use models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
 use std::fs::File;
 use xmltree::Element;
 
@@ -31,9 +31,21 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
 
             for (seqno, c) in i.children.iter().enumerate() {
                 if c.name == "omslag" {
-                    let by = c.get_child("by").map(get_creators);
+                    if let Some(by) = c.get_child("by") {
+                        let by = get_creators(by, db)?;
+                        for creator in by {
+                            use schema::cover_by::dsl as cb;
+                            diesel::insert_into(cb::cover_by)
+                                .values((
+                                    cb::issue_id.eq(issue.id),
+                                    cb::by_id.eq(creator.id),
+                                ))
+                                .on_conflict_do_nothing()
+                                .execute(db)?;
+                        }
+                    }
                     let best = get_best_plac(c);
-                    println!("  -> omslag {:?} {:?}", by, best);
+                    println!("  -> omslag {:?}", best);
                 } else if c.name == "text" {
                     let article = Article::get_or_create(
                         get_req_text(&c, "title")?,
@@ -66,6 +78,24 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     )?;
                     if let Some(ref refs) = get_refs(c)? {
                         episode.set_refs(&refs, db)?;
+                    }
+                    for by in c.children.iter().filter(|e| e.name == "by") {
+                        let role = by
+                            .attributes
+                            .get("role")
+                            .map(|r| r.as_ref())
+                            .unwrap_or("by");
+                        for by in get_creators(by, db)? {
+                            use schema::creativeparts::dsl as cp;
+                            diesel::insert_into(cp::creativeparts)
+                                .values((
+                                    cp::episode_id.eq(episode.id),
+                                    cp::by_id.eq(by.id),
+                                    cp::role.eq(role),
+                                ))
+                                .on_conflict_do_nothing()
+                                .execute(db)?;
+                        }
                     }
                 } else if c.name == "skick" {
                     // ignore
@@ -147,13 +177,25 @@ fn get_best_plac(e: &Element) -> Option<i16> {
         .and_then(|e| e.attributes.get("plac").and_then(|s| s.parse().ok()))
 }
 
-fn get_creators(e: &Element) -> Vec<&str> {
-    let c = &e.children;
+fn get_creators(
+    by: &Element,
+    db: &PgConnection,
+) -> Result<Vec<Creator>, Error> {
+    let one_creator = |e: &Element| {
+        let name = &e
+            .text
+            .as_ref()
+            .ok_or_else(|| format_err!("missing name in {:?}", e))?;
+        Ok(Creator::get_or_create(name, db).map_err(|e| {
+            format_err!("Failed to create creator {:?}: {}", name, e)
+        })?)
+    };
+    let c = &by.children;
     if c.is_empty() {
-        vec![e.text.as_ref().unwrap()]
+        // No child elements, a single name directly in the by element
+        Ok(vec![one_creator(by)?])
     } else {
-        c.iter()
-            .map(|e| e.text.as_ref().unwrap().as_ref())
-            .collect()
+        // Child <who> elements, each containing a name.
+        c.iter().map(one_creator).collect()
     }
 }

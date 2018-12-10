@@ -7,7 +7,9 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::QueryDsl;
 use failure::Error;
-use models::{Article, Episode, Issue, IssueRef, Part, RefKey, Title};
+use models::{
+    Article, CreatorSet, Episode, Issue, IssueRef, Part, RefKey, Title,
+};
 use templates;
 use warp::http::Response;
 use warp::path::Tail;
@@ -60,7 +62,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
 /// Handler for static files.
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     use templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
@@ -81,7 +83,7 @@ fn pg_pool(database_url: &str) -> PgPool {
     Pool::new(manager).expect("Postgres connection pool could not be created")
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use schema::issues::dsl;
     let years = dsl::issues
@@ -110,6 +112,7 @@ pub enum PublishedContent {
     EpisodePart {
         title: Title,
         episode: Episode,
+        creators: CreatorSet,
         refs: Vec<RefKey>,
         part: Part,
         published: Vec<IssueRef>,
@@ -117,7 +120,7 @@ pub enum PublishedContent {
     },
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     use schema::issues::dsl as i;
     let issues = i::issues
@@ -127,13 +130,23 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .into_iter()
         .map(|issue: Issue| {
             use schema::articles::dsl as a;
+            use schema::cover_by::dsl as cb;
+            use schema::creator_aliases::dsl as ca;
+            use schema::creators::dsl as c;
             use schema::episode_parts::dsl as ep;
             use schema::episodes::dsl as e;
             use schema::publications::dsl as p;
             use schema::titles::dsl as t;
-            let id = issue.id;
+            let issue_id = issue.id;
+            let c_columns = (c::id, ca::name, c::slug);
             (
                 issue,
+                c::creators
+                    .inner_join(ca::creator_aliases.inner_join(cb::cover_by))
+                    .select(c_columns)
+                    .filter(cb::issue_id.eq(issue_id))
+                    .load(&db)
+                    .unwrap(),
                 p::publications
                     .left_outer_join(
                         ep::episode_parts
@@ -151,7 +164,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         p::seqno,
                         p::best_plac,
                     ))
-                    .filter(p::issue.eq(id))
+                    .filter(p::issue.eq(issue_id))
                     .order(p::seqno)
                     .load::<(
                         Option<(Title, Episode, Part)>,
@@ -171,17 +184,20 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             } else {
                                 "episode"
                             };
+                            let creators =
+                                CreatorSet::for_episode(&e, &db).unwrap();
                             let published = i::issues
                                 .select((i::year, i::number, i::number_str))
                                 .inner_join(p::publications)
                                 .filter(p::episode_part.eq(part.id))
-                                .filter(i::id.ne(id))
+                                .filter(i::id.ne(issue_id))
                                 .load(&db)
                                 .unwrap();
                             PublishedInfo {
                                 content: PublishedContent::EpisodePart {
                                     title: t,
                                     episode: e,
+                                    creators,
                                     refs: refkeys,
                                     part,
                                     published,
@@ -215,19 +231,19 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     .collect(),
             )
         })
-        .collect::<Vec<(Issue, Vec<_>)>>();
+        .collect::<Vec<(Issue, Vec<_>, Vec<_>)>>();
 
     Response::builder().html(|o| templates::year(o, year, &issues))
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use schema::titles::dsl;
     let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
     use schema::titles::dsl::{slug, titles};
     let (title, articles, episodes) = titles

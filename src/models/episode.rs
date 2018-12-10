@@ -6,7 +6,7 @@ use diesel::result::Error;
 
 #[derive(Debug, Queryable)]
 pub struct Episode {
-    id: i32,
+    pub id: i32,
     title_id: i32,
     pub episode: Option<String>,
     pub teaser: Option<String>,

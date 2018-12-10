@@ -18,6 +18,39 @@ table! {
 }
 
 table! {
+    cover_by (id) {
+        id -> Int4,
+        issue_id -> Int4,
+        by_id -> Int4,
+    }
+}
+
+table! {
+    creativeparts (id) {
+        id -> Int4,
+        episode_id -> Int4,
+        by_id -> Int4,
+        role -> Varchar,
+    }
+}
+
+table! {
+    creator_aliases (id) {
+        id -> Int4,
+        creator_id -> Int4,
+        name -> Varchar,
+    }
+}
+
+table! {
+    creators (id) {
+        id -> Int4,
+        name -> Varchar,
+        slug -> Varchar,
+    }
+}
+
+table! {
     episode_parts (id) {
         id -> Int4,
         episode -> Int4,
@@ -87,6 +120,11 @@ table! {
 
 joinable!(article_refkeys -> articles (article_id));
 joinable!(article_refkeys -> refkeys (refkey_id));
+joinable!(cover_by -> creator_aliases (by_id));
+joinable!(cover_by -> issues (issue_id));
+joinable!(creativeparts -> creator_aliases (by_id));
+joinable!(creativeparts -> episodes (episode_id));
+joinable!(creator_aliases -> creators (creator_id));
 joinable!(episode_parts -> episodes (episode));
 joinable!(episode_refkeys -> episodes (episode_id));
 joinable!(episode_refkeys -> refkeys (refkey_id));
@@ -98,6 +136,10 @@ joinable!(publications -> issues (issue));
 allow_tables_to_appear_in_same_query!(
     article_refkeys,
     articles,
+    cover_by,
+    creativeparts,
+    creator_aliases,
+    creators,
     episode_parts,
     episode_refkeys,
     episodes,
