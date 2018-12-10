@@ -46,9 +46,9 @@ fn main() {
 }
 
 fn run() -> Result<(), failure::Error> {
-    dotenv()?;
-    let db_url = env::var("DATABASE_URL").unwrap();
+    opt_dotenv()?;
     let opt = Fanrs::from_args();
+    let db_url = env::var("DATABASE_URL")?;
     let db = PgConnection::establish(&db_url)?;
 
     match opt {
@@ -65,6 +65,15 @@ fn run() -> Result<(), failure::Error> {
         }
         Fanrs::ListIssues => list_issues(&db),
         Fanrs::RunServer => server::run(&db_url),
+    }
+}
+
+/// Normal dotenv, but if the file .env is not found, that is not an error.
+fn opt_dotenv() -> Result<(), dotenv::Error> {
+    match dotenv() {
+        Ok(_) => Ok(()),
+        Err(ref err) if err.not_found() => Ok(()),
+        Err(err) => Err(err),
     }
 }
 
