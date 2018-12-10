@@ -1,7 +1,7 @@
-@use crate::models::{Article, Episode, Title};
+@use crate::models::{Article, CreatorSet, Episode, PartInIssue, RefKeySet, Title};
 @use super::page;
 
-@(title: &Title, articles: &[Article], episodes: &[Episode])
+@(title: &Title, articles: &[Article], episodes: &[(Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)])
 @:page(&title.title, {
   <h1>@title.title</h1>
   @if !articles.is_empty() {
@@ -17,11 +17,15 @@
   }
   <section>
     <h2>Episoder</h2>
-    @for episode in episodes {
+    @for (episode, refs, creators, pubs) in episodes {
     <div class="episode">
       <h3>@if let Some(ref h) = episode.episode {@h} else {@title.title}</h3>
-      @if let Some(ref info) = episode.teaser { <p>@info</p> }
-      @if let Some(ref info) = episode.note { <p>@info</p> }
+      @if let Some(ref teaser) = episode.teaser {<p class="teaser">@teaser</p>}
+      @refs
+      @creators
+      @if let Some((last_pub, pubs)) = pubs.split_last()
+      {<p class="info pub">Även publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+      @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
       @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
     </div>
     }

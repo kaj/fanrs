@@ -70,17 +70,6 @@ impl Article {
         }
     }
 
-    pub fn load_refs(&self, db: &PgConnection) -> Result<Vec<RefKey>, Error> {
-        use crate::schema::article_refkeys::dsl as ar;
-        use crate::schema::refkeys::{all_columns, dsl as r};
-        r::refkeys
-            .inner_join(ar::article_refkeys)
-            .select(all_columns)
-            .filter(ar::article_id.eq(self.id))
-            .order((r::title, r::slug))
-            .load::<RefKey>(db)
-    }
-
     pub fn set_refs(
         &self,
         refs: &[RefKey],

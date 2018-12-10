@@ -97,17 +97,6 @@ impl Episode {
         Ok(())
     }
 
-    pub fn load_refs(&self, db: &PgConnection) -> Result<Vec<RefKey>, Error> {
-        use crate::schema::episode_refkeys::dsl as er;
-        use crate::schema::refkeys::{all_columns, dsl as r};
-        r::refkeys
-            .inner_join(er::episode_refkeys)
-            .select(all_columns)
-            .filter(er::episode_id.eq(self.id))
-            .order((r::title, r::slug))
-            .load::<RefKey>(db)
-    }
-
     /// A specific part of this episode (None for the whole episode) is
     /// published in a specific issue.
     pub fn publish_part(

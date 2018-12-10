@@ -1,3 +1,4 @@
+use super::IssueRef;
 use crate::templates::ToHtml;
 use std::io::{self, Write};
 use xmltree::Element;
@@ -17,6 +18,9 @@ impl Part {
             name: e.text.clone(),
         })
     }
+    pub fn is_some(&self) -> bool {
+        self.no.is_some() || self.name.is_some()
+    }
 }
 
 impl ToHtml for Part {
@@ -35,5 +39,20 @@ impl ToHtml for Part {
             write!(out, "{}", name)?;
         }
         write!(out, "</span>")
+    }
+}
+
+#[derive(Queryable)]
+pub struct PartInIssue(IssueRef, Part);
+
+impl ToHtml for PartInIssue {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        self.0.to_html(out)?;
+        if self.1.is_some() {
+            write!(out, " (")?;
+            self.1.to_html(out)?;
+            write!(out, ")")?;
+        }
+        Ok(())
     }
 }

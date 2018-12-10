@@ -2,7 +2,7 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, IssueRef, Part, RefKey, Title,
+    Article, CreatorSet, Episode, Issue, Part, PartInIssue, RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -106,16 +106,16 @@ pub enum PublishedContent {
     Text {
         title: String,
         subtitle: Option<String>,
-        refs: Vec<RefKey>,
+        refs: RefKeySet,
         note: Option<String>,
     },
     EpisodePart {
         title: Title,
         episode: Episode,
         creators: CreatorSet,
-        refs: Vec<RefKey>,
+        refs: RefKeySet,
         part: Part,
-        published: Vec<IssueRef>,
+        published: Vec<PartInIssue>,
         best_plac: Option<i16>,
     },
 }
@@ -177,7 +177,8 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     .into_iter()
                     .map(|row| match row {
                         (Some((t, e, part)), None, seqno, b) => {
-                            let refkeys = e.load_refs(&db).unwrap();
+                            let refs =
+                                RefKeySet::for_episode(&e, &db).unwrap();
                             let classnames = if t.title == "Fantomen" {
                                 "episode main"
                             } else if e.teaser.is_none() {
@@ -188,9 +189,15 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             let creators =
                                 CreatorSet::for_episode(&e, &db).unwrap();
                             let published = i::issues
-                                .select((i::year, i::number, i::number_str))
-                                .inner_join(p::publications)
-                                .filter(p::episode_part.eq(part.id))
+                                .inner_join(
+                                    p::publications
+                                        .inner_join(ep::episode_parts),
+                                )
+                                .select((
+                                    (i::year, i::number, i::number_str),
+                                    (ep::id, ep::part_no, ep::part_name),
+                                ))
+                                .filter(ep::episode.eq(e.id))
                                 .filter(i::id.ne(issue_id))
                                 .load(&db)
                                 .unwrap();
@@ -199,7 +206,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                     title: t,
                                     episode: e,
                                     creators,
-                                    refs: refkeys,
+                                    refs,
                                     part,
                                     published,
                                     best_plac: b,
@@ -209,7 +216,8 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             }
                         }
                         (None, Some(a), seqno, None) => {
-                            let refs = a.load_refs(&db).unwrap();
+                            let refs =
+                                RefKeySet::for_article(&a, &db).unwrap();
                             let Article {
                                 title,
                                 subtitle,
@@ -264,7 +272,29 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                 .load::<Article>(&db)?;
             let episodes = e::episodes
                 .filter(e::title.eq(title.id))
-                .load::<Episode>(&db)?;
+                .load::<Episode>(&db)?
+                .into_iter()
+                .map(|episode| {
+                    use crate::schema::episode_parts::dsl as ep;
+                    use crate::schema::issues::dsl as i;
+                    use crate::schema::publications::dsl as p;
+                    let refs = RefKeySet::for_episode(&episode, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_episode(&episode, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(
+                            p::publications.inner_join(ep::episode_parts),
+                        )
+                        .select((
+                            (i::year, i::number, i::number_str),
+                            (ep::id, ep::part_no, ep::part_name),
+                        ))
+                        .filter(ep::episode.eq(episode.id))
+                        .load::<PartInIssue>(&db)
+                        .unwrap();
+                    (episode, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
             Ok((title, articles, episodes))
         })
         .map_err(|e| match e {
