@@ -125,6 +125,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     use schema::issues::dsl as i;
     let issues = i::issues
         .filter(i::year.eq(year as i16))
+        .order(i::number)
         .load(&db)
         .map_err(custom)?
         .into_iter()
