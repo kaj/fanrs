@@ -1,4 +1,5 @@
-use std::fmt;
+use std::io::{self, Write};
+use templates::ToHtml;
 use xmltree::Element;
 
 #[derive(Debug, Queryable)]
@@ -18,8 +19,12 @@ impl Part {
     }
 }
 
-impl fmt::Display for Part {
-    fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
+impl ToHtml for Part {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        if !(self.no.is_some() || self.name.is_some()) {
+            return Ok(());
+        }
+        write!(out, "<span class='part'>")?;
         if let Some(no) = self.no {
             write!(out, "del {}", no)?;
             if self.name.is_some() {
@@ -29,6 +34,6 @@ impl fmt::Display for Part {
         if let Some(ref name) = self.name {
             write!(out, "{}", name)?;
         }
-        Ok(())
+        write!(out, "</span>")
     }
 }
