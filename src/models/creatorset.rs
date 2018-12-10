@@ -1,9 +1,9 @@
 use super::{Creator, Episode};
+use crate::templates::ToHtml;
 use diesel::prelude::*;
 use failure::Error;
 use std::collections::BTreeMap;
 use std::io::{self, Write};
-use templates::ToHtml;
 
 #[derive(Debug)]
 pub struct CreatorSet(BTreeMap<String, Vec<Creator>>);
@@ -13,9 +13,9 @@ impl CreatorSet {
         episode: &Episode,
         db: &PgConnection,
     ) -> Result<CreatorSet, Error> {
-        use schema::creativeparts::dsl as cp;
-        use schema::creator_aliases::dsl as ca;
-        use schema::creators::dsl as c;
+        use crate::schema::creativeparts::dsl as cp;
+        use crate::schema::creator_aliases::dsl as ca;
+        use crate::schema::creators::dsl as c;
         let c_columns = (c::id, ca::name, c::slug);
         let data = cp::creativeparts
             .inner_join(ca::creator_aliases.inner_join(c::creators))

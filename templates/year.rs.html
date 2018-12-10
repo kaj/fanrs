@@ -1,6 +1,6 @@
-@use models::{Creator, Issue};
-@use templates::page;
-@use server::{PublishedInfo, PublishedContent::{EpisodePart, Text}};
+@use crate::models::{Creator, Issue};
+@use crate::server::{PublishedInfo, PublishedContent::{EpisodePart, Text}};
+@use super::page;
 
 @(year: u16, issues: &[(Issue, Vec<Creator>, Vec<PublishedInfo>)])
 @:page(&format!("Årgång {}", year), {

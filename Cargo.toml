@@ -3,6 +3,7 @@ name = "fanrs"
 version = "0.1.0"
 authors = ["Rasmus Kaj <kaj@kth.se>"]
 description = "Rust version of fantomenindex.krats.se"
+edition = "2018"
 
 build = "src/build.rs"
 

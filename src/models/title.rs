@@ -19,7 +19,7 @@ impl Title {
         name: &str,
         db: &PgConnection,
     ) -> Result<Title, Error> {
-        use schema::titles::dsl::*;
+        use crate::schema::titles::dsl::*;
         if let Some(t) = titles
             .filter(title.eq(name))
             .first::<Title>(db)

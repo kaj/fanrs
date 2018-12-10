@@ -19,7 +19,7 @@ impl Article {
         note: Option<&str>,
         db: &PgConnection,
     ) -> Result<Article, Error> {
-        use schema::articles::dsl;
+        use crate::schema::articles::dsl;
         if let Some(article) = dsl::articles
             .filter(dsl::title.eq(title))
             .filter(dsl::subtitle.eq(subtitle))
@@ -46,7 +46,7 @@ impl Article {
         seqno: Option<i16>,
         db: &PgConnection,
     ) -> Result<(), Error> {
-        use schema::publications::dsl as p;
+        use crate::schema::publications::dsl as p;
         if let Some((id, old_seqno)) = p::publications
             .filter(p::issue.eq(issue))
             .filter(p::article_id.eq(self.id))
@@ -71,8 +71,8 @@ impl Article {
     }
 
     pub fn load_refs(&self, db: &PgConnection) -> Result<Vec<RefKey>, Error> {
-        use schema::article_refkeys::dsl as ar;
-        use schema::refkeys::{all_columns, dsl as r};
+        use crate::schema::article_refkeys::dsl as ar;
+        use crate::schema::refkeys::{all_columns, dsl as r};
         r::refkeys
             .inner_join(ar::article_refkeys)
             .select(all_columns)
@@ -87,7 +87,7 @@ impl Article {
         db: &PgConnection,
     ) -> Result<(), Error> {
         for r in refs {
-            use schema::article_refkeys::dsl as ar;
+            use crate::schema::article_refkeys::dsl as ar;
             let id = r.get_or_create_id(db)?;
             diesel::insert_into(ar::article_refkeys)
                 .values((ar::article_id.eq(self.id), ar::refkey_id.eq(id)))

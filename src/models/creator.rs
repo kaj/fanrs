@@ -1,8 +1,8 @@
+use crate::templates::ToHtml;
 use diesel::prelude::*;
 use diesel::result::Error;
 use slug::slugify;
 use std::io::{self, Write};
-use templates::ToHtml;
 
 /// In most cases, this struct will hold the id and name from
 /// creator_aliases together with the slug from creators.
@@ -18,8 +18,8 @@ impl Creator {
         name: &str,
         db: &PgConnection,
     ) -> Result<Creator, Error> {
-        use schema::creator_aliases::dsl as ca;
-        use schema::creators::dsl as c;
+        use crate::schema::creator_aliases::dsl as ca;
+        use crate::schema::creators::dsl as c;
         if let Some(t) = c::creators
             .inner_join(ca::creator_aliases)
             .select((ca::id, ca::name, c::slug))

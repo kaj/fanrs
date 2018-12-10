@@ -1,5 +1,5 @@
+use crate::templates::ToHtml;
 use std::io::{self, Write};
-use templates::ToHtml;
 use xmltree::Element;
 
 #[derive(Debug, Queryable)]

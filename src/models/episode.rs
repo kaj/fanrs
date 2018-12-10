@@ -23,7 +23,7 @@ impl Episode {
         copyright: Option<&str>,
         db: &PgConnection,
     ) -> Result<Episode, Error> {
-        use schema::episodes::dsl;
+        use crate::schema::episodes::dsl;
         dsl::episodes
             .filter(dsl::title.eq(title.id))
             .filter(dsl::episode.eq(name))
@@ -49,7 +49,7 @@ impl Episode {
         copyright: Option<&str>,
         db: &PgConnection,
     ) -> Result<Episode, Error> {
-        use schema::episodes::dsl;
+        use crate::schema::episodes::dsl;
         let q = diesel::update(dsl::episodes.filter(dsl::id.eq(self.id)));
         match (teaser, note, copyright) {
             (Some(teaser), Some(note), Some(copyright)) => q
@@ -88,7 +88,7 @@ impl Episode {
     ) -> Result<(), Error> {
         for r in refs {
             let id = r.get_or_create_id(db)?;
-            use schema::episode_refkeys::dsl as er;
+            use crate::schema::episode_refkeys::dsl as er;
             diesel::insert_into(er::episode_refkeys)
                 .values((er::episode_id.eq(self.id), er::refkey_id.eq(id)))
                 .on_conflict_do_nothing()
@@ -98,8 +98,8 @@ impl Episode {
     }
 
     pub fn load_refs(&self, db: &PgConnection) -> Result<Vec<RefKey>, Error> {
-        use schema::episode_refkeys::dsl as er;
-        use schema::refkeys::{all_columns, dsl as r};
+        use crate::schema::episode_refkeys::dsl as er;
+        use crate::schema::refkeys::{all_columns, dsl as r};
         r::refkeys
             .inner_join(er::episode_refkeys)
             .select(all_columns)
@@ -118,7 +118,7 @@ impl Episode {
         best_plac: Option<i16>,
         db: &PgConnection,
     ) -> Result<(), Error> {
-        use schema::episode_parts::dsl as e;
+        use crate::schema::episode_parts::dsl as e;
         let part_no = part.and_then(|p| p.no.map(i16::from));
         let part_name = part.and_then(|p| p.name.as_ref());
         let epq = e::episode_parts
@@ -150,7 +150,7 @@ impl Episode {
                 .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?
                 .0
         };
-        use schema::publications::dsl as p;
+        use crate::schema::publications::dsl as p;
         if let Some((id, old_seqno)) = p::publications
             .filter(p::issue.eq(issue))
             .filter(p::episode_part.eq(part_id))

@@ -1,3 +1,4 @@
+use crate::templates::ToHtml;
 use bigdecimal::BigDecimal;
 use diesel;
 use diesel::pg::PgConnection;
@@ -5,7 +6,6 @@ use diesel::prelude::*;
 use diesel::result::Error;
 use std::fmt;
 use std::io::{self, Write};
-use templates::ToHtml;
 
 #[derive(Debug, Queryable)]
 pub struct Issue {
@@ -34,7 +34,7 @@ impl Issue {
         price: Option<BigDecimal>,
         db: &PgConnection,
     ) -> Result<Issue, Error> {
-        use schema::issues::dsl;
+        use crate::schema::issues::dsl;
         if let Some(t) = dsl::issues
             .filter(dsl::year.eq(year))
             .filter(dsl::number.eq(number))
@@ -56,7 +56,7 @@ impl Issue {
         }
     }
     pub fn clear(&self, db: &PgConnection) -> Result<(), Error> {
-        use schema::publications::dsl as p;
+        use crate::schema::publications::dsl as p;
         diesel::delete(p::publications.filter(p::issue.eq(self.id)))
             .execute(db)?;
         Ok(())

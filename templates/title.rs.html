@@ -1,5 +1,5 @@
-@use models::{Article, Episode, Title};
-@use templates::page;
+@use crate::models::{Article, Episode, Title};
+@use super::page;
 
 @(title: &Title, articles: &[Article], episodes: &[Episode])
 @:page(&title.title, {

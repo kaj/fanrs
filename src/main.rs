@@ -1,15 +1,5 @@
-extern crate bigdecimal;
-extern crate chrono;
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
-#[macro_use]
-extern crate failure;
-extern crate mime;
-extern crate slug;
-extern crate structopt;
-extern crate warp;
-extern crate xmltree;
 
 mod listissues;
 mod models;
@@ -17,10 +7,11 @@ mod readfiles;
 mod schema;
 mod server;
 
+use crate::listissues::list_issues;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
-use listissues::list_issues;
+use failure::format_err;
 use std::env;
 use std::process::exit;
 use structopt::StructOpt;

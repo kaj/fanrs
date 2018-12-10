@@ -1,16 +1,16 @@
 mod render_ructe;
 
 use self::render_ructe::RenderRucte;
+use crate::models::{
+    Article, CreatorSet, Episode, Issue, IssueRef, Part, RefKey, Title,
+};
+use crate::templates;
 use chrono::{Duration, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::QueryDsl;
 use failure::Error;
-use models::{
-    Article, CreatorSet, Episode, Issue, IssueRef, Part, RefKey, Title,
-};
-use templates;
 use warp::http::Response;
 use warp::path::Tail;
 use warp::{
@@ -64,7 +64,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
 /// and a far expires header (or a 404 if the file does not exist).
 #[allow(clippy::needless_pass_by_value)]
 fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
-    use templates::statics::StaticFile;
+    use crate::templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
         Ok(Response::builder()
@@ -85,7 +85,7 @@ fn pg_pool(database_url: &str) -> PgPool {
 
 #[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use schema::issues::dsl;
+    use crate::schema::issues::dsl;
     let years = dsl::issues
         .select(dsl::year)
         .distinct()
@@ -122,7 +122,7 @@ pub enum PublishedContent {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
-    use schema::issues::dsl as i;
+    use crate::schema::issues::dsl as i;
     let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
@@ -130,14 +130,14 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .map_err(custom)?
         .into_iter()
         .map(|issue: Issue| {
-            use schema::articles::dsl as a;
-            use schema::cover_by::dsl as cb;
-            use schema::creator_aliases::dsl as ca;
-            use schema::creators::dsl as c;
-            use schema::episode_parts::dsl as ep;
-            use schema::episodes::dsl as e;
-            use schema::publications::dsl as p;
-            use schema::titles::dsl as t;
+            use crate::schema::articles::dsl as a;
+            use crate::schema::cover_by::dsl as cb;
+            use crate::schema::creator_aliases::dsl as ca;
+            use crate::schema::creators::dsl as c;
+            use crate::schema::episode_parts::dsl as ep;
+            use crate::schema::episodes::dsl as e;
+            use crate::schema::publications::dsl as p;
+            use crate::schema::titles::dsl as t;
             let issue_id = issue.id;
             let c_columns = (c::id, ca::name, c::slug);
             (
@@ -239,22 +239,22 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use schema::titles::dsl;
+    use crate::schema::titles::dsl;
     let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
 #[allow(clippy::needless_pass_by_value)]
 fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
-    use schema::titles::dsl::{slug, titles};
+    use crate::schema::titles::dsl::{slug, titles};
     let (title, articles, episodes) = titles
         .filter(slug.eq(tslug))
         .first::<Title>(&db)
         .and_then(|title| {
-            use schema::article_refkeys::dsl as ar;
-            use schema::articles::{all_columns, dsl as a};
-            use schema::episodes::dsl as e;
-            use schema::refkeys::dsl as r;
+            use crate::schema::article_refkeys::dsl as ar;
+            use crate::schema::articles::{all_columns, dsl as a};
+            use crate::schema::episodes::dsl as e;
+            use crate::schema::refkeys::dsl as r;
             let title_kind = 4; // TODO Place constant some place sane.
             let articles = a::articles
                 .select(all_columns)

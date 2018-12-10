@@ -1,7 +1,7 @@
+use crate::schema::issues::dsl;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use failure::Error;
-use schema::issues::dsl;
 use std::collections::BTreeMap;
 
 pub fn list_issues(db: &PgConnection) -> Result<(), Error> {

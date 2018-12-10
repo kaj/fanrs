@@ -1,11 +1,11 @@
+use crate::schema;
+use crate::templates::ToHtml;
 use diesel;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::result::Error;
-use schema;
 use slug::slugify;
 use std::io::{self, Write};
-use templates::ToHtml;
 
 #[derive(Debug)]
 pub enum RefKey {
@@ -49,7 +49,7 @@ impl RefKey {
             RefKey::Who(n, s) => (3, n.as_ref(), s),
             RefKey::Title(n, s) => (4, n.as_ref(), s),
         };
-        use schema::refkeys::dsl;
+        use crate::schema::refkeys::dsl;
         dsl::refkeys
             .select(dsl::id)
             .filter(dsl::kind.eq(kind))

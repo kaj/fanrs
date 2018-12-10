@@ -1,6 +1,6 @@
+use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
 use diesel::prelude::*;
-use failure::{Error, Fail};
-use models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
+use failure::{format_err, Error, Fail};
 use std::fs::File;
 use xmltree::Element;
 
@@ -34,7 +34,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     if let Some(by) = c.get_child("by") {
                         let by = get_creators(by, db)?;
                         for creator in by {
-                            use schema::cover_by::dsl as cb;
+                            use crate::schema::cover_by::dsl as cb;
                             diesel::insert_into(cb::cover_by)
                                 .values((
                                     cb::issue_id.eq(issue.id),
@@ -86,7 +86,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                             .map(|r| r.as_ref())
                             .unwrap_or("by");
                         for by in get_creators(by, db)? {
-                            use schema::creativeparts::dsl as cp;
+                            use crate::schema::creativeparts::dsl as cp;
                             diesel::insert_into(cp::creativeparts)
                                 .values((
                                     cp::episode_id.eq(episode.id),
