@@ -27,19 +27,10 @@ table! {
 }
 
 table! {
-    cover_by (id) {
+    covers_by (id) {
         id -> Int4,
         issue_id -> Int4,
         by_id -> Int4,
-    }
-}
-
-table! {
-    creativeparts (id) {
-        id -> Int4,
-        episode_id -> Int4,
-        by_id -> Int4,
-        role -> Varchar,
     }
 }
 
@@ -88,6 +79,15 @@ table! {
 }
 
 table! {
+    episodes_by (id) {
+        id -> Int4,
+        episode_id -> Int4,
+        by_id -> Int4,
+        role -> Varchar,
+    }
+}
+
+table! {
     issues (id) {
         id -> Int4,
         year -> Int2,
@@ -131,15 +131,15 @@ joinable!(article_refkeys -> articles (article_id));
 joinable!(article_refkeys -> refkeys (refkey_id));
 joinable!(articles_by -> articles (article_id));
 joinable!(articles_by -> creator_aliases (by_id));
-joinable!(cover_by -> creator_aliases (by_id));
-joinable!(cover_by -> issues (issue_id));
-joinable!(creativeparts -> creator_aliases (by_id));
-joinable!(creativeparts -> episodes (episode_id));
+joinable!(covers_by -> creator_aliases (by_id));
+joinable!(covers_by -> issues (issue_id));
 joinable!(creator_aliases -> creators (creator_id));
 joinable!(episode_parts -> episodes (episode));
 joinable!(episode_refkeys -> episodes (episode_id));
 joinable!(episode_refkeys -> refkeys (refkey_id));
 joinable!(episodes -> titles (title));
+joinable!(episodes_by -> creator_aliases (by_id));
+joinable!(episodes_by -> episodes (episode_id));
 joinable!(publications -> articles (article_id));
 joinable!(publications -> episode_parts (episode_part));
 joinable!(publications -> issues (issue));
@@ -148,13 +148,13 @@ allow_tables_to_appear_in_same_query!(
     article_refkeys,
     articles,
     articles_by,
-    cover_by,
-    creativeparts,
+    covers_by,
     creator_aliases,
     creators,
     episode_parts,
     episode_refkeys,
     episodes,
+    episodes_by,
     issues,
     publications,
     refkeys,

@@ -13,11 +13,11 @@ impl CreatorSet {
         episode: &Episode,
         db: &PgConnection,
     ) -> Result<CreatorSet, Error> {
-        use crate::schema::creativeparts::dsl as cp;
         use crate::schema::creator_aliases::dsl as ca;
         use crate::schema::creators::dsl as c;
+        use crate::schema::episodes_by::dsl as cp;
         let c_columns = (c::id, ca::name, c::slug);
-        let data = cp::creativeparts
+        let data = cp::episodes_by
             .inner_join(ca::creator_aliases.inner_join(c::creators))
             .select((cp::role, c_columns))
             .filter(cp::episode_id.eq(episode.id))

@@ -130,7 +130,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .into_iter()
         .map(|issue: Issue| {
             use crate::schema::articles::dsl as a;
-            use crate::schema::cover_by::dsl as cb;
+            use crate::schema::covers_by::dsl as cb;
             use crate::schema::creator_aliases::dsl as ca;
             use crate::schema::creators::dsl as c;
             use crate::schema::episode_parts::dsl as ep;
@@ -142,7 +142,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
             (
                 issue,
                 c::creators
-                    .inner_join(ca::creator_aliases.inner_join(cb::cover_by))
+                    .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
                     .select(c_columns)
                     .filter(cb::issue_id.eq(issue_id))
                     .load(&db)

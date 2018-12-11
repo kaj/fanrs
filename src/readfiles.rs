@@ -34,8 +34,8 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                     if let Some(by) = c.get_child("by") {
                         let by = get_creators(by, db)?;
                         for creator in by {
-                            use crate::schema::cover_by::dsl as cb;
-                            diesel::insert_into(cb::cover_by)
+                            use crate::schema::covers_by::dsl as cb;
+                            diesel::insert_into(cb::covers_by)
                                 .values((
                                     cb::issue_id.eq(issue.id),
                                     cb::by_id.eq(creator.id),
@@ -104,12 +104,12 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                             .map(|r| r.as_ref())
                             .unwrap_or("by");
                         for by in get_creators(by, db)? {
-                            use crate::schema::creativeparts::dsl as cp;
-                            diesel::insert_into(cp::creativeparts)
+                            use crate::schema::episodes_by::dsl as eb;
+                            diesel::insert_into(eb::episodes_by)
                                 .values((
-                                    cp::episode_id.eq(episode.id),
-                                    cp::by_id.eq(by.id),
-                                    cp::role.eq(role),
+                                    eb::episode_id.eq(episode.id),
+                                    eb::by_id.eq(by.id),
+                                    eb::role.eq(role),
                                 ))
                                 .on_conflict_do_nothing()
                                 .execute(db)?;
