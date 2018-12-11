@@ -217,3 +217,43 @@ fn get_creators(
         c.iter().map(one_creator).collect()
     }
 }
+
+pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
+    use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episode_refkeys::dsl as er;
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::publications::dsl as p;
+    use diesel::dsl::{all, any};
+
+    // Note: Loading these is an inefficiency, but it is the only way I find
+    // to get rid of the nullability of publications(episode_part) before
+    // comparing to non-nullable episode_parts(id).
+    let published_parts = p::publications
+        .filter(p::episode_part.is_not_null())
+        .select(p::episode_part)
+        .distinct()
+        .load(db)?
+        .into_iter()
+        .filter_map(|e| e)
+        .collect::<Vec<i32>>();
+    let n = diesel::delete(
+        ep::episode_parts.filter(ep::id.ne(all(published_parts))),
+    )
+    .execute(db)?;
+    println!("Delete {} junk episode parts.", n);
+
+    let n = diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(
+        any(e::episodes.select(e::id).filter(
+            e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
+        )),
+    )))
+    .execute(db)?;
+    println!("Delete {} junk episode refkeys.", n);
+
+    let n = diesel::delete(e::episodes.filter(
+        e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
+    ))
+    .execute(db)?;
+    println!("Delete {} junk episodes.", n);
+    Ok(())
+}

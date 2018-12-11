@@ -61,6 +61,7 @@ fn run() -> Result<(), failure::Error> {
             for year in years {
                 readfiles::load_year(year as i16, &db)?;
             }
+            readfiles::delete_unpublished(&db)?;
             Ok(())
         }
         Fanrs::ListIssues => list_issues(&db),
