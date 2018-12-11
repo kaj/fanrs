@@ -32,7 +32,7 @@ impl ToHtml for Part {
         if let Some(no) = self.no {
             write!(out, "del {}", no)?;
             if self.name.is_some() {
-                write!(out, ":")?;
+                write!(out, ": ")?;
             }
         }
         if let Some(ref name) = self.name {
