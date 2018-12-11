@@ -1,4 +1,4 @@
-use super::{Creator, Episode};
+use super::{Article, Creator, Episode};
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use failure::Error;
@@ -22,11 +22,31 @@ impl CreatorSet {
             .select((cp::role, c_columns))
             .filter(cp::episode_id.eq(episode.id))
             .load::<(String, Creator)>(db)?;
+        Ok(CreatorSet::from_data(data))
+    }
+
+    pub fn for_article(
+        article: &Article,
+        db: &PgConnection,
+    ) -> Result<CreatorSet, Error> {
+        use crate::schema::articles_by::dsl as ab;
+        use crate::schema::creator_aliases::dsl as ca;
+        use crate::schema::creators::dsl as c;
+        let c_columns = (c::id, ca::name, c::slug);
+        let data = ab::articles_by
+            .inner_join(ca::creator_aliases.inner_join(c::creators))
+            .select((ab::role, c_columns))
+            .filter(ab::article_id.eq(article.id))
+            .load::<(String, Creator)>(db)?;
+        Ok(CreatorSet::from_data(data))
+    }
+
+    fn from_data(data: Vec<(String, Creator)>) -> CreatorSet {
         let mut result: BTreeMap<String, Vec<Creator>> = BTreeMap::new();
         for (role, creator) in data {
             result.entry(role).or_insert_with(|| vec![]).push(creator);
         }
-        Ok(CreatorSet(result))
+        CreatorSet(result)
     }
 }
 

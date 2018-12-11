@@ -98,6 +98,8 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
 /// Information about an episode / part or article, as published in an issue.
 pub struct PublishedInfo {
     pub content: PublishedContent,
+    pub creators: CreatorSet,
+    pub refs: RefKeySet,
     pub seqno: Option<i16>,
     pub classnames: &'static str,
 }
@@ -106,14 +108,11 @@ pub enum PublishedContent {
     Text {
         title: String,
         subtitle: Option<String>,
-        refs: RefKeySet,
         note: Option<String>,
     },
     EpisodePart {
         title: Title,
         episode: Episode,
-        creators: CreatorSet,
-        refs: RefKeySet,
         part: Part,
         published: Vec<PartInIssue>,
         best_plac: Option<i16>,
@@ -205,12 +204,12 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                 content: PublishedContent::EpisodePart {
                                     title: t,
                                     episode: e,
-                                    creators,
-                                    refs,
                                     part,
                                     published,
                                     best_plac: b,
                                 },
+                                creators,
+                                refs,
                                 seqno,
                                 classnames,
                             }
@@ -218,6 +217,8 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         (None, Some(a), seqno, None) => {
                             let refs =
                                 RefKeySet::for_article(&a, &db).unwrap();
+                            let creators =
+                                CreatorSet::for_article(&a, &db).unwrap();
                             let Article {
                                 title,
                                 subtitle,
@@ -228,9 +229,10 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                 content: PublishedContent::Text {
                                     title,
                                     subtitle,
-                                    refs,
                                     note,
                                 },
+                                creators,
+                                refs,
                                 seqno,
                                 classnames: "article",
                             }

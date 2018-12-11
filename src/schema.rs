@@ -18,6 +18,15 @@ table! {
 }
 
 table! {
+    articles_by (id) {
+        id -> Int4,
+        article_id -> Int4,
+        by_id -> Int4,
+        role -> Varchar,
+    }
+}
+
+table! {
     cover_by (id) {
         id -> Int4,
         issue_id -> Int4,
@@ -120,6 +129,8 @@ table! {
 
 joinable!(article_refkeys -> articles (article_id));
 joinable!(article_refkeys -> refkeys (refkey_id));
+joinable!(articles_by -> articles (article_id));
+joinable!(articles_by -> creator_aliases (by_id));
 joinable!(cover_by -> creator_aliases (by_id));
 joinable!(cover_by -> issues (issue_id));
 joinable!(creativeparts -> creator_aliases (by_id));
@@ -136,6 +147,7 @@ joinable!(publications -> issues (issue));
 allow_tables_to_appear_in_same_query!(
     article_refkeys,
     articles,
+    articles_by,
     cover_by,
     creativeparts,
     creator_aliases,

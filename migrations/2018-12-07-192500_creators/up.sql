@@ -15,6 +15,7 @@ create table creator_aliases (
   name varchar(200) unique not null
 );
 
+-- FIXME rename to covers_by
 create table cover_by (
   id serial primary key,
   issue_id integer not null references issues(id),
@@ -24,6 +25,7 @@ create table cover_by (
 
 create unique index cover_by_natural on cover_by(issue_id, by_id);
 
+-- FIXME rename to episodes_by
 create table creativeparts (
   id serial primary key,
   episode_id integer not null references episodes(id),
@@ -33,6 +35,14 @@ create table creativeparts (
 
 create unique index creativeparts_natural on creativeparts(episode_id, by_id, role);
 
+create table articles_by (
+  id serial primary key,
+  article_id integer not null references articles(id),
+  by_id integer not null references creator_aliases(id),
+  role varchar(10) not null
+);
+
+create unique index articles_by_natural on articles_by(article_id, by_id, role);
 
 -- functions only used in this migration
 create function insert_creator(slugp varchar(200), namep varchar(200))
@@ -308,7 +318,6 @@ select insert_creator('ozcan-erealp', 'Özcan Eralp');
 select insert_alias  ('ozcan-erealp', 'Öscan Eralp');
 select insert_alias  ('ozcan-erealp', 'Ö. Eralp');
 select insert_alias  ('ozcan-erealp', 'Eralp');
-
 
 drop function insert_creator;
 drop function insert_alias;

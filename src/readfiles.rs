@@ -57,6 +57,24 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                         article.set_refs(&refs, db)?;
                     }
                     article.publish(issue.id, Some(seqno as i16), db)?;
+                    for by in c.children.iter().filter(|e| e.name == "by") {
+                        let role = by
+                            .attributes
+                            .get("role")
+                            .map(|r| r.as_ref())
+                            .unwrap_or("by");
+                        for by in get_creators(by, db)? {
+                            use crate::schema::articles_by::dsl as ab;
+                            diesel::insert_into(ab::articles_by)
+                                .values((
+                                    ab::article_id.eq(article.id),
+                                    ab::by_id.eq(by.id),
+                                    ab::role.eq(role),
+                                ))
+                                .on_conflict_do_nothing()
+                                .execute(db)?;
+                        }
+                    }
                 } else if c.name == "serie" {
                     let title =
                         Title::get_or_create(get_req_text(&c, "title")?, db)?;

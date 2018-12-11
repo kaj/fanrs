@@ -15,9 +15,9 @@
       @if let Some(ref price) = issue.price {<p class="price">Pris @price</p>}
     </header>
     <div class="content">
-      @for PublishedInfo{content, seqno, classnames} in contents {
+      @for PublishedInfo{content, creators, refs, seqno, classnames} in contents {
       <div class="@classnames" @if let Some(seqno) = seqno {data-seq="@seqno"}>
-	@if let EpisodePart{title, episode, creators, refs, part, published, best_plac} = content {
+	@if let EpisodePart{title, episode, part, published, best_plac} = content {
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
 	@if let Some(ref teaser) = episode.teaser { <p class="teaser">@teaser</p> }
 	@refs
@@ -28,9 +28,10 @@
 	@if let Some(ref copyright) = episode.copyright {<p class="info copyright">Copyright @copyright</p>}
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
-	@if let Text{title, subtitle, refs, note} = content {
+	@if let Text{title, subtitle, note} = content {
 	<h3>@title@if let Some(ref s) = subtitle {: @s}</h3>
 	@refs
+	@creators
 	@if let Some(ref note) = note { <p class="info note">@note</p> }
 	}
       </div>
