@@ -2,7 +2,7 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, Part, PartInIssue, RefKeySet, Title,
+    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue, RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -276,7 +276,25 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                 .left_join(ar::article_refkeys.left_join(r::refkeys))
                 .filter(r::kind.eq(title_kind))
                 .filter(r::slug.eq(&title.slug))
-                .load::<Article>(&db)?;
+                .inner_join(p::publications.inner_join(i::issues))
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by(all_columns)
+                .load::<Article>(&db)?
+                .into_iter()
+                .map(|article| {
+                    let refs =
+                        RefKeySet::for_article(&article, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_article(&article, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(p::publications)
+                        .select((i::year, i::number, i::number_str))
+                        .filter(p::article_id.eq(article.id))
+                        .load::<IssueRef>(&db)
+                        .unwrap();
+                    (article, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
             let episodes = e::episodes
                 .filter(e::title.eq(title.id))
                 .select(crate::schema::episodes::all_columns)
