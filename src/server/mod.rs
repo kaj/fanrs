@@ -2,7 +2,8 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue, RefKeySet, Title,
+    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue,
+    RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -263,13 +264,13 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
         .and_then(|title| {
             use crate::schema::article_refkeys::dsl as ar;
             use crate::schema::articles::{all_columns, dsl as a};
-            use crate::schema::episodes::dsl as e;
-            use crate::schema::refkeys::dsl as r;
             use crate::schema::episode_parts::dsl as ep;
+            use crate::schema::episodes::dsl as e;
             use crate::schema::issues::dsl as i;
             use crate::schema::publications::dsl as p;
-            use diesel::sql_types::SmallInt;
+            use crate::schema::refkeys::dsl as r;
             use diesel::dsl::{min, sql};
+            use diesel::sql_types::SmallInt;
             let title_kind = 4; // TODO Place constant some place sane.
             let articles = a::articles
                 .select(all_columns)
@@ -282,8 +283,7 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                 .load::<Article>(&db)?
                 .into_iter()
                 .map(|article| {
-                    let refs =
-                        RefKeySet::for_article(&article, &db).unwrap();
+                    let refs = RefKeySet::for_article(&article, &db).unwrap();
                     let creators =
                         CreatorSet::for_article(&article, &db).unwrap();
                     let published = i::issues
@@ -298,7 +298,10 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
             let episodes = e::episodes
                 .filter(e::title.eq(title.id))
                 .select(crate::schema::episodes::all_columns)
-                .inner_join(ep::episode_parts.inner_join(p::publications.inner_join(i::issues)))
+                .inner_join(
+                    ep::episode_parts
+                        .inner_join(p::publications.inner_join(i::issues)),
+                )
                 .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
                 .group_by(crate::schema::episodes::all_columns)
                 .load::<Episode>(&db)?

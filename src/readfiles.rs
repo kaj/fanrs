@@ -220,8 +220,8 @@ fn get_creators(
 
 pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     use crate::schema::article_refkeys::dsl as ar;
-    use crate::schema::articles_by::dsl as ab;
     use crate::schema::articles::dsl as a;
+    use crate::schema::articles_by::dsl as ab;
     use crate::schema::episode_parts::dsl as ep;
     use crate::schema::episode_refkeys::dsl as er;
     use crate::schema::episodes::dsl as e;
@@ -254,11 +254,11 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     .execute(db)?;
     println!("Delete {} junk episode refkeys.", n);
 
-    let n = diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(
-        any(e::episodes.select(e::id).filter(
+    let n = diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(any(
+        e::episodes.select(e::id).filter(
             e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
-        )),
-    )))
+        ),
+    ))))
     .execute(db)?;
     println!("Delete {} junk episodes-by.", n);
 
@@ -267,7 +267,6 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     ))
     .execute(db)?;
     println!("Delete {} junk episodes.", n);
-
 
     let published_articles = p::publications
         .filter(p::article_id.is_not_null())
@@ -279,21 +278,26 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
         .collect::<Vec<i32>>();
 
     let n = diesel::delete(
-        ar::article_refkeys.filter(ar::article_id.ne(all(&published_articles)))
+        ar::article_refkeys
+            .filter(ar::article_id.ne(all(&published_articles))),
     )
-        .execute(db)?;
+    .execute(db)?;
     println!("Delete {} junk article refkeys.", n);
 
     let n = diesel::delete(
-        ab::articles_by.filter(ab::article_id.ne(all(&published_articles)))
+        ab::articles_by.filter(ab::article_id.ne(all(&published_articles))),
     )
-        .execute(db)?;
+    .execute(db)?;
     println!("Delete {} junk articles-by.", n);
 
-    let n = diesel::delete(a::articles.filter(
-        a::id.ne(all(&published_articles))
-    ))
-        .execute(db)?;
-    println!("Delete {} junk articles ({} remains).", n, published_articles.len());
+    let n = diesel::delete(
+        a::articles.filter(a::id.ne(all(&published_articles))),
+    )
+    .execute(db)?;
+    println!(
+        "Delete {} junk articles ({} remains).",
+        n,
+        published_articles.len()
+    );
     Ok(())
 }
