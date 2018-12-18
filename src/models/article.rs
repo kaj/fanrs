@@ -43,7 +43,7 @@ impl Article {
     pub fn publish(
         &self,
         issue: i32,
-        seqno: Option<i16>,
+        seqno: i16,
         db: &PgConnection,
     ) -> Result<(), Error> {
         use crate::schema::publications::dsl as p;
@@ -54,7 +54,7 @@ impl Article {
             .first::<(i32, Option<i16>)>(db)
             .optional()?
         {
-            if seqno.is_some() && old_seqno != seqno {
+            if old_seqno != Some(seqno) {
                 eprintln!("TODO: Should update seqno for {}", id);
             }
             Ok(())
