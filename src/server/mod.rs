@@ -3,7 +3,7 @@ mod render_ructe;
 use self::render_ructe::RenderRucte;
 use crate::models::{
     Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue,
-    RefKeySet, Title,
+    RefKey, RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -271,11 +271,10 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
             use crate::schema::refkeys::dsl as r;
             use diesel::dsl::{min, sql};
             use diesel::sql_types::SmallInt;
-            let title_kind = 4; // TODO Place constant some place sane.
             let articles = a::articles
                 .select(all_columns)
                 .left_join(ar::article_refkeys.left_join(r::refkeys))
-                .filter(r::kind.eq(title_kind))
+                .filter(r::kind.eq(RefKey::TITLE_ID))
                 .filter(r::slug.eq(&title.slug))
                 .inner_join(p::publications.inner_join(i::issues))
                 .order(min(sql::<SmallInt>("(year-1950)*64 + number")))

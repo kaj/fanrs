@@ -22,6 +22,11 @@ pub enum RefKey {
 }
 
 impl RefKey {
+    pub const FA_ID: i16 = 2;
+    pub const KEY_ID: i16 = 1;
+    pub const WHO_ID: i16 = 3;
+    pub const TITLE_ID: i16 = 4;
+
     pub fn fa(slug: &str) -> RefKey {
         RefKey::Fa(slug.into())
     }
@@ -44,10 +49,10 @@ impl RefKey {
 
     pub fn get_or_create_id(&self, db: &PgConnection) -> Result<i32, Error> {
         let (kind, title, slug) = match self {
-            RefKey::Fa(s) => (2, "", s),
-            RefKey::Key(t, s) => (1, t.as_ref(), s),
-            RefKey::Who(n, s) => (3, n.as_ref(), s),
-            RefKey::Title(n, s) => (4, n.as_ref(), s),
+            RefKey::Fa(s) => (RefKey::FA_ID, "", s),
+            RefKey::Key(t, s) => (RefKey::KEY_ID, t.as_ref(), s),
+            RefKey::Who(n, s) => (RefKey::WHO_ID, n.as_ref(), s),
+            RefKey::Title(n, s) => (RefKey::TITLE_ID, n.as_ref(), s),
         };
         use crate::schema::refkeys::dsl;
         dsl::refkeys
@@ -101,10 +106,10 @@ impl Queryable<schema::refkeys::SqlType, Pg> for RefKey {
 
     fn build(row: Self::Row) -> Self {
         match row {
-            (_, 1, Some(t), s) => RefKey::Key(t, s),
-            (_, 2, _, s) => RefKey::Fa(s),
-            (_, 3, Some(t), s) => RefKey::Who(t, s),
-            (_, 4, Some(t), s) => RefKey::Title(t, s),
+            (_, RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
+            (_, RefKey::FA_ID, _, s) => RefKey::Fa(s),
+            (_, RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
+            (_, RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
             (id, k, t, s) => {
                 panic!("Bad refkey #{} kind {} ({:?}, {:?})", id, k, t, s)
             }
