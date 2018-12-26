@@ -1,12 +1,19 @@
-@use crate::models::Title;
+@use crate::models::{IssueRef, Title};
 @use super::page;
 
-@(titles: &[Title])
+@(titles: &[(Title, i64, IssueRef, IssueRef)])
 @:page("Serier", {
-  <h1>Serier</h1>
-  <ul>
-    @for title in titles {
-    <li><a href="@title.slug">@title.title</a></li>
-    }
-  </ul>
+<h1>Serier</h1>
+<section>
+  <table>
+    <thead>
+      <tr><th>Titel</th><th>Antal episoder</th><th>Först</th><th>Senast</th></tr>
+    </thead>
+    <tbody>
+      @for (title, n, first, last) in titles {
+      <tr><td><a href="@title.slug">@title.title</a></td><td>@n</td><td>@first</td><td>@last</td></tr>
+      }
+    </tbody>
+  </table>
+</section>
 })

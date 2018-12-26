@@ -1,4 +1,6 @@
-use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
+use crate::models::{
+    parse_nr, Article, Creator, Episode, Issue, Part, RefKey, Title,
+};
 use diesel::prelude::*;
 use failure::{format_err, Error, Fail};
 use std::fs::File;
@@ -17,7 +19,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                 .attributes
                 .get("nr")
                 .ok_or_else(|| format_err!("nr missing"))
-                .and_then(|s| parse_nr(s))?;
+                .and_then(|s| Ok(parse_nr(s)?))?;
             let issue = Issue::get_or_create(
                 year,
                 nr,
@@ -90,16 +92,6 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
 
 fn fail_year(year: i16, err: &Fail) -> Error {
     format_err!("Failed to read data for {}: {}", year, err)
-}
-
-fn parse_nr(nr_str: &str) -> Result<(i16, &str), Error> {
-    let nr = nr_str
-        .find('-')
-        .map(|p| &nr_str[0..p])
-        .unwrap_or(nr_str)
-        .parse()
-        .map_err(|e| format_err!("Bad nr: {:?} {}", nr_str, e))?;
-    Ok((nr, nr_str))
 }
 
 fn register_published_content(
@@ -233,6 +225,7 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     use crate::schema::episodes::dsl as e;
     use crate::schema::episodes_by::dsl as eb;
     use crate::schema::publications::dsl as p;
+    use crate::schema::titles::dsl as t;
     use diesel::dsl::{all, any};
 
     // Note: Loading these is an inefficiency, but it is the only way I find
@@ -273,6 +266,13 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     ))
     .execute(db)?;
     println!("Delete {} junk episodes.", n);
+
+    let n = diesel::delete(
+        t::titles
+            .filter(t::id.ne(all(e::episodes.select(e::title).distinct()))),
+    )
+    .execute(db)?;
+    println!("Delete {} junk titles.", n);
 
     let published_articles = p::publications
         .filter(p::article_id.is_not_null())

@@ -14,7 +14,7 @@ pub use self::article::Article;
 pub use self::creator::Creator;
 pub use self::creatorset::CreatorSet;
 pub use self::episode::Episode;
-pub use self::issue::{Issue, IssueRef};
+pub use self::issue::{parse_nr, Issue, IssueRef};
 pub use self::part::{Part, PartInIssue};
 pub use self::refkey::RefKey;
 pub use self::refkeyset::RefKeySet;

@@ -3,9 +3,10 @@ use bigdecimal::BigDecimal;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::result::Error;
+use failure::Error;
 use std::fmt;
 use std::io::{self, Write};
+use std::str::FromStr;
 
 #[derive(Debug, Queryable)]
 pub struct Issue {
@@ -73,6 +74,53 @@ impl fmt::Display for Issue {
             (Some(ref pages), None) => write!(out, " ({} sidor)", pages),
             (None, Some(ref price)) => write!(out, " ({})", price),
             (None, None) => Ok(()),
+        }
+    }
+}
+
+pub fn parse_nr(nr_str: &str) -> Result<(i16, &str), ParseError> {
+    let nr = nr_str
+        .find('-')
+        .map(|p| &nr_str[0..p])
+        .unwrap_or(nr_str)
+        .parse()
+        .map_err(|_| ParseError::BadIssue)?;
+    Ok((nr, nr_str))
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    BadIssue,
+    BadYear,
+    NoSpace,
+}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, out: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParseError::BadIssue => write!(out, "Bad issue in input"),
+            ParseError::BadYear => write!(out, "Bad year in input"),
+            ParseError::NoSpace => write!(out, "Space missing in input"),
+        }
+    }
+}
+impl std::error::Error for ParseError {}
+
+impl FromStr for IssueRef {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<IssueRef, Self::Err> {
+        if let Some((Some(year), Some(nr))) =
+            s.find(' ').map(|p| (s.get(0..p), s.get(p + 1..)))
+        {
+            let (nr, nr_str) =
+                parse_nr(nr).map_err(|_| ParseError::BadIssue)?;
+            let year = year.parse().map_err(|_| ParseError::BadYear)?;
+            Ok(IssueRef {
+                year,
+                number: nr,
+                number_str: nr_str.to_string(),
+            })
+        } else {
+            Err(ParseError::NoSpace)
         }
     }
 }

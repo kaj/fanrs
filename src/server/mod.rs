@@ -2,8 +2,8 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue,
-    RefKey, RefKeySet, Title,
+    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue, RefKey,
+    RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -250,8 +250,38 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::titles::dsl;
-    let all = dsl::titles.load::<Title>(&db).map_err(custom)?;
+    use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::issues::dsl as i;
+    use crate::schema::publications::dsl as p;
+    use crate::schema::titles::dsl as t;
+    use diesel::dsl::sql;
+    use diesel::sql_types::{BigInt, Text};
+
+    let all = t::titles
+        .left_join(e::episodes.left_join(
+            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
+        ))
+        .select((
+            t::titles::all_columns(),
+            sql::<BigInt>("count(*)"),
+            sql::<Text>("min(concat(year, ' ', number_str))"),
+            sql::<Text>("max(concat(year, ' ', number_str))"),
+        ))
+        .group_by(t::titles::all_columns())
+        .order(t::title)
+        .load::<(Title, i64, String, String)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|(title, c, first, last)| {
+            Ok((
+                title,
+                c,
+                first.parse().map_err(custom)?,
+                last.parse().map_err(custom)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, Rejection>>()?;
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
