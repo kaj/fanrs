@@ -1,19 +1,26 @@
+@use crate::models::Title;
 @use super::page;
 
-@(years: &[i16])
+@(years: &[i16], titles: &[(Title, i64, u8)])
 @:page("Fantomenindex.krats.se", {
   <h1>Fantomenindex.krats.se</h1>
 
   <section>
     <h2>Årgångar</h2>
-    <p>
+    <p class="article">
       @if let Some((last_year, years)) = years.split_last()
       {@for year in years {<a href="/@year">@year</a>, }
       <a href="@last_year">@last_year</a>.}
     </p>
   </section>
   <section>
-    <h1>Serier</h1>
+    <h2>Serier</h2>
     <p><a href="/titles/">Alla förekommande serier</a></p>
+    <p class="article cloud">
+      @if let Some(((title, n, w), titles)) = titles.split_last()
+      {@for (title, n, w) in titles
+      {<a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>, }
+      <a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>. }
+    </p>
   </section>
 })

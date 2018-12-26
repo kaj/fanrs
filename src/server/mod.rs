@@ -86,14 +86,38 @@ fn pg_pool(database_url: &str) -> PgPool {
 
 #[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::issues::dsl;
-    let years = dsl::issues
-        .select(dsl::year)
+    use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::issues::dsl as i;
+    use crate::schema::publications::dsl as p;
+    use crate::schema::titles::dsl as t;
+    use diesel::dsl::sql;
+    use diesel::sql_types::BigInt;
+
+    let years = i::issues
+        .select(i::year)
         .distinct()
-        .order(dsl::year)
+        .order(i::year)
         .load(&db)
         .map_err(custom)?;
-    Response::builder().html(|o| templates::frontpage(o, &years))
+
+    let num = 50;
+    let mut titles = t::titles
+        .left_join(e::episodes.left_join(
+            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
+        ))
+        .select((t::titles::all_columns(), sql::<BigInt>("count(*) c")))
+        .group_by(t::titles::all_columns())
+        .order(sql::<BigInt>("c").desc())
+        .limit(num)
+        .load::<(Title, i64)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .enumerate()
+        .map(|(n, (title, c))| (title, c, (8 * (num - n as i64) / num) as u8))
+        .collect::<Vec<_>>();
+    titles.sort_by(|a, b| a.0.title.cmp(&b.0.title));
+    Response::builder().html(|o| templates::frontpage(o, &years, &titles))
 }
 
 /// Information about an episode / part or article, as published in an issue.

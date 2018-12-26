@@ -1,4 +1,5 @@
 body {
+    line-height: 1.5;
     > header { border-bottom: solid .5px black; }
     > footer { border-top: solid .5px black; }
 }
@@ -81,4 +82,16 @@ section {
     }
 }
 
-	       
+.cloud {
+    text-align: justify;
+    a { white-space: pre; }
+    .w0 { font-size: 64%; }
+    .w1 { font-size: 71%; }
+    .w2 { font-size: 79%; }
+    .w3 { font-size: 88%; }
+    .w4 { font-size: 98%; }
+    .w5 { font-size: 108%; }
+    .w6 { font-size: 120%; }
+    .w7 { font-size: 134%; }
+    .w8 { font-size: 149%; }
+}
