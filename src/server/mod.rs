@@ -2,8 +2,8 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, IssueRef, Part, PartInIssue, RefKey,
-    RefKeySet, Title,
+    Article, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
+    PartInIssue, RefKey, RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -51,6 +51,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(path::param())
             .and(end())
             .and_then(one_title))
+        .or(get()
+            .and(path("what"))
+            .and(s())
+            .and(path::param())
+            .and(end())
+            .and_then(one_ref))
         .or(get()
             .and(s())
             .and(path::param())
@@ -385,4 +391,91 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
         })?;
     Response::builder()
         .html(|o| templates::title(o, &title, &articles, &episodes))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn one_ref(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
+    use crate::schema::refkeys::dsl as r;
+    let (refkey, articles, episodes) = r::refkeys
+        .filter(r::slug.eq(tslug))
+        .first::<IdRefKey>(&db)
+        .and_then(|refkey| {
+            use crate::schema::article_refkeys::dsl as ar;
+            use crate::schema::articles::{all_columns, dsl as a};
+            use crate::schema::episode_parts::dsl as ep;
+            use crate::schema::episode_refkeys::dsl as er;
+            use crate::schema::episodes::dsl as e;
+            use crate::schema::issues::dsl as i;
+            use crate::schema::publications::dsl as p;
+            use crate::schema::refkeys::dsl as r;
+            use crate::schema::titles::dsl as t;
+            use diesel::dsl::{min, sql};
+            use diesel::sql_types::SmallInt;
+            let articles = a::articles
+                .select(all_columns)
+                .left_join(ar::article_refkeys.left_join(r::refkeys))
+                .filter(ar::refkey_id.eq(refkey.id))
+                .inner_join(p::publications.inner_join(i::issues))
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by(all_columns)
+                .load::<Article>(&db)?
+                .into_iter()
+                .map(|article| {
+                    let refs = RefKeySet::for_article(&article, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_article(&article, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(p::publications)
+                        .select((i::year, i::number, i::number_str))
+                        .filter(p::article_id.eq(article.id))
+                        .load::<IssueRef>(&db)
+                        .unwrap();
+                    (article, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
+            let episodes = e::episodes
+                .left_join(er::episode_refkeys)
+                .inner_join(t::titles)
+                .filter(er::refkey_id.eq(refkey.id))
+                .select((
+                    t::titles::all_columns(),
+                    e::episodes::all_columns(),
+                ))
+                .inner_join(
+                    ep::episode_parts
+                        .inner_join(p::publications.inner_join(i::issues)),
+                )
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by((
+                    t::titles::all_columns(),
+                    e::episodes::all_columns(),
+                ))
+                .load::<(Title, Episode)>(&db)?
+                .into_iter()
+                .map(|(title, episode)| {
+                    let refs = RefKeySet::for_episode(&episode, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_episode(&episode, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(
+                            p::publications.inner_join(ep::episode_parts),
+                        )
+                        .select((
+                            (i::year, i::number, i::number_str),
+                            (ep::id, ep::part_no, ep::part_name),
+                        ))
+                        .filter(ep::episode.eq(episode.id))
+                        .load::<PartInIssue>(&db)
+                        .unwrap();
+                    (title, episode, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
+            Ok((refkey.refkey, articles, episodes))
+        })
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => not_found(),
+            e => custom(e),
+        })?;
+    Response::builder()
+        .html(|o| templates::refkey(o, &refkey, &articles, &episodes))
 }

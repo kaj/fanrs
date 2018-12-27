@@ -1,4 +1,4 @@
-use super::{Article, Episode, RefKey};
+use super::{Article, Episode, IdRefKey, RefKey};
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use failure::Error;
@@ -19,7 +19,10 @@ impl RefKeySet {
                 .select(all_columns)
                 .filter(ar::article_id.eq(article.id))
                 .order((r::title, r::slug))
-                .load::<RefKey>(db)?,
+                .load::<IdRefKey>(db)?
+                .into_iter()
+                .map(|ir| ir.refkey)
+                .collect(),
         ))
     }
 
@@ -35,7 +38,10 @@ impl RefKeySet {
                 .select(all_columns)
                 .filter(er::episode_id.eq(episode.id))
                 .order((r::title, r::slug))
-                .load::<RefKey>(db)?,
+                .load::<IdRefKey>(db)?
+                .into_iter()
+                .map(|ir| ir.refkey)
+                .collect(),
         ))
     }
 }

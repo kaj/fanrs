@@ -8,6 +8,12 @@ use slug::slugify;
 use std::io::{self, Write};
 
 #[derive(Debug)]
+pub struct IdRefKey {
+    pub id: i32,
+    pub refkey: RefKey,
+}
+
+#[derive(Debug)]
 pub enum RefKey {
     /// slug
     Fa(String),
@@ -101,18 +107,22 @@ impl RefKey {
     }
 }
 
-impl Queryable<schema::refkeys::SqlType, Pg> for RefKey {
+impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
     type Row = (i32, i16, Option<String>, String);
 
     fn build(row: Self::Row) -> Self {
-        match row {
-            (_, RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
-            (_, RefKey::FA_ID, _, s) => RefKey::Fa(s),
-            (_, RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
-            (_, RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
-            (id, k, t, s) => {
-                panic!("Bad refkey #{} kind {} ({:?}, {:?})", id, k, t, s)
-            }
+        IdRefKey {
+            id: row.0,
+            refkey: match (row.1, row.2, row.3) {
+                (RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
+                (RefKey::FA_ID, _, s) => RefKey::Fa(s),
+                (RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
+                (RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
+                (k, t, s) => panic!(
+                    "Bad refkey #{} kind {} ({:?}, {:?})",
+                    row.0, k, t, s,
+                ),
+            },
         }
     }
 }
