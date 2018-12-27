@@ -225,6 +225,7 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     use crate::schema::episodes::dsl as e;
     use crate::schema::episodes_by::dsl as eb;
     use crate::schema::publications::dsl as p;
+    use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
     use diesel::dsl::{all, any};
 
@@ -289,6 +290,14 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
     )
     .execute(db)?;
     println!("Delete {} junk article refkeys.", n);
+
+    let n = diesel::delete(
+        r::refkeys
+            .filter(r::id.ne(all(er::episode_refkeys.select(er::refkey_id))))
+            .filter(r::id.ne(all(ar::article_refkeys.select(ar::refkey_id)))),
+    )
+    .execute(db)?;
+    println!("Delete {} junk refkeys.", n);
 
     let n = diesel::delete(
         ab::articles_by.filter(ab::article_id.ne(all(&published_articles))),

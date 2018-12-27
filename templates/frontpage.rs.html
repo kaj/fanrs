@@ -1,10 +1,18 @@
-@use crate::models::Title;
+@use crate::models::{RefKey, Title};
 @use super::page;
 
-@(years: &[i16], titles: &[(Title, i64, u8)])
+@(all_fa: &[RefKey], years: &[i16], titles: &[(Title, i64, u8)], refkeys: &[(RefKey, i64, u8)])
 @:page("Fantomenindex.krats.se", {
   <h1>Fantomenindex.krats.se</h1>
 
+  <section>
+    <h2>Fantomenätten</h2>
+    <p class="article">
+      @if let Some((last_fa, all_fa)) = all_fa.split_last()
+      {@for fa in all_fa {<a href="@fa.url()">@fa.short()</a>, }
+      <a href="@last_fa.url()">@last_fa.short().}
+    </p>
+  </section>
   <section>
     <h2>Årgångar</h2>
     <p class="article">
@@ -21,6 +29,16 @@
       {@for (title, n, w) in titles
       {<a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>, }
       <a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>. }
+    </p>
+  </section>
+  <section>
+    <h2>Personer och företeelser i Fantomens värld</h2>
+    <p><a href="/what/">Alla taggar</a></p>
+    <p class="article cloud">
+      @if let Some(((refkey, n, w), refkeys)) = refkeys.split_last()
+      {@for (refkey, n, w) in refkeys
+      {<a href="@refkey.url()" class="w@w" data-n="@n">@refkey.name()</a>, }
+      <a href="@refkey.url()" class="w@w" data-n="@n">@refkey.name()</a>. }
     </p>
   </section>
 })

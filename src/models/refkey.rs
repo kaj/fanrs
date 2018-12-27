@@ -105,6 +105,21 @@ impl RefKey {
             RefKey::Title(name, _) => name.clone(),
         }
     }
+
+    pub fn short(&self) -> String {
+        match self {
+            RefKey::Fa(slug) => match slug.as_ref() {
+                "0" => "Kapten Walker".into(),
+                "17j" => "Julie".into(),
+                "22h" => "Heloise".into(),
+                "22k" => "Kit".into(),
+                slug => slug.to_string()
+            },
+            RefKey::Key(name, _) => name.clone(),
+            RefKey::Who(name, _) => name.clone(),
+            RefKey::Title(name, _) => name.clone(),
+        }
+    }
 }
 
 impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {

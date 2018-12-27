@@ -52,11 +52,22 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(end())
             .and_then(one_title))
         .or(get()
+            .and(path("fa"))
+            .and(s())
+            .and(path::param())
+            .and(end())
+            .and_then(one_fa))
+        .or(get()
             .and(path("what"))
             .and(s())
             .and(path::param())
             .and(end())
             .and_then(one_ref))
+        .or(get()
+            .and(path("what"))
+            .and(end())
+            .and(s())
+            .and_then(list_refs))
         .or(get()
             .and(s())
             .and(path::param())
@@ -93,12 +104,14 @@ fn pg_pool(database_url: &str) -> PgPool {
 #[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episode_refkeys::dsl as er;
     use crate::schema::episodes::dsl as e;
     use crate::schema::issues::dsl as i;
     use crate::schema::publications::dsl as p;
+    use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
     use diesel::dsl::sql;
-    use diesel::sql_types::BigInt;
+    use diesel::sql_types::{BigInt, Integer};
 
     let years = i::issues
         .select(i::year)
@@ -106,6 +119,15 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .order(i::year)
         .load(&db)
         .map_err(custom)?;
+
+    let all_fa = r::refkeys
+        .filter(r::kind.eq(RefKey::FA_ID))
+        .order((sql::<Integer>("cast(substr(slug, 1, 2) as int)"), r::slug))
+        .load::<IdRefKey>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|rk| rk.refkey)
+        .collect::<Vec<_>>();
 
     let num = 50;
     let mut titles = t::titles
@@ -123,7 +145,28 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .map(|(n, (title, c))| (title, c, (8 * (num - n as i64) / num) as u8))
         .collect::<Vec<_>>();
     titles.sort_by(|a, b| a.0.title.cmp(&b.0.title));
-    Response::builder().html(|o| templates::frontpage(o, &years, &titles))
+
+    let mut refkeys = r::refkeys
+        .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
+            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
+        )))
+        .select((r::refkeys::all_columns(), sql::<BigInt>("count(*) c")))
+        .filter(r::kind.eq(RefKey::KEY_ID))
+        .group_by(r::refkeys::all_columns())
+        .order(sql::<BigInt>("c").desc())
+        .limit(num)
+        .load::<(IdRefKey, i64)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .enumerate()
+        .map(|(n, (rk, c))| {
+            (rk.refkey, c, (8 * (num - n as i64) / num) as u8)
+        })
+        .collect::<Vec<_>>();
+    refkeys.sort_by(|a, b| a.0.name().cmp(&b.0.name()));
+
+    Response::builder()
+        .html(|o| templates::frontpage(o, &all_fa, &years, &titles, &refkeys))
 }
 
 /// Information about an episode / part or article, as published in an issue.
@@ -394,9 +437,56 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn one_ref(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
+fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
+    use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episode_refkeys::dsl as er;
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::issues::dsl as i;
+    use crate::schema::publications::dsl as p;
+    use crate::schema::refkeys::dsl as r;
+    use diesel::dsl::sql;
+    use diesel::sql_types::{BigInt, Text};
+
+    let all = r::refkeys
+        .filter(r::kind.eq(RefKey::KEY_ID))
+        .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
+            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
+        )))
+        .select((
+            r::refkeys::all_columns(),
+            sql::<BigInt>("count(*)"),
+            sql::<Text>("min(concat(year, ' ', number_str))"),
+            sql::<Text>("max(concat(year, ' ', number_str))"),
+        ))
+        .group_by(r::refkeys::all_columns())
+        .order(r::title)
+        .load::<(IdRefKey, i64, String, String)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|(refkey, c, first, last)| {
+            (refkey.refkey, c, first.parse().ok(), last.parse().ok())
+        })
+        .collect::<Vec<_>>();
+    Response::builder().html(|o| templates::refkeys(o, &all))
+}
+
+fn one_fa(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+    one_ref_impl(db, slug, RefKey::FA_ID)
+}
+
+fn one_ref(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+    one_ref_impl(db, slug, RefKey::KEY_ID)
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn one_ref_impl(
+    db: PooledPg,
+    tslug: String,
+    kind: i16,
+) -> Result<impl Reply, Rejection> {
     use crate::schema::refkeys::dsl as r;
     let (refkey, articles, episodes) = r::refkeys
+        .filter(r::kind.eq(kind))
         .filter(r::slug.eq(tslug))
         .first::<IdRefKey>(&db)
         .and_then(|refkey| {
