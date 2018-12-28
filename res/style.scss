@@ -4,6 +4,10 @@ body {
     > footer { border-top: solid .5px black; }
 }
 
+h2 {
+    margin: 0;
+}
+
 h3 .part {
     font-weight: lighter;
 }
@@ -79,6 +83,16 @@ section {
 		background: rgba(white, 0.7);
 	    }
 	}
+    }
+}
+
+section.front {
+    header {
+	margin: 0 .3em;
+	display: flex;
+	flex-flow: row wrap;
+	align-items: baseline;
+	p { margin: 0 1em; }
     }
 }
 

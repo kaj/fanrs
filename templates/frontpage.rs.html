@@ -5,25 +5,27 @@
 @:page("Fantomenindex.krats.se", {
   <h1>Fantomenindex.krats.se</h1>
 
-  <section>
-    <h2>Fantomenätten</h2>
+  <section class="front">
+    <header><h2>Fantomenätten</h2></header>
     <p class="article">
       @if let Some((last_fa, all_fa)) = all_fa.split_last()
       {@for fa in all_fa {<a href="@fa.url()">@fa.short()</a>, }
       <a href="@last_fa.url()">@last_fa.short().}
     </p>
   </section>
-  <section>
-    <h2>Årgångar</h2>
+  <section class="front">
+    <header><h2>Årgångar</h2></header>
     <p class="article">
       @if let Some((last_year, years)) = years.split_last()
       {@for year in years {<a href="/@year">@year</a>, }
       <a href="@last_year">@last_year</a>.}
     </p>
   </section>
-  <section>
-    <h2>Serier</h2>
-    <p><a href="/titles/">Alla förekommande serier</a></p>
+  <section class="front">
+    <header>
+      <h2>Serier</h2>
+      <p>(<a href="/titles/">Alla förekommande serier</a>)</p>
+    </header>
     <p class="article cloud">
       @if let Some(((title, n, w), titles)) = titles.split_last()
       {@for (title, n, w) in titles
@@ -31,9 +33,11 @@
       <a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>. }
     </p>
   </section>
-  <section>
-    <h2>Personer och företeelser i Fantomens värld</h2>
-    <p><a href="/what/">Alla taggar</a></p>
+  <section class="front">
+    <header>
+      <h2>Personer och företeelser i Fantomens värld</h2>
+      <p>(<a href="/what/">Alla taggar</a>)</p>
+    </header>
     <p class="article cloud">
       @if let Some(((refkey, n, w), refkeys)) = refkeys.split_last()
       {@for (refkey, n, w) in refkeys
