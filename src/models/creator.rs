@@ -30,12 +30,13 @@ impl Creator {
             Ok(t)
         } else {
             let slug = slugify(name);
-            let creator: Creator = diesel::insert_into(c::creators)
+            let mut creator: Creator = diesel::insert_into(c::creators)
                 .values((c::name.eq(name), c::slug.eq(slug)))
                 .get_result(db)?;
-            diesel::insert_into(ca::creator_aliases)
+            creator.id = diesel::insert_into(ca::creator_aliases)
                 .values((ca::creator_id.eq(creator.id), ca::name.eq(name)))
-                .execute(db)?;
+                .returning(ca::id)
+                .get_result(db)?;
             Ok(creator)
         }
     }
