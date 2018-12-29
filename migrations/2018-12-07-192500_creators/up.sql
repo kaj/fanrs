@@ -312,10 +312,10 @@ select insert_alias  ('yves-sente', 'Y. Sente');
 select insert_creator('zane-grey', 'Zane Grey');
 select insert_alias  ('zane-grey', 'Zane Gray');
 select insert_alias  ('zane-grey', 'Zane Grej');
-select insert_creator('ozcan-erealp', 'Özcan Eralp');
-select insert_alias  ('ozcan-erealp', 'Öscan Eralp');
-select insert_alias  ('ozcan-erealp', 'Ö. Eralp');
-select insert_alias  ('ozcan-erealp', 'Eralp');
+select insert_creator('ozcan-eralp', 'Özcan Eralp');
+select insert_alias  ('ozcan-eralp', 'Öscan Eralp');
+select insert_alias  ('ozcan-eralp', 'Ö. Eralp');
+select insert_alias  ('ozcan-eralp', 'Eralp');
 
 drop function insert_creator;
 drop function insert_alias;
