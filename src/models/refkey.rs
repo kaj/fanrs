@@ -113,7 +113,7 @@ impl RefKey {
                 "17j" => "Julie".into(),
                 "22h" => "Heloise".into(),
                 "22k" => "Kit".into(),
-                slug => slug.to_string()
+                slug => slug.to_string(),
             },
             RefKey::Key(name, _) => name.clone(),
             RefKey::Who(name, _) => name.clone(),

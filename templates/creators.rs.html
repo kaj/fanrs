@@ -1,0 +1,19 @@
+@use crate::models::{IssueRef, Creator};
+@use super::page;
+
+@(creators: &[(Creator, i64, Option<IssueRef>, Option<IssueRef>)])
+@:page("Serier", {
+<h1>Serieskapare i Fantomentidningen</h1>
+<section>
+  <table>
+    <thead>
+      <tr><th>Titel</th><th>Antal episoder</th><th>Först</th><th>Senast</th></tr>
+    </thead>
+    <tbody>
+      @for (creator, n, first, last) in creators {
+      <tr><td>@creator</td><td>@n</td><td>@if let Some(first) = first {@first}</td><td>@if let Some(last) = last {@last}</td></tr>
+      }
+    </tbody>
+  </table>
+</section>
+})

@@ -3,11 +3,12 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
 use slug::slugify;
+use std::cmp::Ordering;
 
 /// A title of a comic.
 ///
 /// May be recurring, such as "Fantomen" or "Spirit", or a one-shot.
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Ord, PartialEq, Eq)]
 pub struct Title {
     pub id: i32,
     pub title: String,
@@ -31,5 +32,11 @@ impl Title {
                 .values((title.eq(name), slug.eq(&slugify(name))))
                 .get_result(db)?)
         }
+    }
+}
+
+impl PartialOrd for Title {
+    fn partial_cmp(&self, rhs: &Title) -> Option<Ordering> {
+        Some(self.title.cmp(&rhs.title))
     }
 }

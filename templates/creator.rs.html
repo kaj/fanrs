@@ -1,0 +1,58 @@
+@use crate::models::{Article, Creator, CreatorSet, Episode, IssueRef, PartInIssue, RefKeySet, Title};
+@use super::page;
+@use std::collections::BTreeMap;
+
+@(creator: &Creator, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
+@:page(&creator.name, {
+  <h1>@creator.name</h1>
+  @if !articles.is_empty() {
+  <section>
+    <h2>Artiklar</h2>
+    @for (article, refs, creators, pubs) in articles {
+    <div class="article">
+      <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
+      @refs
+      @creators
+      @if let Some(ref note) = article.note { <p class="info note">@note</p> }
+      @if let Some((last_pub, pubs)) = pubs.split_last()
+      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+    </div>
+    }
+  </section>
+  }
+  @if !episodes.is_empty() {
+  <section>
+    <h2>Episoder</h2>
+    @for (title, episode, refs, creators, pubs) in episodes {
+    <div class="episode">
+      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = episode.episode {: @h}</h3>
+      @if let Some(ref teaser) = episode.teaser {<p class="teaser">@teaser</p>}
+      @refs
+      @creators
+      @if let Some((last_pub, pubs)) = pubs.split_last()
+      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+      @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
+      @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
+    </div>
+    }
+  </section>
+  }
+  @if !other.is_empty() {
+  <section>
+    <h2>Medverkat som @o_roles</h2>
+    @for (title, episodes) in other {
+    <div class="episode">
+      <h3><a href="/titles/@title.slug">@title.title</a></h3>
+      <ul>
+	@for (episode, pubs) in episodes {
+	<li>@if let Some(e) = episode {@e }
+	  @if let Some((last_pub, pubs)) = pubs.split_last()
+	  {<small>@for p in pubs {@p, }@last_pub.</small>}
+	</li>
+	}
+      </ul>
+    </div>
+    }
+  </section>
+  }
+})

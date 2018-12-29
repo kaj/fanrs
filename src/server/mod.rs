@@ -2,7 +2,7 @@ mod render_ructe;
 
 use self::render_ructe::RenderRucte;
 use crate::models::{
-    Article, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
+    Article, Creator, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
     PartInIssue, RefKey, RefKeySet, Title,
 };
 use crate::templates;
@@ -69,6 +69,17 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and_then(list_refs))
         .or(get()
+            .and(path("who"))
+            .and(s())
+            .and(path::param())
+            .and(end())
+            .and_then(one_creator))
+        .or(get()
+            .and(path("who"))
+            .and(end())
+            .and(s())
+            .and_then(list_creators))
+        .or(get()
             .and(s())
             .and(path::param())
             .and(end())
@@ -103,14 +114,17 @@ fn pg_pool(database_url: &str) -> PgPool {
 
 #[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
+    use crate::schema::creator_aliases::dsl as ca;
+    use crate::schema::creators::dsl as c;
     use crate::schema::episode_parts::dsl as ep;
     use crate::schema::episode_refkeys::dsl as er;
     use crate::schema::episodes::dsl as e;
+    use crate::schema::episodes_by::dsl as eb;
     use crate::schema::issues::dsl as i;
     use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
-    use diesel::dsl::sql;
+    use diesel::dsl::{any, sql};
     use diesel::sql_types::{BigInt, Integer};
 
     let years = i::issues
@@ -165,8 +179,30 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
     refkeys.sort_by(|a, b| a.0.name().cmp(&b.0.name()));
 
-    Response::builder()
-        .html(|o| templates::frontpage(o, &all_fa, &years, &titles, &refkeys))
+    let main_roles = vec!["by", "bild", "text"];
+    let mut creators = c::creators
+        .left_join(ca::creator_aliases.left_join(eb::episodes_by))
+        .filter(eb::role.eq(any(&main_roles)))
+        .select((
+            c::creators::all_columns(),
+            sql::<BigInt>("count(distinct episode_id) c"),
+        ))
+        .group_by(c::creators::all_columns())
+        .order(sql::<BigInt>("c").desc())
+        .limit(num)
+        .load::<(Creator, i64)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .enumerate()
+        .map(|(n, (creator, c))| {
+            (creator, c, (8 * (num - n as i64) / num) as u8)
+        })
+        .collect::<Vec<_>>();
+    creators.sort_by(|a, b| a.0.name.cmp(&b.0.name));
+
+    Response::builder().html(|o| {
+        templates::frontpage(o, &all_fa, &years, &titles, &refkeys, &creators)
+    })
 }
 
 /// Information about an episode / part or article, as published in an issue.
@@ -568,4 +604,182 @@ fn one_ref_impl(
         })?;
     Response::builder()
         .html(|o| templates::refkey(o, &refkey, &articles, &episodes))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
+    use crate::schema::creator_aliases::dsl as ca;
+    use crate::schema::creators::dsl as c;
+    use crate::schema::episode_parts::dsl as ep;
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::episodes_by::dsl as eb;
+    use crate::schema::issues::dsl as i;
+    use crate::schema::publications::dsl as p;
+    use diesel::dsl::sql;
+    use diesel::sql_types::{BigInt, Text};
+
+    let all = c::creators
+        .left_join(
+            ca::creator_aliases.left_join(
+                eb::episodes_by.left_join(
+                    e::episodes.left_join(
+                        ep::episode_parts
+                            .left_join(p::publications.left_join(i::issues)),
+                    ),
+                ),
+            ),
+        )
+        .select((
+            c::creators::all_columns(),
+            sql::<BigInt>("count(*)"),
+            sql::<Text>("min(concat(year, ' ', number_str))"),
+            sql::<Text>("max(concat(year, ' ', number_str))"),
+        ))
+        .group_by(c::creators::all_columns())
+        .order(c::name)
+        .load::<(Creator, i64, String, String)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|(creator, c, first, last)| {
+            (creator, c, first.parse().ok(), last.parse().ok())
+        })
+        .collect::<Vec<_>>();
+    Response::builder().html(|o| templates::creators(o, &all))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+    use crate::schema::creators::dsl as c;
+    let (creator, articles, episodes, o_roles, oe) = c::creators
+        .filter(c::slug.eq(slug))
+        .first::<Creator>(&db)
+        .and_then(|creator| {
+            use crate::schema::article_refkeys::dsl as ar;
+            use crate::schema::articles::{all_columns, dsl as a};
+            use crate::schema::creator_aliases::dsl as ca;
+            use crate::schema::episode_parts::dsl as ep;
+            use crate::schema::episodes::dsl as e;
+            use crate::schema::episodes_by::dsl as eb;
+            use crate::schema::issues::dsl as i;
+            use crate::schema::publications::dsl as p;
+            use crate::schema::refkeys::dsl as r;
+            use crate::schema::titles::dsl as t;
+            use diesel::dsl::{min, sql};
+            use diesel::sql_types::SmallInt;
+            let articles = a::articles
+                .select(all_columns)
+                .left_join(ar::article_refkeys.left_join(r::refkeys))
+                .filter(r::kind.eq(RefKey::WHO_ID))
+                .filter(r::slug.eq(&creator.slug))
+                .inner_join(p::publications.inner_join(i::issues))
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by(all_columns)
+                .load::<Article>(&db)?
+                .into_iter()
+                .map(|article| {
+                    let refs = RefKeySet::for_article(&article, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_article(&article, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(p::publications)
+                        .select((i::year, i::number, i::number_str))
+                        .filter(p::article_id.eq(article.id))
+                        .load::<IssueRef>(&db)
+                        .unwrap();
+                    (article, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
+            let e_t_columns =
+                (t::titles::all_columns(), e::episodes::all_columns());
+            use diesel::dsl::{all, any};
+            let main_roles = vec!["by", "bild", "text", "orig", "ink"];
+            let main_episodes = e::episodes
+                .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
+                .inner_join(t::titles)
+                .filter(ca::creator_id.eq(creator.id))
+                .filter(eb::role.eq(any(&main_roles)))
+                .select(e_t_columns)
+                .inner_join(
+                    ep::episode_parts
+                        .inner_join(p::publications.inner_join(i::issues)),
+                )
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by(e_t_columns)
+                .load::<(Title, Episode)>(&db)?
+                .into_iter()
+                .map(|(title, episode)| {
+                    let refs = RefKeySet::for_episode(&episode, &db).unwrap();
+                    let creators =
+                        CreatorSet::for_episode(&episode, &db).unwrap();
+                    let published = i::issues
+                        .inner_join(
+                            p::publications.inner_join(ep::episode_parts),
+                        )
+                        .select((
+                            (i::year, i::number, i::number_str),
+                            (ep::id, ep::part_no, ep::part_name),
+                        ))
+                        .filter(ep::episode.eq(episode.id))
+                        .order((i::year, i::number))
+                        .load::<PartInIssue>(&db)
+                        .unwrap();
+                    (title, episode, refs, creators, published)
+                })
+                .collect::<Vec<_>>();
+            let oe_columns = (t::titles::all_columns(), e::id, e::episode);
+            let other_episodes = e::episodes
+                .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
+                .inner_join(t::titles)
+                .filter(ca::creator_id.eq(creator.id))
+                .filter(eb::role.ne(all(&main_roles)))
+                .select(oe_columns)
+                .inner_join(
+                    ep::episode_parts
+                        .inner_join(p::publications.inner_join(i::issues)),
+                )
+                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .group_by(oe_columns)
+                .load::<(Title, i32, Option<String>)>(&db)?;
+
+            use std::collections::BTreeMap;
+            let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
+            for (title, episode_id, episode) in other_episodes {
+                let published = i::issues
+                    .inner_join(p::publications.inner_join(ep::episode_parts))
+                    .select((
+                        (i::year, i::number, i::number_str),
+                        (ep::id, ep::part_no, ep::part_name),
+                    ))
+                    .filter(ep::episode.eq(episode_id))
+                    .load::<PartInIssue>(&db)
+                    .unwrap();
+                oe.entry(title).or_default().push((episode, published));
+            }
+
+            let o_roles = eb::episodes_by
+                .inner_join(ca::creator_aliases)
+                .filter(ca::creator_id.eq(creator.id))
+                .filter(eb::role.ne(all(&main_roles)))
+                .select(eb::role)
+                .distinct()
+                .load::<String>(&db)?
+                .into_iter()
+                .map(|r| match r.as_ref() {
+                    "color" => "färgläggare",
+                    "redax" => "redaktion",
+                    "xlat" => "översättare",
+                    "textning" => "textsättare",
+                    _ => "något annat",
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            Ok((creator, articles, main_episodes, o_roles, oe))
+        })
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => not_found(),
+            e => custom(e),
+        })?;
+    Response::builder().html(|o| {
+        templates::creator(o, &creator, &articles, &episodes, &o_roles, &oe)
+    })
 }

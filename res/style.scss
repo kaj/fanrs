@@ -109,3 +109,12 @@ section.front {
     .w7 { font-size: 134%; }
     .w8 { font-size: 149%; }
 }
+
+.episode ul {
+    column-width: 22em;
+    column-gap: 2em;
+    li {
+	page-break-inside: avoid;
+	break-inside: avoid;
+    }
+}

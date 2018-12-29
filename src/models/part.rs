@@ -42,7 +42,7 @@ impl ToHtml for Part {
     }
 }
 
-#[derive(Queryable)]
+#[derive(Debug, Queryable)]
 pub struct PartInIssue(IssueRef, Part);
 
 impl ToHtml for PartInIssue {
