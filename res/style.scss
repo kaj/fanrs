@@ -95,6 +95,19 @@ section.front {
 	p { margin: 0 1em; }
     }
 }
+section.titles h2::before {
+    content: url(static_name("prat.svg"));
+    margin-right: 1ex;
+}
+section.refkeys h2::before {
+    content: url(static_name("goda.svg"));
+    margin-right: 1ex;
+}
+section.creators h2::before {
+    content: url(static_name("creator.svg"));
+    margin-right: 1ex;
+}
+
 
 .cloud {
     text-align: justify;
