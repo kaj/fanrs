@@ -27,6 +27,15 @@ table! {
 }
 
 table! {
+    covers (id) {
+        id -> Int4,
+        issue -> Int4,
+        image -> Bytea,
+        fetch_time -> Timestamp,
+    }
+}
+
+table! {
     covers_by (id) {
         id -> Int4,
         issue_id -> Int4,
@@ -131,6 +140,7 @@ joinable!(article_refkeys -> articles (article_id));
 joinable!(article_refkeys -> refkeys (refkey_id));
 joinable!(articles_by -> articles (article_id));
 joinable!(articles_by -> creator_aliases (by_id));
+joinable!(covers -> issues (issue));
 joinable!(covers_by -> creator_aliases (by_id));
 joinable!(covers_by -> issues (issue_id));
 joinable!(creator_aliases -> creators (creator_id));
@@ -148,6 +158,7 @@ allow_tables_to_appear_in_same_query!(
     article_refkeys,
     articles,
     articles_by,
+    covers,
     covers_by,
     creator_aliases,
     creators,

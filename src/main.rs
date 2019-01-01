@@ -1,12 +1,14 @@
 #[macro_use]
 extern crate diesel;
 
+mod fetchcovers;
 mod listissues;
 mod models;
 mod readfiles;
 mod schema;
 mod server;
 
+use crate::fetchcovers::fetch_covers;
 use crate::listissues::list_issues;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -33,6 +35,10 @@ enum Fanrs {
     #[structopt(name = "runserver")]
     /// Run the web server.
     RunServer,
+
+    #[structopt(name = "fetchcovers")]
+    /// Fetch missing cover images from phantomwiki.
+    FetchCovers,
 }
 
 fn main() {
@@ -66,6 +72,7 @@ fn run() -> Result<(), failure::Error> {
         }
         Fanrs::ListIssues => list_issues(&db),
         Fanrs::RunServer => server::run(&db_url),
+        Fanrs::FetchCovers => fetch_covers(&db),
     }
 }
 

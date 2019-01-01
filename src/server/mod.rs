@@ -39,6 +39,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
     use warp::{get2 as get, path, path::end};
     let routes = warp::any()
         .and(get().and(path("s")).and(path::tail()).and_then(static_file))
+        .or(get()
+            .and(path("c"))
+            .and(s())
+            .and(path::param())
+            .and(end())
+            .and_then(cover_image))
         .or(get().and(end()).and(s()).and_then(frontpage))
         .or(get()
             .and(path("titles"))
@@ -97,7 +103,6 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
         Ok(Response::builder()
-            //.status(StatusCode::OK)
             .header(CONTENT_TYPE, data.mime.as_ref())
             .header(EXPIRES, far_expires.to_rfc2822())
             .body(data.content))
@@ -110,6 +115,53 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
 fn pg_pool(database_url: &str) -> PgPool {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::new(manager).expect("Postgres connection pool could not be created")
+}
+
+struct CoverRef {
+    year: i16,
+    number: i16,
+}
+
+use std::str::FromStr;
+impl FromStr for CoverRef {
+    type Err = u8;
+    /// expect fYYYY-NN.jpg
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !s.starts_with('f') {
+            return Err(0);
+        }
+        let p1 = s.find('-').ok_or(1)?;
+        let p2 = s.find(".jpg").ok_or(2)?;
+        Ok(CoverRef {
+            year: s[1..p1].parse().map_err(|_| 3)?,
+            number: s[p1 + 1..p2].parse().map_err(|_| 4)?,
+        })
+    }
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn cover_image(
+    db: PooledPg,
+    issue: CoverRef,
+) -> Result<impl Reply, Rejection> {
+    use crate::schema::covers::dsl as c;
+    use crate::schema::issues::dsl as i;
+    use mime::IMAGE_JPEG;
+    let data = i::issues
+        .inner_join(c::covers)
+        .select(c::image)
+        .filter(i::year.eq(issue.year))
+        .filter(i::number.eq(issue.number))
+        .first::<Vec<u8>>(&db)
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => not_found(),
+            e => custom(e),
+        })?;
+    let medium_expires = Utc::now() + Duration::days(90);
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
+        .header(EXPIRES, medium_expires.to_rfc2822())
+        .body(data))
 }
 
 #[allow(clippy::needless_pass_by_value)]
