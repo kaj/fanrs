@@ -703,6 +703,7 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
 fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::{all_columns, dsl as a};
+    use crate::schema::covers_by::dsl as cb;
     use crate::schema::creator_aliases::dsl as ca;
     use crate::schema::creators::dsl as c;
     use crate::schema::episode_parts::dsl as ep;
@@ -746,6 +747,21 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             (article, refs, creators, published)
         })
         .collect::<Vec<_>>();
+
+    // TODO Show only the best if there are many, otherwist cronological.
+    // all_covers should always be cronological.
+    let covers = i::issues
+        .select(((i::year, i::number, i::number_str), i::cover_best))
+        .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
+        .filter(ca::creator_id.eq(creator.id))
+        .load::<(IssueRef, Option<i16>)>(&db)
+        .unwrap();
+
+    let (covers, all_covers) = if covers.len() > 25 {
+        (&covers[0..20], &covers[..])
+    } else {
+        (&covers[..], &[][..])
+    };
 
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
     let main_roles = vec!["by", "bild", "text", "orig", "ink"];
@@ -835,6 +851,8 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             o,
             &creator,
             &articles,
+            covers,
+            all_covers,
             &main_episodes,
             &o_roles,
             &oe,

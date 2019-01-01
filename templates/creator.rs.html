@@ -2,7 +2,7 @@
 @use super::page;
 @use std::collections::BTreeMap;
 
-@(creator: &Creator, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
+@(creator: &Creator, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
 @:page(&creator.name, {
   <h1>@creator.name</h1>
   @if !articles.is_empty() {
@@ -17,6 +17,32 @@
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
+    }
+  </section>
+  }
+  @if !covers.is_empty() {
+  <section>
+    <h2>Omslag</h2>
+    @if !all_covers.is_empty() {
+    <p>@creator.name har skapat minst @all_covers.len() omslag till
+    Fantomentidningen. Här visas några av de bästa, en så komplett
+    lista som indexet förmår följer nedan.</p>
+    }
+    <div class="covers">
+      @for (issue, _best) in covers {
+      <div class="cover">
+	<img src="/c/f@issue.year-@issue.number&#46;jpg">
+	<p>@issue</p>
+	<!-- TODO: Best? -->
+      </div>
+      }
+    </div>
+    @if !all_covers.is_empty() {
+    <ul class="allcovers">
+      @for (issue, _best) in all_covers {
+      <li>@issue<!-- TODO: Best? --></li>
+      }
+    </ul>
     }
   </section>
   }

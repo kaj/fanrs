@@ -19,7 +19,7 @@ section {
     padding: .2em .2em 0;
     background: #eee;
 
-    .episode, .article, table {
+    .episode, .article, table, .covers .cover {
 	background: white;
 	border: solid .5px rgba(black, 0.5);
 	border-radius: .2em;
@@ -53,6 +53,17 @@ section {
 		text-align: right;
 	    }
 	}
+    }
+}
+
+.covers {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-around;
+    .cover {
+	flex-grow: .1;
+	text-align: center;
+	img { width: 10em; }
     }
 }
 
@@ -131,7 +142,7 @@ section.creators h2::before {
     .w8 { font-size: 149%; }
 }
 
-.episode ul {
+.episode ul, ul.allcovers {
     column-width: 22em;
     column-gap: 2em;
     li {
