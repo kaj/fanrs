@@ -26,6 +26,7 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                 nr_str,
                 i.attributes.get("pages").and_then(|s| s.parse().ok()),
                 i.attributes.get("price").and_then(|s| s.parse().ok()),
+                i.get_child("omslag").and_then(get_best_plac),
                 db,
             )?;
             println!("Found issue {}", issue);
@@ -46,8 +47,6 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                                 .execute(db)?;
                         }
                     }
-                    let best = get_best_plac(c);
-                    println!("  -> omslag {:?}", best);
                 } else if c.name == "text" {
                     let article = Article::get_or_create(
                         get_req_text(&c, "title")?,

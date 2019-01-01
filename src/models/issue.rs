@@ -4,6 +4,7 @@ use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use failure::Error;
+use std::cmp::Ordering;
 use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -19,7 +20,7 @@ pub struct Issue {
     pub cover_best: Option<i16>,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
 pub struct IssueRef {
     pub year: i16,
     pub number: i16,
@@ -33,6 +34,7 @@ impl Issue {
         number_str: &str,
         pages: Option<i16>,
         price: Option<BigDecimal>,
+        cover_best: Option<i16>,
         db: &PgConnection,
     ) -> Result<Issue, Error> {
         use crate::schema::issues::dsl;
@@ -43,6 +45,19 @@ impl Issue {
             .first::<Issue>(db)
             .optional()?
         {
+            // TODO: Also pages and price!
+            if t.cover_best != cover_best {
+                eprintln!(
+                    "Update {}/{} to cover best {:?}",
+                    number_str, year, cover_best,
+                );
+                diesel::update(dsl::issues)
+                    .filter(dsl::year.eq(year))
+                    .filter(dsl::number.eq(number))
+                    .filter(dsl::number_str.eq(number_str))
+                    .set(dsl::cover_best.eq(cover_best))
+                    .execute(db)?;
+            }
             Ok(t)
         } else {
             Ok(diesel::insert_into(dsl::issues)
@@ -52,6 +67,7 @@ impl Issue {
                     dsl::number_str.eq(number_str),
                     dsl::pages.eq(pages),
                     dsl::price.eq(price),
+                    dsl::cover_best.eq(cover_best),
                 ))
                 .get_result(db)?)
         }
@@ -122,6 +138,16 @@ impl FromStr for IssueRef {
         } else {
             Err(ParseError::NoSpace)
         }
+    }
+}
+
+impl PartialOrd for IssueRef {
+    fn partial_cmp(&self, rhs: &IssueRef) -> Option<Ordering> {
+        Some(
+            self.year
+                .cmp(&rhs.year)
+                .then_with(|| self.number.cmp(&rhs.number)),
+        )
     }
 }
 

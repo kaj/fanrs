@@ -12,6 +12,7 @@
       <img src="/c/f@issue.year-@issue.number&#46;jpg">
       @if let Some((last_c, creators)) = cover_by.split_last()
       {<p class="cover">Omslag av @for c in creators {@c, }@last_c.</p>}
+      @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
       @if let Some(ref pages) = issue.pages {<p class="pages">@pages sidor</p>}
       @if let Some(ref price) = issue.price {<p class="price">Pris @price</p>}
     </header>

@@ -22,25 +22,25 @@
   }
   @if !covers.is_empty() {
   <section>
-    <h2>Omslag</h2>
+    <h2>Omslagsbilder</h2>
     @if !all_covers.is_empty() {
     <p>@creator.name har skapat minst @all_covers.len() omslag till
     Fantomentidningen. Här visas några av de bästa, en så komplett
     lista som indexet förmår följer nedan.</p>
     }
     <div class="covers">
-      @for (issue, _best) in covers {
-      <div class="cover">
-	<img src="/c/f@issue.year-@issue.number&#46;jpg">
+      @for (issue, best) in covers {
+      <div class="cover@if let Some(best) = best { best@best}">
 	<p>@issue</p>
-	<!-- TODO: Best? -->
+	<img src="/c/f@issue.year-@issue.number&#46;jpg">
+	@if let Some(best) = best {<p class="info">Nr @best i bästa omslag.</p>}
       </div>
       }
     </div>
     @if !all_covers.is_empty() {
     <ul class="allcovers">
-      @for (issue, _best) in all_covers {
-      <li>@issue<!-- TODO: Best? --></li>
+      @for (issue, best) in all_covers {
+      <li>@issue@if let Some(best) = best {, nr @best i bästa omslag}.</li>
       }
     </ul>
     }

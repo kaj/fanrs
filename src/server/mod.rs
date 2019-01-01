@@ -748,19 +748,21 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         })
         .collect::<Vec<_>>();
 
-    // TODO Show only the best if there are many, otherwist cronological.
-    // all_covers should always be cronological.
-    let covers = i::issues
+    let mut covers = i::issues
         .select(((i::year, i::number, i::number_str), i::cover_best))
         .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
         .filter(ca::creator_id.eq(creator.id))
+        .order((i::cover_best, i::year, i::number))
         .load::<(IssueRef, Option<i16>)>(&db)
-        .unwrap();
+        .map_err(custom)?;
 
-    let (covers, all_covers) = if covers.len() > 25 {
-        (&covers[0..20], &covers[..])
+    let (covers, all_covers) = if covers.len() > 20 {
+        let best = covers[0..15].to_vec();
+        covers.sort_by(|a, b| a.0.cmp(&b.0));
+        (best, covers)
     } else {
-        (&covers[..], &[][..])
+        covers.sort_by(|a, b| a.0.cmp(&b.0));
+        (covers, vec![])
     };
 
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
@@ -851,8 +853,8 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             o,
             &creator,
             &articles,
-            covers,
-            all_covers,
+            &covers,
+            &all_covers,
             &main_episodes,
             &o_roles,
             &oe,
