@@ -176,8 +176,13 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
-    use diesel::dsl::{any, sql};
+    use diesel::dsl::{any, count_star, sql};
     use diesel::sql_types::{BigInt, Integer};
+
+    let n = i::issues
+        .select(count_star())
+        .first::<i64>(&db)
+        .map_err(custom)?;
 
     let years = i::issues
         .select(i::year)
@@ -253,7 +258,9 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     creators.sort_by(|a, b| a.0.name.cmp(&b.0.name));
 
     Response::builder().html(|o| {
-        templates::frontpage(o, &all_fa, &years, &titles, &refkeys, &creators)
+        templates::frontpage(
+            o, &n, &all_fa, &years, &titles, &refkeys, &creators,
+        )
     })
 }
 
