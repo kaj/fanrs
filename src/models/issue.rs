@@ -45,17 +45,19 @@ impl Issue {
             .first::<Issue>(db)
             .optional()?
         {
-            // TODO: Also pages and price!
-            if t.cover_best != cover_best {
-                eprintln!(
-                    "Update {}/{} to cover best {:?}",
-                    number_str, year, cover_best,
-                );
+            if t.cover_best != cover_best
+                || t.pages != pages
+                || t.price != price
+            {
                 diesel::update(dsl::issues)
                     .filter(dsl::year.eq(year))
                     .filter(dsl::number.eq(number))
                     .filter(dsl::number_str.eq(number_str))
-                    .set(dsl::cover_best.eq(cover_best))
+                    .set((
+                        dsl::cover_best.eq(cover_best),
+                        dsl::pages.eq(pages),
+                        dsl::price.eq(price),
+                    ))
                     .execute(db)?;
             }
             Ok(t)
