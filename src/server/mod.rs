@@ -179,10 +179,7 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use diesel::dsl::{any, count_star, sql};
     use diesel::sql_types::{BigInt, Integer};
 
-    let n = i::issues
-        .select(count_star())
-        .first::<i64>(&db)
-        .map_err(custom)?;
+    let n = i::issues.select(count_star()).first(&db).map_err(custom)?;
 
     let years = i::issues
         .select(i::year)
@@ -259,7 +256,7 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
 
     Response::builder().html(|o| {
         templates::frontpage(
-            o, &n, &all_fa, &years, &titles, &refkeys, &creators,
+            o, n, &all_fa, &years, &titles, &refkeys, &creators,
         )
     })
 }
