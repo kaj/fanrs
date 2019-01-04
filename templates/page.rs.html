@@ -1,4 +1,4 @@
-@use super::statics::{goda_svg, style_css};
+@use super::statics::{goda_svg, sc_png, style_css};
 @(title: &str, content: Content)
 
 <!doctype html>
@@ -19,13 +19,15 @@
     </main>
     <footer>
       <p>Den svenska Fantomentidningen ges ut av Egmont Publishing,
-	redaktör är Mikael Sol. Fantomen © King Features Syndicate Inc.
+	redaktör är Mikael Sol. Fantomen © King Features Syndicate Inc.
 	Dessa sidor är gjorda av Rasmus Kaj med
 	<a href="https://github.com/kaj/fanrs">fanrs
 	@env!("CARGO_PKG_VERSION")</a> och fritt
 	tillgängliga.
 	Omslagsbilder ägs av sina tecknare / förlag, och presenteras
 	här genom <a href="http://www.phantomwiki.org/">Phantom wiki</a>.</p>
+      <p><a href="http://schapter.org/"><img src="/s/@sc_png.name"
+        alt="Scandinavian Chapter of the Lee Falk Memorial Bengali Explorers Club"/></a></p>
     </footer>
   </body>
 </html>
