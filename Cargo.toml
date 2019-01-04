@@ -8,7 +8,7 @@ edition = "2018"
 build = "src/build.rs"
 
 [build-dependencies]
-ructe = { git = "https://github.com/kaj/ructe", features = ["sass", "mime03"] }
+ructe = { version = "0.5.6", features = ["sass", "mime03"] }
 
 [dependencies]
 bigdecimal = "0.0.11"
