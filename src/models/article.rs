@@ -2,7 +2,7 @@ use super::RefKey;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::result::Error;
+use failure::{format_err, Error};
 
 #[derive(Debug, Queryable)]
 pub struct Article {
@@ -29,13 +29,13 @@ impl Article {
         {
             Ok(article)
         } else {
-            diesel::insert_into(dsl::articles)
+            Ok(diesel::insert_into(dsl::articles)
                 .values((
                     dsl::title.eq(title),
                     dsl::subtitle.eq(subtitle),
                     dsl::note.eq(note),
                 ))
-                .get_result(db)
+                .get_result(db)?)
         }
     }
 
@@ -77,7 +77,9 @@ impl Article {
     ) -> Result<(), Error> {
         for r in refs {
             use crate::schema::article_refkeys::dsl as ar;
-            let id = r.get_or_create_id(db)?;
+            let id = r.get_or_create_id(db).map_err(|e| {
+                format_err!("Failed to get id for {:?}: {}", r, e)
+            })?;
             diesel::insert_into(ar::article_refkeys)
                 .values((ar::article_id.eq(self.id), ar::refkey_id.eq(id)))
                 .on_conflict_do_nothing()

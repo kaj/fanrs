@@ -55,17 +55,21 @@ impl RefKey {
 
     pub fn get_or_create_id(&self, db: &PgConnection) -> Result<i32, Error> {
         let (kind, title, slug) = match self {
-            RefKey::Fa(s) => (RefKey::FA_ID, "", s),
-            RefKey::Key(t, s) => (RefKey::KEY_ID, t.as_ref(), s),
-            RefKey::Who(n, s) => (RefKey::WHO_ID, n.as_ref(), s),
-            RefKey::Title(n, s) => (RefKey::TITLE_ID, n.as_ref(), s),
+            RefKey::Fa(s) => (RefKey::FA_ID, "", s.clone()),
+            RefKey::Key(t, s) => (RefKey::KEY_ID, t.as_ref(), s.clone()),
+            RefKey::Who(n, _s) => {
+                use super::Creator;
+                let creator = Creator::get_or_create(&n, db)?;
+                (RefKey::WHO_ID, n.as_ref(), creator.slug)
+            }
+            RefKey::Title(n, s) => (RefKey::TITLE_ID, n.as_ref(), s.clone()),
         };
         use crate::schema::refkeys::dsl;
         dsl::refkeys
             .select(dsl::id)
             .filter(dsl::kind.eq(kind))
             .filter(dsl::title.eq(title))
-            .filter(dsl::slug.eq(slug))
+            .filter(dsl::slug.eq(&slug))
             .first(db)
             .optional()?
             .ok_or(0)
@@ -74,7 +78,7 @@ impl RefKey {
                     .values((
                         dsl::kind.eq(kind),
                         dsl::title.eq(title),
-                        dsl::slug.eq(slug),
+                        dsl::slug.eq(&slug),
                     ))
                     .returning(dsl::id)
                     .get_result::<i32>(db)

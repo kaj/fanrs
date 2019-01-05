@@ -55,7 +55,9 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
                         db,
                     )?;
                     if let Some(ref refs) = get_refs(c)? {
-                        article.set_refs(&refs, db)?;
+                        article.set_refs(&refs, db).map_err(|e| {
+                            format_err!("Bad refs on {:?}: {}", article, e)
+                        })?;
                     }
                     article.publish(issue.id, seqno as i16, db)?;
                     for by in c.children.iter().filter(|e| e.name == "by") {
