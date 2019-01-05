@@ -159,7 +159,33 @@ fn register_serie(
                 }
             }
             "ref" => episode.set_refs(&parse_refs(&e.children)?, db)?,
-            "prevpub" => (),  // TODO
+            "prevpub" => match e.children.get(0).map(|e| e.name.as_ref()) {
+                Some("fa") => {
+                    let (nr, nr_str) = parse_nr(get_text(e, "fa").unwrap())?;
+                    let year = get_text(e, "year")
+                        .ok_or_else(|| format_err!("nr missing"))?
+                        .parse()?;
+                    let issue = Issue::get_or_create(
+                        year,
+                        nr,
+                        nr_str,
+                        None,
+                        None,
+                        None,
+                        db,
+                    )?;
+                    episode.publish_part(
+                        None,
+                        issue.id,
+                        Some(seqno as i16),
+                        get_best_plac(c),
+                        db,
+                    )?;
+                }
+                Some("date") => eprintln!("Got prevpub date {:?}", e),
+                Some("magazine") => eprintln!("Got magazine date {:?}", e),
+                _other => Err(format_err!("Unknown prevpub {:?}", e))?,
+            }
             "label" => (),    // TODO
             "daystrip" => (), // TODO
             _other => Err(format_err!("Unknown {:?} in serie", e))?,
