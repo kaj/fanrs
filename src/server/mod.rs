@@ -359,7 +359,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                                         .inner_join(ep::episode_parts),
                                 )
                                 .select((
-                                    (i::year, i::number, i::number_str),
+                                    (i::year, (i::number, i::number_str)),
                                     (ep::id, ep::part_no, ep::part_name),
                                 ))
                                 .filter(ep::episode.eq(e.id))
@@ -482,7 +482,7 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                         CreatorSet::for_article(&article, &db).unwrap();
                     let published = i::issues
                         .inner_join(p::publications)
-                        .select((i::year, i::number, i::number_str))
+                        .select((i::year, (i::number, i::number_str)))
                         .filter(p::article_id.eq(article.id))
                         .load::<IssueRef>(&db)
                         .unwrap();
@@ -509,7 +509,7 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                             p::publications.inner_join(ep::episode_parts),
                         )
                         .select((
-                            (i::year, i::number, i::number_str),
+                            (i::year, (i::number, i::number_str)),
                             (ep::id, ep::part_no, ep::part_name),
                         ))
                         .filter(ep::episode.eq(episode.id))
@@ -608,7 +608,7 @@ fn one_ref_impl(
                         CreatorSet::for_article(&article, &db).unwrap();
                     let published = i::issues
                         .inner_join(p::publications)
-                        .select((i::year, i::number, i::number_str))
+                        .select((i::year, (i::number, i::number_str)))
                         .filter(p::article_id.eq(article.id))
                         .load::<IssueRef>(&db)
                         .unwrap();
@@ -643,7 +643,7 @@ fn one_ref_impl(
                             p::publications.inner_join(ep::episode_parts),
                         )
                         .select((
-                            (i::year, i::number, i::number_str),
+                            (i::year, (i::number, i::number_str)),
                             (ep::id, ep::part_no, ep::part_name),
                         ))
                         .filter(ep::episode.eq(episode.id))
@@ -744,7 +744,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             let creators = CreatorSet::for_article(&article, &db).unwrap();
             let published = i::issues
                 .inner_join(p::publications)
-                .select((i::year, i::number, i::number_str))
+                .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
                 .load::<IssueRef>(&db)
                 .unwrap();
@@ -753,7 +753,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
 
     let mut covers = i::issues
-        .select(((i::year, i::number, i::number_str), i::cover_best))
+        .select(((i::year, (i::number, i::number_str)), i::cover_best))
         .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
         .filter(ca::creator_id.eq(creator.id))
         .order((i::cover_best, i::year, i::number))
@@ -792,7 +792,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             let published = i::issues
                 .inner_join(p::publications.inner_join(ep::episode_parts))
                 .select((
-                    (i::year, i::number, i::number_str),
+                    (i::year, (i::number, i::number_str)),
                     (ep::id, ep::part_no, ep::part_name),
                 ))
                 .filter(ep::episode.eq(episode.id))
@@ -824,7 +824,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         let published = i::issues
             .inner_join(p::publications.inner_join(ep::episode_parts))
             .select((
-                (i::year, i::number, i::number_str),
+                (i::year, (i::number, i::number_str)),
                 (ep::id, ep::part_no, ep::part_name),
             ))
             .filter(ep::episode.eq(episode_id))

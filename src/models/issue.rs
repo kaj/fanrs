@@ -23,15 +23,13 @@ pub struct Issue {
 #[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
 pub struct IssueRef {
     pub year: i16,
-    pub number: i16,
-    pub number_str: String,
+    pub number: Nr,
 }
 
 impl Issue {
     pub fn get_or_create(
         year: i16,
-        number: i16,
-        number_str: &str,
+        number: Nr,
         pages: Option<i16>,
         price: Option<BigDecimal>,
         cover_best: Option<i16>,
@@ -40,8 +38,8 @@ impl Issue {
         use crate::schema::issues::dsl;
         if let Some(t) = dsl::issues
             .filter(dsl::year.eq(year))
-            .filter(dsl::number.eq(number))
-            .filter(dsl::number_str.eq(number_str))
+            .filter(dsl::number.eq(number.number))
+            .filter(dsl::number_str.eq(&number.nr_str))
             .first::<Issue>(db)
             .optional()?
         {
@@ -51,8 +49,8 @@ impl Issue {
             {
                 diesel::update(dsl::issues)
                     .filter(dsl::year.eq(year))
-                    .filter(dsl::number.eq(number))
-                    .filter(dsl::number_str.eq(number_str))
+                    .filter(dsl::number.eq(number.number))
+                    .filter(dsl::number_str.eq(number.nr_str))
                     .set((
                         dsl::cover_best.eq(cover_best),
                         dsl::pages.eq(pages),
@@ -65,8 +63,8 @@ impl Issue {
             Ok(diesel::insert_into(dsl::issues)
                 .values((
                     dsl::year.eq(year),
-                    dsl::number.eq(number),
-                    dsl::number_str.eq(number_str),
+                    dsl::number.eq(number.number),
+                    dsl::number_str.eq(number.nr_str),
                     dsl::pages.eq(pages),
                     dsl::price.eq(price),
                     dsl::cover_best.eq(cover_best),
@@ -96,16 +94,6 @@ impl fmt::Display for Issue {
     }
 }
 
-pub fn parse_nr(nr_str: &str) -> Result<(i16, &str), ParseError> {
-    let nr = nr_str
-        .find('-')
-        .map(|p| &nr_str[0..p])
-        .unwrap_or(nr_str)
-        .parse()
-        .map_err(|_| ParseError::BadIssue)?;
-    Ok((nr, nr_str))
-}
-
 #[derive(Debug)]
 pub enum ParseError {
     BadIssue,
@@ -129,13 +117,9 @@ impl FromStr for IssueRef {
         if let Some((Some(year), Some(nr))) =
             s.find(' ').map(|p| (s.get(0..p), s.get(p + 1..)))
         {
-            let (nr, nr_str) =
-                parse_nr(nr).map_err(|_| ParseError::BadIssue)?;
-            let year = year.parse().map_err(|_| ParseError::BadYear)?;
             Ok(IssueRef {
-                year,
-                number: nr,
-                number_str: nr_str.to_string(),
+                year: year.parse().map_err(|_| ParseError::BadYear)?,
+                number: nr.parse()?,
             })
         } else {
             Err(ParseError::NoSpace)
@@ -159,8 +143,43 @@ impl ToHtml for IssueRef {
             out,
             "<a href='/{y}#i{n}'>Fa {ns}/{y}</a>",
             y = self.year,
-            n = self.number,
-            ns = self.number_str,
+            n = self.number.number,
+            ns = self.number.nr_str,
         )
+    }
+}
+
+/// A number of an issue (excluding year).
+#[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
+pub struct Nr {
+    number: i16,
+    nr_str: String,
+}
+
+impl fmt::Display for Nr {
+    fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
+        write!(out, "{}", self.nr_str)
+    }
+}
+
+impl FromStr for Nr {
+    type Err = ParseError;
+    fn from_str(nr_str: &str) -> Result<Nr, Self::Err> {
+        let number = nr_str
+            .find('-')
+            .map(|p| &nr_str[0..p])
+            .unwrap_or(nr_str)
+            .parse()
+            .map_err(|_| ParseError::BadIssue)?;
+        Ok(Nr {
+            number,
+            nr_str: nr_str.to_string(),
+        })
+    }
+}
+
+impl PartialOrd for Nr {
+    fn partial_cmp(&self, rhs: &Nr) -> Option<Ordering> {
+        Some(self.number.cmp(&rhs.number))
     }
 }

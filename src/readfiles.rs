@@ -1,6 +1,4 @@
-use crate::models::{
-    parse_nr, Article, Creator, Episode, Issue, Part, RefKey, Title,
-};
+use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
 use diesel::prelude::*;
 use failure::{format_err, Error, Fail};
 use std::fs::File;
@@ -15,15 +13,14 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
         match i.name.as_ref() {
             "info" => (), // ignore
             "issue" => {
-                let (nr, nr_str) = i
+                let nr = i
                     .attributes
                     .get("nr")
                     .ok_or_else(|| format_err!("nr missing"))
-                    .and_then(|s| Ok(parse_nr(s)?))?;
+                    .and_then(|s| Ok(s.parse()?))?;
                 let issue = Issue::get_or_create(
                     year,
                     nr,
-                    nr_str,
                     i.attributes.get("pages").and_then(|s| s.parse().ok()),
                     i.attributes.get("price").and_then(|s| s.parse().ok()),
                     i.get_child("omslag").and_then(get_best_plac),
@@ -161,23 +158,16 @@ fn register_serie(
             "ref" => episode.set_refs(&parse_refs(&e.children)?, db)?,
             "prevpub" => match e.children.get(0).map(|e| e.name.as_ref()) {
                 Some("fa") => {
-                    let (nr, nr_str) = parse_nr(get_text(e, "fa").unwrap())?;
+                    let nr = get_text(e, "fa").unwrap().parse()?;
                     let year = get_text(e, "year")
-                        .ok_or_else(|| format_err!("nr missing"))?
+                        .ok_or_else(|| format_err!("year missing"))?
                         .parse()?;
-                    let issue = Issue::get_or_create(
-                        year,
-                        nr,
-                        nr_str,
-                        None,
-                        None,
-                        None,
-                        db,
-                    )?;
+                    let issue =
+                        Issue::get_or_create(year, nr, None, None, None, db)?;
                     episode.publish_part(
                         None,
                         issue.id,
-                        Some(seqno as i16),
+                        None,
                         get_best_plac(c),
                         db,
                     )?;
@@ -185,7 +175,7 @@ fn register_serie(
                 Some("date") => eprintln!("Got prevpub date {:?}", e),
                 Some("magazine") => eprintln!("Got magazine date {:?}", e),
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
-            }
+            },
             "label" => (),    // TODO
             "daystrip" => (), // TODO
             _other => Err(format_err!("Unknown {:?} in serie", e))?,
