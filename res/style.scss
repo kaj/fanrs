@@ -1,5 +1,23 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+html body {
+    margin: 0 1%;
+}
 body {
     line-height: 1.5;
+    display: flex;
+    flex-flow: column;
+    justify-content: space-between;
+
+    > * {
+	flex-shrink: 0;
+    }
+    > main {
+	flex-grow: 0.5;
+    }
     > header { border-bottom: solid .5px black; }
     > footer {
 	border-top: solid .5px black;
@@ -13,6 +31,7 @@ body {
 	img {
 	    width: 5em;
 	    height: auto;
+	    vertical-align: middle;
 	}
     }
 }

@@ -9,7 +9,7 @@
   <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>
-      <img src="/c/f@issue.year-@issue.number&#46;jpg">
+      <img src="/c/f@issue.year-@issue.number&#46;jpg" alt="">
       @if let Some((last_c, creators)) = cover_by.split_last()
       {<p class="cover">Omslag av @for c in creators {@c, }@last_c.</p>}
       @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
