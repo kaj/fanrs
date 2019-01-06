@@ -17,26 +17,31 @@ use failure::format_err;
 use std::env;
 use std::process::exit;
 use structopt::StructOpt;
+use time;
 
 #[derive(StructOpt)]
-#[structopt(name = "fanrs", about = "Manage index of the Phantom comics")]
+#[structopt(
+    name = "fanrs",
+    about = "Manage and serve index of the Phantom comic books.",
+    rename_all = "kebab-case"
+)]
 enum Fanrs {
-    #[structopt(name = "readfiles")]
     /// Read data from xml content files.
     ReadFiles {
-        #[structopt(name = "year")]
+        /// Read data for all years, from 1950 to current.
+        #[structopt(long, short)]
+        all: bool,
+
         /// Year(s) to read data for.
+        #[structopt(name = "year")]
         years: Vec<u32>,
     },
-    #[structopt(name = "listissues")]
     /// List known comic book issues (in compact format).
     ListIssues,
 
-    #[structopt(name = "runserver")]
     /// Run the web server.
     RunServer,
 
-    #[structopt(name = "fetchcovers")]
     /// Fetch missing cover images from phantomwiki.
     FetchCovers,
 }
@@ -58,14 +63,22 @@ fn run() -> Result<(), failure::Error> {
     let db = PgConnection::establish(&db_url)?;
 
     match opt {
-        Fanrs::ReadFiles { years } => {
-            if years.is_empty() {
-                return Err(format_err!(
-                    "No year(s) to read files for given."
-                ));
-            }
-            for year in years {
-                readfiles::load_year(year as i16, &db)?;
+        Fanrs::ReadFiles { all, years } => {
+            if all {
+                let current_year = 1900 + time::now().tm_year as i16;
+                eprintln!("Current year is {}", current_year);
+                for year in 1950..=current_year {
+                    readfiles::load_year(year, &db)?;
+                }
+            } else {
+                if years.is_empty() {
+                    return Err(format_err!(
+                        "No year(s) to read files for given."
+                    ));
+                }
+                for year in years {
+                    readfiles::load_year(year as i16, &db)?;
+                }
             }
             readfiles::delete_unpublished(&db)?;
             Ok(())

@@ -1,13 +1,25 @@
 use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
 use diesel::prelude::*;
-use failure::{format_err, Error, Fail};
+use failure::{format_err, Error};
 use std::fs::File;
+use std::io::ErrorKind;
 use xmltree::Element;
 
 pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
-    let data = File::open(format!("/home/kaj/proj/fantomen/{}.data", year))
-        .map_err(|e| fail_year(year, &e))
-        .and_then(|f| Element::parse(f).map_err(|e| fail_year(year, &e)))?;
+    do_load_year(year, db)
+        .map_err(|e| format_err!("Error reading data for {}: {}", year, e))
+}
+
+pub fn do_load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
+    let data =
+        match File::open(format!("/home/kaj/proj/fantomen/{}.data", year)) {
+            Err(ref e) if e.kind() == ErrorKind::NotFound => {
+                eprintln!("No data found for {}", year);
+                return Ok(());
+            }
+            Err(e) => Err(e)?,
+            Ok(f) => Element::parse(f)?,
+        };
 
     for i in data.children {
         match i.name.as_ref() {
@@ -65,10 +77,6 @@ pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
         }
     }
     Ok(())
-}
-
-fn fail_year(year: i16, err: &Fail) -> Error {
-    format_err!("Failed to read data for {}: {}", year, err)
 }
 
 fn register_article(
