@@ -9,6 +9,9 @@ use std::io::{self, Write};
 pub struct CreatorSet(BTreeMap<String, Vec<Creator>>);
 
 impl CreatorSet {
+    pub const MAIN_ROLES: &'static [&'static str] =
+        &["by", "bild", "text", "orig", "ink"];
+
     pub fn for_episode(
         episode: &Episode,
         db: &PgConnection,

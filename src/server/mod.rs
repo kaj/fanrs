@@ -173,7 +173,6 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::episodes::dsl as e;
     use crate::schema::episodes_by::dsl as eb;
     use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
     use diesel::dsl::{any, count_star, sql};
@@ -198,13 +197,12 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
 
     let num = 50;
+    let (c_def, c) = named(sql("count(*)"), "c");
     let mut titles = t::titles
-        .left_join(e::episodes.left_join(
-            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
-        ))
-        .select((t::titles::all_columns(), sql::<BigInt>("count(*) c")))
+        .left_join(e::episodes.left_join(ep::episode_parts))
+        .select((t::titles::all_columns(), c_def))
         .group_by(t::titles::all_columns())
-        .order(sql::<BigInt>("c").desc())
+        .order(c.desc())
         .limit(num)
         .load::<(Title, i64)>(&db)
         .map_err(custom)?
@@ -214,14 +212,13 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
     titles.sort_by(|a, b| a.0.title.cmp(&b.0.title));
 
+    let (c_def, c) = named(sql("count(*)"), "c");
     let mut refkeys = r::refkeys
-        .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
-            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
-        )))
-        .select((r::refkeys::all_columns(), sql::<BigInt>("count(*) c")))
+        .left_join(er::episode_refkeys.left_join(e::episodes))
+        .select((r::refkeys::all_columns(), c_def))
         .filter(r::kind.eq(RefKey::KEY_ID))
         .group_by(r::refkeys::all_columns())
-        .order(sql::<BigInt>("c").desc())
+        .order(c.desc())
         .limit(num)
         .load::<(IdRefKey, i64)>(&db)
         .map_err(custom)?
@@ -233,16 +230,14 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
     refkeys.sort_by(|a, b| a.0.name().cmp(&b.0.name()));
 
-    let main_roles = vec!["by", "bild", "text"];
+    let (c_ep, c_ep_n) =
+        named(sql::<BigInt>("count(distinct episode_id)"), "n");
     let mut creators = c::creators
         .left_join(ca::creator_aliases.left_join(eb::episodes_by))
-        .filter(eb::role.eq(any(&main_roles)))
-        .select((
-            c::creators::all_columns(),
-            sql::<BigInt>("count(distinct episode_id) c"),
-        ))
+        .filter(eb::role.eq(any(CreatorSet::MAIN_ROLES)))
+        .select((c::creators::all_columns(), c_ep))
         .group_by(c::creators::all_columns())
-        .order(sql::<BigInt>("c").desc())
+        .order(c_ep_n.desc())
         .limit(num)
         .load::<(Creator, i64)>(&db)
         .map_err(custom)?
@@ -421,7 +416,7 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::publications::dsl as p;
     use crate::schema::titles::dsl as t;
     use diesel::dsl::sql;
-    use diesel::sql_types::{BigInt, Text};
+    use diesel::sql_types::Text;
 
     let all = t::titles
         .left_join(e::episodes.left_join(
@@ -429,7 +424,7 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
         ))
         .select((
             t::titles::all_columns(),
-            sql::<BigInt>("count(*)"),
+            sql("count(*)"),
             sql::<Text>("min(concat(year, ' ', number_str))"),
             sql::<Text>("max(concat(year, ' ', number_str))"),
         ))
@@ -472,7 +467,7 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                 .filter(r::kind.eq(RefKey::TITLE_ID))
                 .filter(r::slug.eq(&title.slug))
                 .inner_join(p::publications.inner_join(i::issues))
-                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+                .order(min(sortable_issue()))
                 .group_by(all_columns)
                 .load::<Article>(&db)?
                 .into_iter()
@@ -537,7 +532,7 @@ fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use diesel::dsl::sql;
-    use diesel::sql_types::{BigInt, Text};
+    use diesel::sql_types::Text;
 
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
@@ -546,7 +541,7 @@ fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
         )))
         .select((
             r::refkeys::all_columns(),
-            sql::<BigInt>("count(*)"),
+            sql("count(*)"),
             sql::<Text>("min(concat(year, ' ', number_str))"),
             sql::<Text>("max(concat(year, ' ', number_str))"),
         ))
@@ -672,7 +667,6 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::issues::dsl as i;
     use crate::schema::publications::dsl as p;
     use diesel::dsl::sql;
-    use diesel::sql_types::{BigInt, Text};
 
     let all = c::creators
         .left_join(
@@ -687,9 +681,9 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
         )
         .select((
             c::creators::all_columns(),
-            sql::<BigInt>("count(*)"),
-            sql::<Text>("min(concat(year, ' ', number_str))"),
-            sql::<Text>("max(concat(year, ' ', number_str))"),
+            sql("count(*)"),
+            sql("min(concat(year, ' ', number_str))"),
+            sql("max(concat(year, ' ', number_str))"),
         ))
         .group_by(c::creators::all_columns())
         .order(c::name)
@@ -770,12 +764,11 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     };
 
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
-    let main_roles = vec!["by", "bild", "text", "orig", "ink"];
     let main_episodes = e::episodes
         .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
         .inner_join(t::titles)
         .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.eq(any(&main_roles)))
+        .filter(eb::role.eq(any(CreatorSet::MAIN_ROLES)))
         .select(e_t_columns)
         .inner_join(
             ep::episode_parts
@@ -807,13 +800,13 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
         .inner_join(t::titles)
         .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.ne(all(&main_roles)))
+        .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
         .select(oe_columns)
         .inner_join(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),
         )
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(sortable_issue()))
         .group_by(oe_columns)
         .load::<(Title, i32, Option<String>)>(&db)
         .map_err(custom)?;
@@ -836,7 +829,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     let o_roles = eb::episodes_by
         .inner_join(ca::creator_aliases)
         .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.ne(all(&main_roles)))
+        .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
         .select(eb::role)
         .distinct()
         .load::<String>(&db)
@@ -864,4 +857,20 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             &oe,
         )
     })
+}
+
+use diesel::expression::SqlLiteral;
+use diesel::sql_types::SmallInt;
+
+fn named<T>(
+    query: SqlLiteral<T>,
+    name: &str,
+) -> (SqlLiteral<T, SqlLiteral<T>>, SqlLiteral<T>) {
+    use diesel::dsl::sql;
+    (query.sql(&format!(" {}", name)), sql::<T>(name))
+}
+
+fn sortable_issue() -> SqlLiteral<SmallInt> {
+    use diesel::dsl::sql;
+    sql("(year-1950)*64 + number")
 }
