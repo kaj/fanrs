@@ -111,6 +111,33 @@ impl std::fmt::Display for ParseError {
 }
 impl std::error::Error for ParseError {}
 
+impl IssueRef {
+    pub const MAGIC_Q: &'static str =
+        "cast(((year-1950)*64+number)*2 + sign(cast(position('-' in number_str) as smallint)) as smallint)";
+
+    pub fn from_magic(n: i16) -> IssueRef {
+        let double = (n % 2) > 0;
+        let n = n / 2;
+        let number = n % 64;
+        let year = 1950 + n / 64;
+        IssueRef {
+            year,
+            number: Nr {
+                number,
+                nr_str: if double {
+                    format!("{}-{}", number, number + 1)
+                } else {
+                    format!("{}", number)
+                },
+            },
+        }
+    }
+
+    pub fn sortno(&self) -> i16 {
+        (self.year - 1950) * 64 + self.number.number
+    }
+}
+
 impl FromStr for IssueRef {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<IssueRef, Self::Err> {

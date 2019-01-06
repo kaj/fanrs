@@ -419,7 +419,7 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::publications::dsl as p;
     use crate::schema::titles::dsl as t;
     use diesel::dsl::sql;
-    use diesel::sql_types::Text;
+    use diesel::sql_types::SmallInt;
 
     let all = t::titles
         .left_join(e::episodes.left_join(
@@ -428,20 +428,20 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
         .select((
             t::titles::all_columns(),
             sql("count(*)"),
-            sql::<Text>("min(concat(year, ' ', number_str))"),
-            sql::<Text>("max(concat(year, ' ', number_str))"),
+            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q)),
+            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q)),
         ))
         .group_by(t::titles::all_columns())
         .order(t::title)
-        .load::<(Title, i64, String, String)>(&db)
+        .load(&db)
         .map_err(custom)?
         .into_iter()
         .map(|(title, c, first, last)| {
             Ok((
                 title,
                 c,
-                first.parse().map_err(custom)?,
-                last.parse().map_err(custom)?,
+                IssueRef::from_magic(first),
+                IssueRef::from_magic(last),
             ))
         })
         .collect::<Result<Vec<_>, Rejection>>()?;
@@ -535,7 +535,6 @@ fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use diesel::dsl::sql;
-    use diesel::sql_types::Text;
 
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
@@ -545,16 +544,23 @@ fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
         .select((
             r::refkeys::all_columns(),
             sql("count(*)"),
-            sql::<Text>("min(concat(year, ' ', number_str))"),
-            sql::<Text>("max(concat(year, ' ', number_str))"),
+            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q))
+                .nullable(),
+            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q))
+                .nullable(),
         ))
         .group_by(r::refkeys::all_columns())
         .order(r::title)
-        .load::<(IdRefKey, i64, String, String)>(&db)
+        .load::<(IdRefKey, i64, Option<i16>, Option<i16>)>(&db)
         .map_err(custom)?
         .into_iter()
         .map(|(refkey, c, first, last)| {
-            (refkey.refkey, c, first.parse().ok(), last.parse().ok())
+            (
+                refkey.refkey,
+                c,
+                first.map(IssueRef::from_magic),
+                last.map(IssueRef::from_magic),
+            )
         })
         .collect::<Vec<_>>();
     Response::builder().html(|o| templates::refkeys(o, &all))
@@ -684,17 +690,24 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
         )
         .select((
             c::creators::all_columns(),
-            sql("count(*)"),
-            sql("min(concat(year, ' ', number_str))"),
-            sql("max(concat(year, ' ', number_str))"),
+            sql("count(distinct episodes.id)"),
+            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q))
+                .nullable(),
+            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q))
+                .nullable(),
         ))
         .group_by(c::creators::all_columns())
         .order(c::name)
-        .load::<(Creator, i64, String, String)>(&db)
+        .load::<(Creator, i64, Option<i16>, Option<i16>)>(&db)
         .map_err(custom)?
         .into_iter()
         .map(|(creator, c, first, last)| {
-            (creator, c, first.parse().ok(), last.parse().ok())
+            (
+                creator,
+                c,
+                first.map(IssueRef::from_magic),
+                last.map(IssueRef::from_magic),
+            )
         })
         .collect::<Vec<_>>();
     Response::builder().html(|o| templates::creators(o, &all))

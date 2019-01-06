@@ -182,3 +182,15 @@ section.creators h2::before {
 	break-inside: avoid;
     }
 }
+
+table.sortable thead th {
+    &::after {
+	content: "  ";
+    }
+    &.dir-u::after {
+	content: " \025b4";
+    }
+    &.dir-d::after {
+	content: " \025be";
+    }
+}

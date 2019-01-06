@@ -1,19 +1,24 @@
 @use crate::models::{IssueRef, Title};
 @use super::page;
+@use super::statics::sortable_js;
 
 @(titles: &[(Title, i64, IssueRef, IssueRef)])
 @:page("Serier", {
 <h1>Serier</h1>
 <section>
-  <table>
+  <table class="sortable">
     <thead>
-      <tr><th>Titel</th><th>Antal episoder</th><th>Först</th><th>Senast</th></tr>
+      <tr><th class=" dir-d ">Titel</th><th>Antal episoder</th><th>Först</th><th>Senast</th></tr>
     </thead>
     <tbody>
       @for (title, n, first, last) in titles {
-      <tr><td><a href="@title.slug">@title.title</a></td><td>@n</td><td>@first</td><td>@last</td></tr>
+      <tr><td><a href="@title.slug">@title.title</a></td><td>@n</td>
+	<td data-sort="@first.sortno()">@first</td>
+	<td data-sort="@last.sortno()">@last</td>
+      </tr>
       }
     </tbody>
   </table>
 </section>
+<script type="application/javascript" async src="/s/@sortable_js.name"></script>
 })
