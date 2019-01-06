@@ -405,6 +405,9 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         })
         .collect::<Vec<(Issue, Vec<_>, Vec<_>)>>();
 
+    if issues.is_empty() {
+        return Err(not_found());
+    }
     Response::builder().html(|o| templates::year(o, year, &issues))
 }
 
