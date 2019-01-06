@@ -717,6 +717,7 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
 fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::{all_columns, dsl as a};
+    use crate::schema::articles_by::dsl as ab;
     use crate::schema::covers_by::dsl as cb;
     use crate::schema::creator_aliases::dsl as ca;
     use crate::schema::creators::dsl as c;
@@ -738,7 +739,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             e => custom(e),
         })?;
 
-    let articles = a::articles
+    let about = a::articles
         .select(all_columns)
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(r::kind.eq(RefKey::WHO_ID))
@@ -811,6 +812,30 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             (title, episode, refs, creators, published)
         })
         .collect::<Vec<_>>();
+
+    let articles_by = a::articles
+        .select(all_columns)
+        .inner_join(ab::articles_by.inner_join(ca::creator_aliases))
+        .filter(ca::creator_id.eq(creator.id))
+        .inner_join(p::publications.inner_join(i::issues))
+        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .group_by(all_columns)
+        .load::<Article>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|article| {
+            let refs = RefKeySet::for_article(&article, &db).unwrap();
+            let creators = CreatorSet::for_article(&article, &db).unwrap();
+            let published = i::issues
+                .inner_join(p::publications)
+                .select((i::year, (i::number, i::number_str)))
+                .filter(p::article_id.eq(article.id))
+                .load::<IssueRef>(&db)
+                .unwrap();
+            (article, refs, creators, published)
+        })
+        .collect::<Vec<_>>();
+
     let oe_columns = (t::titles::all_columns(), e::id, e::episode);
     let other_episodes = e::episodes
         .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
@@ -865,10 +890,11 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         templates::creator(
             o,
             &creator,
-            &articles,
+            &about,
             &covers,
             &all_covers,
             &main_episodes,
+            &articles_by,
             &o_roles,
             &oe,
         )

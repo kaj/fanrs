@@ -136,6 +136,11 @@ impl IssueRef {
     pub fn sortno(&self) -> i16 {
         (self.year - 1950) * 64 + self.number.number
     }
+
+    /// Site-relative url to the cover image of this issue.
+    pub fn cover_url(&self) -> String {
+        format!("/c/f{}-{}.jpg", self.year, self.number.number)
+    }
 }
 
 impl FromStr for IssueRef {

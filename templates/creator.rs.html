@@ -2,13 +2,13 @@
 @use super::page;
 @use std::collections::BTreeMap;
 
-@(creator: &Creator, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
+@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
 @:page(&creator.name, {
   <h1>@creator.name</h1>
-  @if !articles.is_empty() {
+  @if !about.is_empty() {
   <section>
     <h2>Artiklar</h2>
-    @for (article, refs, creators, pubs) in articles {
+    @for (article, refs, creators, pubs) in about {
     <div class="article">
       <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
       @refs
@@ -32,7 +32,7 @@
       @for (issue, best) in covers {
       <div class="cover@if let Some(best) = best { best@best}">
 	<p>@issue</p>
-	<img src="/c/f@issue.year-@issue.number&#46;jpg">
+	<img src="@issue.cover_url()">
 	@if let Some(best) = best {<p class="info">Nr @best i bästa omslag.</p>}
       </div>
       }
@@ -59,6 +59,21 @@
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
       @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
       @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
+    </div>
+    }
+  </section>
+  }
+  @if !articles_by.is_empty() {
+  <section>
+    <h2>Artiklar</h2>
+    @for (article, refs, creators, pubs) in articles_by {
+    <div class="article">
+      <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
+      @refs
+      @creators
+      @if let Some(ref note) = article.note { <p class="info note">@note</p> }
+      @if let Some((last_pub, pubs)) = pubs.split_last()
+      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
     }
   </section>
