@@ -16,6 +16,7 @@ chrono = "0.4.6"
 diesel = { version = "1.3", features = ["numeric", "r2d2", "postgres"] }
 dotenv = "0.13"
 failure = "0.1"
+io-result-optional = "0.1.2"
 mime = "0.3"
 reqwest = "*"
 scraper = "0.9.0"

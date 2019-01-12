@@ -1,78 +1,81 @@
 use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
 use diesel::prelude::*;
 use failure::{format_err, Error};
+use io_result_optional::IoResultOptional;
 use std::fs::File;
-use std::io::ErrorKind;
+use std::path::Path;
 use xmltree::Element;
 
-pub fn load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
+type Result<T> = std::result::Result<T, Error>;
+
+pub fn load_year(year: i16, db: &PgConnection) -> Result<()> {
     do_load_year(year, db)
         .map_err(|e| format_err!("Error reading data for {}: {}", year, e))
 }
 
-pub fn do_load_year(year: i16, db: &PgConnection) -> Result<(), Error> {
-    let data =
-        match File::open(format!("/home/kaj/proj/fantomen/{}.data", year)) {
-            Err(ref e) if e.kind() == ErrorKind::NotFound => {
-                eprintln!("No data found for {}", year);
-                return Ok(());
-            }
-            Err(e) => Err(e)?,
-            Ok(f) => Element::parse(f)?,
-        };
-
-    for i in data.children {
-        match i.name.as_ref() {
-            "info" => (), // ignore
-            "issue" => {
-                let nr = i
-                    .attributes
-                    .get("nr")
-                    .ok_or_else(|| format_err!("nr missing"))
-                    .and_then(|s| Ok(s.parse()?))?;
-                let issue = Issue::get_or_create(
+pub fn do_load_year(year: i16, db: &PgConnection) -> Result<()> {
+    let base = Path::new("/home/kaj/proj/fantomen");
+    if let Some(file) =
+        File::open(base.join(format!("{}.data", year))).optional()?
+    {
+        for i in Element::parse(file)?.children {
+            match i.name.as_ref() {
+                "info" => (), // ignore
+                "issue" => register_issue(year, &i, db)?,
+                other => Err(format_err!(
+                    "Unexpected element {:?} in year {}",
+                    other,
                     year,
-                    nr,
-                    i.attributes.get("pages").and_then(|s| s.parse().ok()),
-                    i.attributes.get("price").and_then(|s| s.parse().ok()),
-                    i.get_child("omslag").and_then(get_best_plac),
-                    db,
-                )?;
-                println!("Found issue {}", issue);
-                issue.clear(db)?;
+                ))?,
+            }
+        }
+    } else {
+        eprintln!("No data found for {}", year);
+    };
+    Ok(())
+}
 
-                for (seqno, c) in i.children.iter().enumerate() {
-                    match c.name.as_ref() {
-                        "omslag" => {
-                            if let Some(by) = c.get_child("by") {
-                                let by = get_creators(by, db)?;
-                                for creator in by {
-                                    use crate::schema::covers_by::dsl as cb;
-                                    diesel::insert_into(cb::covers_by)
-                                        .values((
-                                            cb::issue_id.eq(issue.id),
-                                            cb::by_id.eq(creator.id),
-                                        ))
-                                        .on_conflict_do_nothing()
-                                        .execute(db)?;
-                                }
-                            }
-                        }
-                        "text" => register_article(&issue, seqno, &c, db)?,
-                        "serie" => register_serie(&issue, seqno, &c, db)?,
-                        "skick" => (), // ignore
-                        _ => Err(format_err!(
-                            "Unexpected element {:?} in issue {}",
-                            c,
-                            issue,
-                        ))?,
+fn register_issue(year: i16, i: &Element, db: &PgConnection) -> Result<()> {
+    let nr = i
+        .attributes
+        .get("nr")
+        .ok_or_else(|| format_err!("nr missing"))
+        .and_then(|s| Ok(s.parse()?))?;
+    let issue = Issue::get_or_create(
+        year,
+        nr,
+        i.attributes.get("pages").and_then(|s| s.parse().ok()),
+        i.attributes.get("price").and_then(|s| s.parse().ok()),
+        i.get_child("omslag").and_then(get_best_plac),
+        db,
+    )?;
+    println!("Found issue {}", issue);
+    issue.clear(db)?;
+
+    for (seqno, c) in i.children.iter().enumerate() {
+        match c.name.as_ref() {
+            "omslag" => {
+                if let Some(by) = c.get_child("by") {
+                    let by = get_creators(by, db)?;
+                    for creator in by {
+                        use crate::schema::covers_by::dsl as cb;
+                        diesel::insert_into(cb::covers_by)
+                            .values((
+                                cb::issue_id.eq(issue.id),
+                                cb::by_id.eq(creator.id),
+                            ))
+                            .on_conflict_do_nothing()
+                            .execute(db)?;
                     }
                 }
             }
-            other => Err(format_err!(
-                "Unexpected element {:?} in year {}",
-                other,
-                year,
+            "text" => register_article(&issue, seqno, &c, db)?,
+            "serie" => register_serie(&issue, seqno, &c, db)?,
+            "skick" => (), // ignore
+            _ => Err(format_err!(
+                "Unexpected element {:?} in issue {}",
+                c,
+                issue,
             ))?,
         }
     }
@@ -84,7 +87,7 @@ fn register_article(
     seqno: usize,
     c: &Element,
     db: &PgConnection,
-) -> Result<(), Error> {
+) -> Result<()> {
     let article = Article::get_or_create(
         get_req_text(c, "title")?,
         get_text(c, "subtitle"),
@@ -125,7 +128,7 @@ fn register_serie(
     seqno: usize,
     c: &Element,
     db: &PgConnection,
-) -> Result<(), Error> {
+) -> Result<()> {
     let episode = Episode::get_or_create(
         &Title::get_or_create(get_req_text(&c, "title")?, db)?,
         get_text(&c, "episode"),
@@ -192,11 +195,11 @@ fn register_serie(
     Ok(())
 }
 
-fn parse_refs(refs: &[Element]) -> Result<Vec<RefKey>, Error> {
+fn parse_refs(refs: &[Element]) -> Result<Vec<RefKey>> {
     refs.iter().map(parse_ref).collect()
 }
 
-fn parse_ref(e: &Element) -> Result<RefKey, Error> {
+fn parse_ref(e: &Element) -> Result<RefKey> {
     match e.name.as_ref() {
         "fa" => e
             .attributes
@@ -222,7 +225,7 @@ fn parse_ref(e: &Element) -> Result<RefKey, Error> {
     }
 }
 
-fn get_req_text<'a>(e: &'a Element, name: &str) -> Result<&'a str, Error> {
+fn get_req_text<'a>(e: &'a Element, name: &str) -> Result<&'a str> {
     get_text(e, name)
         .ok_or_else(|| format_err!("{:?} missing child {}", e, name))
 }
@@ -237,10 +240,7 @@ fn get_best_plac(e: &Element) -> Option<i16> {
         .and_then(|e| e.attributes.get("plac").and_then(|s| s.parse().ok()))
 }
 
-fn get_creators(
-    by: &Element,
-    db: &PgConnection,
-) -> Result<Vec<Creator>, Error> {
+fn get_creators(by: &Element, db: &PgConnection) -> Result<Vec<Creator>> {
     let one_creator = |e: &Element| {
         let name = &e
             .text
@@ -260,7 +260,7 @@ fn get_creators(
     }
 }
 
-pub fn delete_unpublished(db: &PgConnection) -> Result<(), Error> {
+pub fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::dsl as a;
     use crate::schema::articles_by::dsl as ab;
