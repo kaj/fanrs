@@ -15,6 +15,7 @@ use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::format_err;
 use std::env;
+use std::path::PathBuf;
 use std::process::exit;
 use structopt::StructOpt;
 use time;
@@ -28,6 +29,10 @@ use time;
 enum Fanrs {
     /// Read data from xml content files.
     ReadFiles {
+        /// The directory containing the data files.
+        #[structopt(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
+        basedir: PathBuf,
+
         /// Read data for all years, from 1950 to current.
         #[structopt(long, short)]
         all: bool,
@@ -63,12 +68,15 @@ fn run() -> Result<(), failure::Error> {
     let db = PgConnection::establish(&db_url)?;
 
     match opt {
-        Fanrs::ReadFiles { all, years } => {
+        Fanrs::ReadFiles {
+            basedir,
+            all,
+            years,
+        } => {
             if all {
                 let current_year = 1900 + time::now().tm_year as i16;
-                eprintln!("Current year is {}", current_year);
                 for year in 1950..=current_year {
-                    readfiles::load_year(year, &db)?;
+                    readfiles::load_year(&basedir, year, &db)?;
                 }
             } else {
                 if years.is_empty() {
@@ -77,7 +85,7 @@ fn run() -> Result<(), failure::Error> {
                     ));
                 }
                 for year in years {
-                    readfiles::load_year(year as i16, &db)?;
+                    readfiles::load_year(&basedir, year as i16, &db)?;
                 }
             }
             readfiles::delete_unpublished(&db)?;

@@ -8,13 +8,12 @@ use xmltree::Element;
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub fn load_year(year: i16, db: &PgConnection) -> Result<()> {
-    do_load_year(year, db)
+pub fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
+    do_load_year(base, year, db)
         .map_err(|e| format_err!("Error reading data for {}: {}", year, e))
 }
 
-pub fn do_load_year(year: i16, db: &PgConnection) -> Result<()> {
-    let base = Path::new("/home/kaj/proj/fantomen");
+pub fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     if let Some(file) =
         File::open(base.join(format!("{}.data", year))).optional()?
     {
