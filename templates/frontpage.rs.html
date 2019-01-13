@@ -1,5 +1,6 @@
 @use crate::models::{Creator, RefKey, Title};
-@use super::page;
+@use crate::server::search::SearchQuery;
+@use super::{page, searchbox};
 
 @(n: i64, all_fa: &[RefKey], years: &[i16], titles: &[(Title, i64, u8)], refkeys: &[(RefKey, i64, u8)], creators: &[(Creator, i64, u8)])
 @:page("Fantomenindex.krats.se", {
@@ -7,6 +8,7 @@
 
   <p>Här listas innehållet i @n av de drygt 1600 svenska Fantomentidningar som kommit ut. Du kan välja att titta på en årgång, någon företeelse i Fantomenserien, eller någon serieskapare i listorna nedan.</p>
 
+  <section class="front search">@:searchbox(&SearchQuery::empty())</section>
   <section class="front">
     <header><h2>Fantomenätten</h2></header>
     <p class="article">

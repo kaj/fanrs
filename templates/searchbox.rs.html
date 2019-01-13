@@ -1,0 +1,21 @@
+@use crate::server::search::SearchQuery;
+
+@(query: &SearchQuery)
+<form id="search" action="/search">
+  <div class="q">
+    <input type="search" name="q" value="@query.q"><input type="submit" value="Sök">
+  </div>
+  <div class="refs">
+    @for t in &query.t {
+    <label class="t">@t.title <input type="checkbox" checked name="t" value="@t.slug"></label>
+    }
+    @for p in &query.p {
+    <label class="p">@p.name <input type="checkbox" checked name="p" value="@p.slug"></label>
+    }
+    @for k in &query.k {
+    <label class="k">@k.name() <input type="checkbox" checked name="@k.letter()" value="@k.slug()"></label>
+    }
+  </div>
+  <p class="help">Du kan fritextsöka i de texter som beskriver serierna.
+    För närvarande går det bara att söka efter serier; inte artiklar, noveller, etc.</p>
+</form>

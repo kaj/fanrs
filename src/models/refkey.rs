@@ -13,6 +13,42 @@ pub struct IdRefKey {
     pub refkey: RefKey,
 }
 
+impl IdRefKey {
+    pub fn key_from_slug(
+        slug: &str,
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
+        IdRefKey::from_slug(slug, RefKey::KEY_ID, db)
+    }
+    pub fn fa_from_slug(
+        slug: &str,
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
+        IdRefKey::from_slug(slug, RefKey::FA_ID, db)
+    }
+    fn from_slug(
+        slug: &str,
+        kind: i16,
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
+        use crate::schema::refkeys::dsl as r;
+        r::refkeys
+            .select(r::refkeys::all_columns())
+            .filter(r::kind.eq(kind))
+            .filter(r::slug.eq(slug))
+            .first(db)
+    }
+    pub fn name(&self) -> String {
+        self.refkey.name()
+    }
+    pub fn slug(&self) -> &str {
+        self.refkey.slug()
+    }
+    pub fn letter(&self) -> char {
+        self.refkey.letter()
+    }
+}
+
 #[derive(Debug)]
 pub enum RefKey {
     /// slug
@@ -93,6 +129,14 @@ impl RefKey {
             RefKey::Title(_, slug) => format!("/titles/{}", slug),
         }
     }
+    pub fn slug(&self) -> &str {
+        match self {
+            RefKey::Fa(slug) => slug,
+            RefKey::Key(_, slug) => slug,
+            RefKey::Who(_, slug) => slug,
+            RefKey::Title(_, slug) => slug,
+        }
+    }
 
     pub fn name(&self) -> String {
         match self {
@@ -124,6 +168,14 @@ impl RefKey {
             RefKey::Title(name, _) => name.clone(),
         }
     }
+    pub fn letter(&self) -> char {
+        match self {
+            RefKey::Fa(..) => 'f',
+            RefKey::Key(..) => 'k',
+            RefKey::Who(..) => 'p',
+            RefKey::Title(..) => 't',
+        }
+    }
 }
 
 impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
@@ -142,6 +194,21 @@ impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
                     row.0, k, t, s,
                 ),
             },
+        }
+    }
+}
+
+use diesel::sql_types::{Nullable, SmallInt, Text};
+impl Queryable<(SmallInt, Nullable<Text>, Text), Pg> for RefKey {
+    type Row = (i16, Option<String>, String);
+
+    fn build(row: Self::Row) -> Self {
+        match row {
+            (RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
+            (RefKey::FA_ID, _, s) => RefKey::Fa(s),
+            (RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
+            (RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
+            (k, t, s) => panic!("Bad refkey kind {} ({:?}, {:?})", k, t, s),
         }
     }
 }

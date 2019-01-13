@@ -147,6 +147,7 @@ fn register_serie(
         match e.name.as_ref() {
             "title" | "episode" | "teaser" | "part" | "note"
             | "copyright" | "best" => (), // handled above
+            // TODO: episode other languages!
             "by" => {
                 let role = e
                     .attributes

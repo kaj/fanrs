@@ -51,7 +51,7 @@ section {
     padding: .2em .2em 0;
     background: #eee;
 
-    .episode, .article, table, .covers .cover {
+    section, .episode, .article, table, .covers .cover {
 	background: white;
 	border: solid .5px rgba(black, 0.5);
 	border-radius: .2em;
@@ -84,6 +84,22 @@ section {
 	    &:nth-child(2) {
 		text-align: right;
 	    }
+	}
+    }
+}
+
+section.searchresults.tags {
+    display: flex;
+    flex-flow: row wrap;
+    h2 { flex-basis: 100%; }
+    section {
+	flex-basis: 19em;
+	flex-grow: 1;
+	h3 { display: inline }
+	button {
+	    background: #eee;
+	    border: outset 0.6px #eee;
+	    border-radius: .2em;
 	}
     }
 }
@@ -159,6 +175,87 @@ section.creators h2::before {
     margin-right: 1ex;
 }
 
+#search {
+    margin: .4rem .5rem;
+}
+#search div.q {
+    display: flex;
+    flex-flow: row nowrap;
+}
+#search div.q input[name=q] {
+    border-radius: .4em 0 0 .4em;
+    border-width: 1px;
+    flex-grow: 2;
+    padding: .2rem .5rem;
+    z-index: 18;
+}
+#search div.q input[type=submit] {
+    border-radius: 0 .4em .4em 0;
+    border-width: 1px;
+    padding: .2rem .5rem;
+}
+
+#search div.list {
+    border-bottom: solid 1px #888;
+    box-shadow: .2em .1em .5em rgba(0, 0, 0, .7);
+    display: block;
+    margin-left: .5em;
+    position: absolute;
+    z-index: 17;
+}
+#search div.list :link,
+#search div.list :visited {
+    background: rgba(255,255,255,0.95) no-repeat scroll 0.3em 50% / contain;
+    border-color: #888;
+    border-style: solid;
+    border-width: 1px 1px 0;
+    display: block;
+    padding: .2em .5em .2em 2.2em;
+    color: black;
+    text-decoration: none;
+}
+#search {
+    div.list a:focus {
+	background-color: #aaaaff;
+    }
+    div.refs {
+	display: flex;
+	flex-flow: row wrap;
+    }
+    div.refs label {
+	background: rgba(255,255,255,0.7) no-repeat scroll 0.3em 50% / contain;
+	border-radius: .3em;
+	border: solid 1px rgba(0,0,0,0.3);
+	line-height: 1.2;
+	margin: .2em .3em .2em 0;
+	padding: .1em .3em; // .1em 1.9em;
+
+	&:before {
+	    display: inline-block;
+	    line-height: 1;
+	    margin-right: .2em;
+	    vertical-align: middle;
+	}
+	&.f:before, &.k:before {
+	    content: url(static_name("goda.svg"));
+	}
+	&.t:before {
+	    content: url(static_name("prat.svg"));
+	}
+	&.p:before {
+	    content: url(static_name("creator.svg"));
+	}
+	input {
+	    line-height: 1;
+	    vertical-align: middle;
+	}
+
+    }
+    .help {
+	font-size: 80%;
+	margin: .3em 0;
+    }
+}
 
 .cloud {
     text-align: justify;

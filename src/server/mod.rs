@@ -1,6 +1,8 @@
 mod render_ructe;
+pub mod search;
 
 use self::render_ructe::RenderRucte;
+use self::search::search;
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
     PartInIssue, RefKey, RefKeySet, Title,
@@ -36,6 +38,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
         })
         .boxed();
     let s = move || s.clone();
+    use warp::filters::query::query;
     use warp::{get2 as get, path, path::end};
     let routes = warp::any()
         .and(get().and(path("s")).and(path::tail()).and_then(static_file))
@@ -46,6 +49,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(end())
             .and_then(cover_image))
         .or(get().and(end()).and(s()).and_then(frontpage))
+        .or(get()
+            .and(path("search"))
+            .and(end())
+            .and(s())
+            .and(query())
+            .and_then(search))
         .or(get()
             .and(path("titles"))
             .and(end())

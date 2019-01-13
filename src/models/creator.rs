@@ -14,6 +14,7 @@ pub struct Creator {
 }
 
 impl Creator {
+    /// The id and name here is for an alias.
     pub fn get_or_create(
         name: &str,
         db: &PgConnection,
@@ -39,6 +40,18 @@ impl Creator {
                 .get_result(db)?;
             Ok(creator)
         }
+    }
+
+    /// The id and name here is for the actual creator.
+    pub fn from_slug(
+        slug: &str,
+        db: &PgConnection,
+    ) -> Result<Creator, Error> {
+        use crate::schema::creators::dsl as c;
+        c::creators
+            .select((c::id, c::name, c::slug))
+            .filter(c::slug.eq(slug))
+            .first(db)
     }
 }
 

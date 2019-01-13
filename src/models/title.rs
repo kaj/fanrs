@@ -1,3 +1,4 @@
+use crate::schema::titles::dsl as t;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -20,18 +21,21 @@ impl Title {
         name: &str,
         db: &PgConnection,
     ) -> Result<Title, Error> {
-        use crate::schema::titles::dsl::*;
-        if let Some(t) = titles
-            .filter(title.eq(name))
+        if let Some(t) = t::titles
+            .filter(t::title.eq(name))
             .first::<Title>(db)
             .optional()?
         {
             Ok(t)
         } else {
-            Ok(diesel::insert_into(titles)
-                .values((title.eq(name), slug.eq(&slugify(name))))
+            Ok(diesel::insert_into(t::titles)
+                .values((t::title.eq(name), t::slug.eq(&slugify(name))))
                 .get_result(db)?)
         }
+    }
+
+    pub fn from_slug(slug: &str, db: &PgConnection) -> Result<Title, Error> {
+        t::titles.filter(t::slug.eq(slug)).first(db)
     }
 }
 
