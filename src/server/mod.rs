@@ -182,12 +182,17 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     use crate::schema::episodes::dsl as e;
     use crate::schema::episodes_by::dsl as eb;
     use crate::schema::issues::dsl as i;
+    use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
-    use diesel::dsl::{any, count_star, sql};
+    use diesel::dsl::{any, not, sql};
     use diesel::sql_types::{BigInt, Integer};
 
-    let n = i::issues.select(count_star()).first(&db).map_err(custom)?;
+    let n = p::publications
+        .select(sql("count(distinct issue)"))
+        .filter(not(p::seqno.is_null()))
+        .first(&db)
+        .map_err(custom)?;
 
     let years = i::issues
         .select(i::year)
