@@ -1,10 +1,10 @@
 @use super::statics::{goda_svg, sc_png, style_css};
-@(title: &str, content: Content)
+@(title: &str, inhead: Content, content: Content)
 
 <!doctype html>
 <html>
   <head>
-    <title>@title</title>
+    <title>@title@if !title.contains("index") { - Rasmus Fantomenindex}</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <link rel="stylesheet" href="/s/@style_css.name"/>
@@ -12,7 +12,9 @@
   </head>
   <body>
     <header>
-      <p><a href="/">Fantomenindex.krats.se</a></p>
+      @if !title.contains("index") {<p><a href="/">Rasmus Fantomenindex</a></p>}
+      <h1>@title</h1>
+      @:inhead()
     </header>
     <main>
       @:content()

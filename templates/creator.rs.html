@@ -3,8 +3,7 @@
 @use std::collections::BTreeMap;
 
 @(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
-@:page(&creator.name, {
-  <h1>@creator.name</h1>
+@:page(&creator.name, {}, {
   @if !about.is_empty() {
   <section>
     <h2>Artiklar</h2>

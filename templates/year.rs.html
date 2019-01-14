@@ -3,8 +3,7 @@
 @use super::page;
 
 @(year: u16, issues: &[(Issue, Vec<Creator>, Vec<PublishedInfo>)])
-@:page(&format!("Årgång {}", year), {
-  <h1>@year</h1>
+@:page(&format!("Årgång {}", year), {}, {
   @for (issue, cover_by, contents) in issues {
   <section class="issue" id="i@issue.number">
     <header>

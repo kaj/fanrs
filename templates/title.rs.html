@@ -2,8 +2,7 @@
 @use super::page;
 
 @(title: &Title, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)])
-@:page(&title.title, {
-  <h1>@title.title</h1>
+@:page(&title.title, {}, {
   @if !articles.is_empty() {
   <section>
     <h2>Artiklar</h2>

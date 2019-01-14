@@ -3,8 +3,7 @@
 @use super::statics::sortable_js;
 
 @(creators: &[(Creator, i64, Option<IssueRef>, Option<IssueRef>)])
-@:page("Serier", {
-<h1>Serieskapare i Fantomentidningen</h1>
+@:page("Serieskapare i Fantomentidningen", {}, {
 <section>
   <table class="sortable">
     <thead>

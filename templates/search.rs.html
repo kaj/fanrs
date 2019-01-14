@@ -3,11 +3,7 @@
 @use super::{page, searchbox};
 
 @(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)])
-@:page("Sök", {
-  <section>
-  <h1>Sök</h1>
-  @:searchbox(q)
-  </section>
+@:page("Sök", {@:searchbox(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
     <h2>Serier</h2>
