@@ -6,7 +6,7 @@
 @:page("Rasmus Fantomenindex", {
   <p>Här listas innehållet i @n av de drygt 1600 svenska Fantomentidningar som kommit ut. Du kan välja att titta på en årgång, någon företeelse i Fantomenserien, eller någon serieskapare i listorna nedan.</p>
 }, {
-  <section class="front search">@:searchbox(&SearchQuery::empty())</section>
+  <div class="wrapfour">
   <section class="front">
     <header><h2>Fantomenätten</h2></header>
     <p class="article">
@@ -15,6 +15,7 @@
       <a href="@last_fa.url()">@last_fa.short()</a>.}
     </p>
   </section>
+  <section class="front search">@:searchbox(&SearchQuery::empty())</section>
   <section class="front">
     <header><h2>Årgångar</h2></header>
     <p class="article">
@@ -38,7 +39,7 @@
       </ul>
     </div>
   </section>
-
+  </div>
   <section class="front titles">
     <header>
       <h2>Serier</h2>

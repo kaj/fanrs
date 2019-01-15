@@ -14,11 +14,11 @@ body {
     }
     > main {
         flex-grow: 0.5;
-        margin: 0 1%;
+        margin: 0 1vw;
     }
     > header {
         border-bottom: solid .5px black;
-        padding: 1ex 1%;
+        padding: 1ex 1vw;
         h1 {
             margin: .2em 0 0;
             font-size: 2.6em;
@@ -29,7 +29,7 @@ body {
         display: flex;
         flex-flow: row wrap;
         justify-content: space-between;
-        padding: 1ex 1%;
+        padding: 1ex 1vw;
         p:nth-child(1) {
             flex-basis: 36em;
             flex-grow: 0.5;
@@ -308,5 +308,22 @@ table.sortable thead th {
     }
     &.dir-d::after {
         content: " \025be";
+    }
+}
+
+div.wrapfour {
+    align-items: start;
+    display: flex;
+    flex-flow: row wrap;
+    margin: 0 -.6vw;
+    section {
+        flex-basis: 20em;
+        flex-grow: 1;
+        margin: .5em .6vw;
+        min-width: 35%;
+        ul {
+            margin: .5em 0;
+            padding-left: 1.8em;
+        }
     }
 }
