@@ -130,10 +130,10 @@ fn register_serie(
 ) -> Result<()> {
     let episode = Episode::get_or_create(
         &Title::get_or_create(get_req_text(&c, "title")?, db)?,
-        get_text(&c, "episode"),
-        get_text(&c, "teaser"),
-        get_text(&c, "note"),
-        get_text(&c, "copyright"),
+        get_text_norm(c, "episode").as_ref().map(|t| t.as_ref()),
+        get_text_norm(c, "teaser").as_ref().map(|t| t.as_ref()),
+        get_text_norm(c, "note").as_ref().map(|t| t.as_ref()),
+        get_text_norm(c, "copyright").as_ref().map(|t| t.as_ref()),
         db,
     )?;
     episode.publish_part(
@@ -145,9 +145,24 @@ fn register_serie(
     )?;
     for e in &c.children {
         match e.name.as_ref() {
+            "episode"
+                if e.attributes.get("role") == Some(&"orig".to_string()) =>
+            {
+                let lang =
+                    e.attributes.get("lang").expect("orig should have lang");
+                let orig = e
+                    .text
+                    .as_ref()
+                    .map(|t| normalize_space(&t))
+                    .expect("orig should have name");
+                use crate::schema::episodes::dsl as e;
+                diesel::update(e::episodes)
+                    .set((e::orig_lang.eq(lang), e::orig_episode.eq(orig)))
+                    .filter(e::id.eq(episode.id))
+                    .execute(db)?;
+            }
             "title" | "episode" | "teaser" | "part" | "note"
             | "copyright" | "best" => (), // handled above
-            // TODO: episode other languages!
             "by" => {
                 let role = e
                     .attributes
@@ -233,6 +248,10 @@ fn get_req_text<'a>(e: &'a Element, name: &str) -> Result<&'a str> {
 fn get_text<'a>(e: &'a Element, name: &str) -> Option<&'a str> {
     e.get_child(name)
         .and_then(|e| e.text.as_ref().map(|s| s.as_ref()))
+}
+fn get_text_norm<'a>(e: &'a Element, name: &str) -> Option<String> {
+    e.get_child(name)
+        .and_then(|e| e.text.as_ref().map(|s| normalize_space(&s)))
 }
 
 fn get_best_plac(e: &Element) -> Option<i16> {
@@ -359,4 +378,30 @@ pub fn delete_unpublished(db: &PgConnection) -> Result<()> {
         published_articles.len()
     );
     Ok(())
+}
+
+fn normalize_space(s: &str) -> String {
+    let mut buf = vec![];
+    let mut space = true; // ignore leading space
+    for ch in s.bytes() {
+        if ch.is_ascii_whitespace() {
+            if !space {
+                buf.push(b' ');
+                space = true;
+            }
+        } else {
+            space = false;
+            buf.push(ch);
+        }
+    }
+    if space {
+        buf.pop();
+    }
+    String::from_utf8(buf).expect("Normalize space should retain utf8")
+}
+
+#[test]
+fn test_normalize_space() {
+    assert_eq!(normalize_space("foo bar"), "foo bar");
+    assert_eq!(normalize_space("\n  foo\n\tbar \n"), "foo bar");
 }

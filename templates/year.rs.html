@@ -21,6 +21,7 @@
 	@if let EpisodePart{title, episode, part, published, best_plac} = content {
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode {: @e} @part</h3>
 	@if let Some(ref teaser) = episode.teaser { <p class="teaser">@teaser</p> }
+	@if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
 	@refs
 	@creators
 	@if let Some(ref note) = episode.note { <p class="info note">@note</p> }

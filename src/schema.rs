@@ -84,6 +84,8 @@ table! {
         teaser -> Nullable<Varchar>,
         note -> Nullable<Varchar>,
         copyright -> Nullable<Varchar>,
+        orig_lang -> Nullable<Varchar>,
+        orig_episode -> Nullable<Varchar>,
     }
 }
 

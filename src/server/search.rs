@@ -133,6 +133,7 @@ impl SearchQuery {
             episodes = episodes.filter(
                 e::episode
                     .like(word)
+                    .or(e::orig_episode.like(word))
                     .or(e::teaser.like(word))
                     .or(e::note.like(word))
                     .or(e::copyright.like(word)),

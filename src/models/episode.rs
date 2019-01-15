@@ -1,8 +1,10 @@
 use super::{Part, RefKey, Title};
+use crate::templates::ToHtml;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use std::io::{self, Write};
 
 #[derive(Debug, Queryable)]
 pub struct Episode {
@@ -12,6 +14,8 @@ pub struct Episode {
     pub teaser: Option<String>,
     pub note: Option<String>,
     pub copyright: Option<String>,
+    orig_lang: Option<String>,
+    orig_episode: Option<String>,
 }
 
 impl Episode {
@@ -162,5 +166,40 @@ impl Episode {
                 .execute(db)?;
             Ok(())
         }
+    }
+    /// Return original language and title, if known.
+    pub fn orig(&self) -> Option<OrigEpisode> {
+        if let (Some(lang), Some(episode)) =
+            (&self.orig_lang, &self.orig_episode)
+        {
+            Some(OrigEpisode {
+                lang: &lang,
+                episode: &episode,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+pub struct OrigEpisode<'a> {
+    lang: &'a str,
+    episode: &'a str,
+}
+
+impl<'a> ToHtml for OrigEpisode<'a> {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        write!(
+            out,
+            "{} originalets titel: <i lang='{}'>",
+            match self.lang {
+                "fr" => "Franska",
+                "en" => "Engelska",
+                l => l,
+            },
+            self.lang,
+        )?;
+        self.episode.to_html(out)?;
+        out.write_all(b"</i>")
     }
 }

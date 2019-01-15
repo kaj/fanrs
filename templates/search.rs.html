@@ -44,6 +44,7 @@
     <section class="episode">
       <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = episode.episode {: @h}</h3>
       @if let Some(ref teaser) = episode.teaser {<p class="teaser">@teaser</p>}
+      @if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
       @refs
       @creators
       @if let Some((last_pub, pubs)) = pubs.split_last()
