@@ -18,6 +18,7 @@
     }
   </section>
   }
+  @if !episodes.is_empty() {
   <section>
     <h2>Episoder</h2>
     @for (title, episode, refs, creators, pubs) in episodes {
@@ -33,4 +34,5 @@
     </div>
     }
   </section>
+  }
 })
