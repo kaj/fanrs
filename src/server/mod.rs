@@ -1,11 +1,13 @@
+mod publist;
 mod render_ructe;
 pub mod search;
 
+pub use self::publist::PartsPublished;
 use self::render_ructe::RenderRucte;
 use self::search::search;
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
-    PartInIssue, RefKey, RefKeySet, Title,
+    RefKey, RefKeySet, Title,
 };
 use crate::templates;
 use chrono::{Duration, Utc};
@@ -289,7 +291,7 @@ pub enum PublishedContent {
         title: Title,
         episode: Episode,
         part: Part,
-        published: Vec<PartInIssue>,
+        published: PartsPublished,
         best_plac: Option<i16>,
     },
 }
@@ -312,110 +314,96 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
             use crate::schema::episodes::dsl as e;
             use crate::schema::publications::dsl as p;
             use crate::schema::titles::dsl as t;
-            let issue_id = issue.id;
             let c_columns = (c::id, ca::name, c::slug);
-            (
-                issue,
-                c::creators
-                    .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-                    .select(c_columns)
-                    .filter(cb::issue_id.eq(issue_id))
-                    .load(&db)
-                    .unwrap(),
-                p::publications
-                    .left_outer_join(
-                        ep::episode_parts
-                            .inner_join(e::episodes.inner_join(t::titles)),
+            let cover_by = c::creators
+                .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
+                .select(c_columns)
+                .filter(cb::issue_id.eq(issue.id))
+                .load(&db)
+                .unwrap();
+            let content = p::publications
+                .left_outer_join(
+                    ep::episode_parts
+                        .inner_join(e::episodes.inner_join(t::titles)),
+                )
+                .left_outer_join(a::articles)
+                .select((
+                    (
+                        t::titles::all_columns(),
+                        e::episodes::all_columns(),
+                        (ep::id, ep::part_no, ep::part_name),
                     )
-                    .left_outer_join(a::articles)
-                    .select((
-                        (
-                            t::titles::all_columns(),
-                            e::episodes::all_columns(),
-                            (ep::id, ep::part_no, ep::part_name),
+                        .nullable(),
+                    a::articles::all_columns().nullable(),
+                    p::seqno,
+                    p::best_plac,
+                ))
+                .filter(p::issue.eq(issue.id))
+                .order(p::seqno)
+                .load::<(
+                    Option<(Title, Episode, Part)>,
+                    Option<Article>,
+                    Option<i16>,
+                    Option<i16>,
+                )>(&db)
+                .unwrap()
+                .into_iter()
+                .map(|row| match row {
+                    (Some((t, e, part)), None, seqno, b) => {
+                        let classnames = if t.title == "Fantomen" {
+                            "episode main"
+                        } else if e.teaser.is_none() {
+                            "episode noteaser"
+                        } else {
+                            "episode"
+                        };
+                        let refs = RefKeySet::for_episode(&e, &db).unwrap();
+                        let creators =
+                            CreatorSet::for_episode(&e, &db).unwrap();
+                        let published = PartsPublished::for_episode_except(
+                            &e, &issue, &db,
                         )
-                            .nullable(),
-                        a::articles::all_columns().nullable(),
-                        p::seqno,
-                        p::best_plac,
-                    ))
-                    .filter(p::issue.eq(issue_id))
-                    .order(p::seqno)
-                    .load::<(
-                        Option<(Title, Episode, Part)>,
-                        Option<Article>,
-                        Option<i16>,
-                        Option<i16>,
-                    )>(&db)
-                    .unwrap()
-                    .into_iter()
-                    .map(|row| match row {
-                        (Some((t, e, part)), None, seqno, b) => {
-                            let refs =
-                                RefKeySet::for_episode(&e, &db).unwrap();
-                            let classnames = if t.title == "Fantomen" {
-                                "episode main"
-                            } else if e.teaser.is_none() {
-                                "episode noteaser"
-                            } else {
-                                "episode"
-                            };
-                            let creators =
-                                CreatorSet::for_episode(&e, &db).unwrap();
-                            let published = i::issues
-                                .inner_join(
-                                    p::publications
-                                        .inner_join(ep::episode_parts),
-                                )
-                                .select((
-                                    (i::year, (i::number, i::number_str)),
-                                    (ep::id, ep::part_no, ep::part_name),
-                                ))
-                                .filter(ep::episode.eq(e.id))
-                                .filter(i::id.ne(issue_id))
-                                .load(&db)
-                                .unwrap();
-                            PublishedInfo {
-                                content: PublishedContent::EpisodePart {
-                                    title: t,
-                                    episode: e,
-                                    part,
-                                    published,
-                                    best_plac: b,
-                                },
-                                creators,
-                                refs,
-                                seqno,
-                                classnames,
-                            }
+                        .unwrap();
+                        PublishedInfo {
+                            content: PublishedContent::EpisodePart {
+                                title: t,
+                                episode: e,
+                                part,
+                                published,
+                                best_plac: b,
+                            },
+                            creators,
+                            refs,
+                            seqno,
+                            classnames,
                         }
-                        (None, Some(a), seqno, None) => {
-                            let refs =
-                                RefKeySet::for_article(&a, &db).unwrap();
-                            let creators =
-                                CreatorSet::for_article(&a, &db).unwrap();
-                            let Article {
+                    }
+                    (None, Some(a), seqno, None) => {
+                        let refs = RefKeySet::for_article(&a, &db).unwrap();
+                        let creators =
+                            CreatorSet::for_article(&a, &db).unwrap();
+                        let Article {
+                            title,
+                            subtitle,
+                            note,
+                            ..
+                        } = a;
+                        PublishedInfo {
+                            content: PublishedContent::Text {
                                 title,
                                 subtitle,
                                 note,
-                                ..
-                            } = a;
-                            PublishedInfo {
-                                content: PublishedContent::Text {
-                                    title,
-                                    subtitle,
-                                    note,
-                                },
-                                creators,
-                                refs,
-                                seqno,
-                                classnames: "article",
-                            }
+                            },
+                            creators,
+                            refs,
+                            seqno,
+                            classnames: "article",
                         }
-                        row => panic!("Strange row: {:?}", row),
-                    })
-                    .collect(),
-            )
+                    }
+                    row => panic!("Strange row: {:?}", row),
+                })
+                .collect();
+            (issue, cover_by, content)
         })
         .collect::<Vec<(Issue, Vec<_>, Vec<_>)>>();
 
@@ -516,17 +504,8 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                     let refs = RefKeySet::for_episode(&episode, &db).unwrap();
                     let creators =
                         CreatorSet::for_episode(&episode, &db).unwrap();
-                    let published = i::issues
-                        .inner_join(
-                            p::publications.inner_join(ep::episode_parts),
-                        )
-                        .select((
-                            (i::year, (i::number, i::number_str)),
-                            (ep::id, ep::part_no, ep::part_name),
-                        ))
-                        .filter(ep::episode.eq(episode.id))
-                        .load::<PartInIssue>(&db)
-                        .unwrap();
+                    let published =
+                        PartsPublished::for_episode(&episode, &db).unwrap();
                     (episode, refs, creators, published)
                 })
                 .collect::<Vec<_>>();
@@ -656,17 +635,8 @@ fn one_ref_impl(
                     let refs = RefKeySet::for_episode(&episode, &db).unwrap();
                     let creators =
                         CreatorSet::for_episode(&episode, &db).unwrap();
-                    let published = i::issues
-                        .inner_join(
-                            p::publications.inner_join(ep::episode_parts),
-                        )
-                        .select((
-                            (i::year, (i::number, i::number_str)),
-                            (ep::id, ep::part_no, ep::part_name),
-                        ))
-                        .filter(ep::episode.eq(episode.id))
-                        .load::<PartInIssue>(&db)
-                        .unwrap();
+                    let published =
+                        PartsPublished::for_episode(&episode, &db).unwrap();
                     (title, episode, refs, creators, published)
                 })
                 .collect::<Vec<_>>();
@@ -813,16 +783,8 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .map(|(title, episode)| {
             let refs = RefKeySet::for_episode(&episode, &db).unwrap();
             let creators = CreatorSet::for_episode(&episode, &db).unwrap();
-            let published = i::issues
-                .inner_join(p::publications.inner_join(ep::episode_parts))
-                .select((
-                    (i::year, (i::number, i::number_str)),
-                    (ep::id, ep::part_no, ep::part_name),
-                ))
-                .filter(ep::episode.eq(episode.id))
-                .order((i::year, i::number))
-                .load::<PartInIssue>(&db)
-                .unwrap();
+            let published =
+                PartsPublished::for_episode(&episode, &db).unwrap();
             (title, episode, refs, creators, published)
         })
         .collect::<Vec<_>>();
@@ -869,15 +831,8 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     use std::collections::BTreeMap;
     let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
     for (title, episode_id, episode) in other_episodes {
-        let published = i::issues
-            .inner_join(p::publications.inner_join(ep::episode_parts))
-            .select((
-                (i::year, (i::number, i::number_str)),
-                (ep::id, ep::part_no, ep::part_name),
-            ))
-            .filter(ep::episode.eq(episode_id))
-            .load::<PartInIssue>(&db)
-            .unwrap();
+        let published =
+            PartsPublished::for_episode_id(episode_id, &db).unwrap();
         oe.entry(title).or_default().push((episode, published));
     }
 

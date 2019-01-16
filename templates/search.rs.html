@@ -1,8 +1,9 @@
-@use crate::models::{Article, Creator, CreatorSet, Episode, PartInIssue, RefKey, RefKeySet, Title};
+@use crate::models::{Article, Creator, CreatorSet, Episode, RefKey, RefKeySet, Title};
 @use crate::server::search::SearchQuery;
+@use crate::server::PartsPublished;
 @use super::{page, searchbox};
 
-@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)])
+@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)])
 @:page("Sök", {@:searchbox(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
@@ -47,8 +48,7 @@
       @if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
       @refs
       @creators
-      @if let Some((last_pub, pubs)) = pubs.split_last()
-      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+      @pubs
       @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
       @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
     </section>

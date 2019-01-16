@@ -1,7 +1,6 @@
-use super::{PooledPg, RenderRucte};
+use super::{PartsPublished, PooledPg, RenderRucte};
 use crate::models::{
-    Creator, CreatorSet, Episode, IdRefKey, PartInIssue, RefKey, RefKeySet,
-    Title,
+    Creator, CreatorSet, Episode, IdRefKey, RefKey, RefKeySet, Title,
 };
 // Article, Issue, IssueRef, Part
 use crate::templates;
@@ -72,7 +71,7 @@ impl SearchQuery {
             Vec<Title>,
             Vec<Creator>,
             Vec<RefKey>,
-            Vec<(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)>,
+            Vec<(Title, Episode, RefKeySet, CreatorSet, PartsPublished)>,
         ),
         Error,
     > {
@@ -229,15 +228,8 @@ impl SearchQuery {
             .map(|(title, episode)| {
                 let refs = RefKeySet::for_episode(&episode, db).unwrap();
                 let creators = CreatorSet::for_episode(&episode, db).unwrap();
-                let published = i::issues
-                    .inner_join(p::publications.inner_join(ep::episode_parts))
-                    .select((
-                        (i::year, (i::number, i::number_str)),
-                        (ep::id, ep::part_no, ep::part_name),
-                    ))
-                    .filter(ep::episode.eq(episode.id))
-                    .load::<PartInIssue>(db)
-                    .unwrap();
+                let published =
+                    PartsPublished::for_episode(&episode, db).unwrap();
                 (title, episode, refs, creators, published)
             })
             .collect::<Vec<_>>();

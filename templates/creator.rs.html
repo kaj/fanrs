@@ -1,8 +1,9 @@
-@use crate::models::{Article, Creator, CreatorSet, Episode, IssueRef, PartInIssue, RefKeySet, Title};
+@use crate::models::{Article, Creator, CreatorSet, Episode, IssueRef, RefKeySet, Title};
+@use crate::server::PartsPublished;
 @use super::page;
 @use std::collections::BTreeMap;
 
-@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, Vec<PartInIssue>)>>)
+@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, PartsPublished)>>)
 @:page(&creator.name, {}, {
   @if !about.is_empty() {
   <section>
@@ -55,8 +56,7 @@
       @if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
       @refs
       @creators
-      @if let Some((last_pub, pubs)) = pubs.split_last()
-      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+      @pubs
       @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
       @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
     </div>
@@ -86,10 +86,7 @@
       <h3><a href="/titles/@title.slug">@title.title</a></h3>
       <ul>
 	@for (episode, pubs) in episodes {
-	<li>@if let Some(e) = episode {@e }
-	  @if let Some((last_pub, pubs)) = pubs.split_last()
-	  {<small>@for p in pubs {@p, }@last_pub.</small>}
-	</li>
+	<li>@if let Some(e) = episode {@e }@pubs.small()</li>
 	}
       </ul>
     </div>

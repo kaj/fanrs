@@ -1,7 +1,8 @@
-@use crate::models::{Article, CreatorSet, Episode, IssueRef, PartInIssue, RefKey, RefKeySet, Title};
+@use crate::models::{Article, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title};
+@use crate::server::PartsPublished;
 @use super::page;
 
-@(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, Vec<PartInIssue>)])
+@(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)])
 @:page(&refkey.name(), {}, {
   @if !articles.is_empty() {
   <section>
@@ -28,8 +29,7 @@
       @if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
       @refs
       @creators
-      @if let Some((last_pub, pubs)) = pubs.split_last()
-      {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+      @pubs
       @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
       @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
     </div>

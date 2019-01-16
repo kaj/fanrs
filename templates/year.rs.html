@@ -25,8 +25,7 @@
 	@refs
 	@creators
 	@if let Some(ref note) = episode.note { <p class="info note">@note</p> }
-	@if let Some((last_pub, pubs)) = published.split_last()
-	{<p class="info refs">Även publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+	@published
 	@if let Some(ref copyright) = episode.copyright {<p class="info copyright">Copyright @copyright</p>}
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
