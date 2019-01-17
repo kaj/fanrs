@@ -86,6 +86,7 @@ table! {
         copyright -> Nullable<Varchar>,
         orig_lang -> Nullable<Varchar>,
         orig_episode -> Nullable<Varchar>,
+        orig_date -> Nullable<Date>,
     }
 }
 

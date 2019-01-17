@@ -1,6 +1,6 @@
 @use crate::models::{Article, CreatorSet, Episode, IssueRef, RefKeySet, Title};
 @use crate::server::PartsPublished;
-@use super::page;
+@use super::{epmisc, page};
 
 @(title: &Title, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Episode, RefKeySet, CreatorSet, PartsPublished)])
 @:page(&title.title, {}, {
@@ -24,13 +24,7 @@
     @for (episode, refs, creators, pubs) in episodes {
     <div class="episode">
       <h3>@if let Some(ref h) = episode.episode {@h} else {@title.title}</h3>
-      @if let Some(ref teaser) = episode.teaser {<p class="teaser">@teaser</p>}
-      @if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
-      @refs
-      @creators
-      @pubs
-      @if let Some(ref info) = episode.note { <p class="info note">@info</p> }
-      @if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
+      @:epmisc(episode, refs, creators, pubs)
     </div>
     }
   </section>

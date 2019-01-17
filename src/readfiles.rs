@@ -1,4 +1,5 @@
 use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
+use chrono::NaiveDate;
 use diesel::prelude::*;
 use failure::{format_err, Error};
 use io_result_optional::IoResultOptional;
@@ -128,6 +129,8 @@ fn register_serie(
     c: &Element,
     db: &PgConnection,
 ) -> Result<()> {
+    use crate::schema::episodes::dsl as e;
+    use crate::schema::episodes_by::dsl as eb;
     let episode = Episode::get_or_create(
         &Title::get_or_create(get_req_text(&c, "title")?, db)?,
         get_text_norm(c, "episode").as_ref().map(|t| t.as_ref()),
@@ -155,7 +158,6 @@ fn register_serie(
                     .as_ref()
                     .map(|t| normalize_space(&t))
                     .expect("orig should have name");
-                use crate::schema::episodes::dsl as e;
                 diesel::update(e::episodes)
                     .set((e::orig_lang.eq(lang), e::orig_episode.eq(orig)))
                     .filter(e::id.eq(episode.id))
@@ -170,7 +172,6 @@ fn register_serie(
                     .map(|r| r.as_ref())
                     .unwrap_or("by");
                 for by in get_creators(&e, db)? {
-                    use crate::schema::episodes_by::dsl as eb;
                     diesel::insert_into(eb::episodes_by)
                         .values((
                             eb::episode_id.eq(episode.id),
@@ -198,7 +199,17 @@ fn register_serie(
                         db,
                     )?;
                 }
-                Some("date") => eprintln!("Got prevpub date {:?}", e),
+                Some("date")
+                    if e.attributes.get("role")
+                        == Some(&"orig".to_string()) =>
+                {
+                    let date: NaiveDate =
+                        get_text(e, "date").unwrap().parse()?;
+                    diesel::update(e::episodes)
+                        .set(e::orig_date.eq(Some(date)))
+                        .filter(e::id.eq(episode.id))
+                        .execute(db)?;
+                }
                 Some("magazine") => eprintln!("Got magazine date {:?}", e),
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
             },

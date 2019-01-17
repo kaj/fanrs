@@ -1,5 +1,6 @@
 use super::{Part, RefKey, Title};
 use crate::templates::ToHtml;
+use chrono::NaiveDate;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -16,6 +17,7 @@ pub struct Episode {
     pub copyright: Option<String>,
     orig_lang: Option<String>,
     orig_episode: Option<String>,
+    pub orig_date: Option<NaiveDate>,
 }
 
 impl Episode {

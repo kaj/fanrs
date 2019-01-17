@@ -1,0 +1,13 @@
+@* Common stuff for episodes.  Header not included, as that is different on different pages. *@
+@use crate::models::{CreatorSet, Episode, RefKeySet};
+@use crate::server::PartsPublished;
+
+@(episode: &Episode, refs: &RefKeySet, creators: &CreatorSet, pubs: &PartsPublished)
+@if let Some(ref teaser) = episode.teaser {<p class="teaser">@teaser</p>}
+@if let Some(orig) = episode.orig() {<p class="info orig">@orig</p>}
+@refs
+@creators
+@pubs
+@if let Some(date) = episode.orig_date {<p class="info date">Först publicerad @date.format("%A, %-d %B %C%y").</p>}
+@if let Some(ref note) = episode.note { <p class="info note">@note</p> }
+@if let Some(ref copyright) = episode.copyright { <p class="info copyright">Copyright @copyright</p> }
