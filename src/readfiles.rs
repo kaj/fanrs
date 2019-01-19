@@ -219,17 +219,29 @@ fn register_serie(
             },
             "label" => (), // TODO
             "daystrip" => {
-                let from: NaiveDate = get_req_text(e, "from")?.parse()?;
-                let to: NaiveDate = get_req_text(e, "to")?.parse()?;
-                let sun = e.attributes.get("d") == Some(&"sun".to_string());
-                diesel::update(e::episodes)
-                    .set((
-                        e::orig_date.eq(Some(from)),
-                        e::orig_to_date.eq(Some(to)),
-                        e::orig_sundays.eq(sun),
-                    ))
-                    .filter(e::id.eq(episode.id))
-                    .execute(db)?;
+                if let Some(from) = get_text(e, "from") {
+                    let from: NaiveDate = from.parse()?;
+                    let to: NaiveDate = get_req_text(e, "to")?.parse()?;
+                    let sun =
+                        e.attributes.get("d") == Some(&"sun".to_string());
+                    diesel::update(e::episodes)
+                        .set((
+                            e::orig_date.eq(Some(from)),
+                            e::orig_to_date.eq(Some(to)),
+                            e::orig_sundays.eq(sun),
+                        ))
+                        .filter(e::id.eq(episode.id))
+                        .execute(db)?;
+                } else if let Some(from) = get_text(e, "fromnr") {
+                    let from: u32 = from.parse()?;
+                    let to: u32 = get_req_text(e, "tonr")?.parse()?;
+                    println!(
+                        "TODO Episode {:?} is daystrip #{} - #{}.",
+                        episode.episode, from, to,
+                    );
+                } else {
+                    Err(format_err!("Unknown daystrip {:?}", e))?;
+                }
             }
             _other => Err(format_err!("Unknown {:?} in serie", e))?,
         }
