@@ -73,6 +73,7 @@ fn run() -> Result<(), failure::Error> {
             all,
             years,
         } => {
+            readfiles::read_persondata(&basedir, &db)?;
             if all {
                 let current_year = 1900 + time::now().tm_year as i16;
                 for year in 1950..=current_year {

@@ -306,6 +306,70 @@ fn get_creators(by: &Element, db: &PgConnection) -> Result<Vec<Creator>> {
     }
 }
 
+pub fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
+    use crate::schema::creator_aliases::dsl as ca;
+    use crate::schema::creators::dsl as c;
+    use slug::slugify;
+    let file = File::open(base.join("extra-people.data"))?;
+    for e in Element::parse(file)?.children {
+        match e.name.as_ref() {
+            "person" => {
+                let name = get_req_text(&e, "name")?;
+                let slug = e
+                    .attributes
+                    .get("slug")
+                    .map(|s| s.clone())
+                    .unwrap_or(slugify(&name));
+                let creator = c::creators
+                    .select((c::id, c::name, c::slug))
+                    .filter(c::name.eq(&name))
+                    .filter(c::slug.eq(&slug))
+                    .first::<Creator>(db)
+                    .optional()?
+                    .ok_or(0)
+                    .or_else(|_| {
+                        diesel::insert_into(c::creators)
+                            .values((c::name.eq(&name), c::slug.eq(&slug)))
+                            .returning((c::id, c::name, c::slug))
+                            .get_result::<Creator>(db)
+                            .and_then(|c| {
+                                diesel::insert_into(ca::creator_aliases)
+                                    .values((
+                                        ca::creator_id.eq(c.id),
+                                        ca::name.eq(&name),
+                                    ))
+                                    .execute(db)?;
+                                Ok(c)
+                            })
+                    })?;
+
+                for a in e.children.iter().filter(|a| a.name == "alias") {
+                    if let Some(ref alias) = a.text {
+                        ca::creator_aliases
+                            .select(ca::id)
+                            .filter(ca::creator_id.eq(creator.id))
+                            .filter(ca::name.eq(&alias))
+                            .first::<i32>(db)
+                            .optional()?
+                            .ok_or(0)
+                            .or_else(|_| {
+                                diesel::insert_into(ca::creator_aliases)
+                                    .values((
+                                        ca::creator_id.eq(creator.id),
+                                        ca::name.eq(alias),
+                                    ))
+                                    .returning(ca::id)
+                                    .get_result(db)
+                            })?;
+                    }
+                }
+            }
+            _other => panic!("Unknown element {:?}", e),
+        }
+    }
+    Ok(())
+}
+
 pub fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::dsl as a;
