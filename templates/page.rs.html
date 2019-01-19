@@ -12,7 +12,14 @@
   </head>
   <body>
     <header>
-      @if !title.contains("index") {<p><a href="/">Rasmus Fantomenindex</a></p>}
+      @if !title.contains("index") {
+      <nav>
+	<a href="/">Rasmus Fantomenindex</a>;
+	<a href="/titles/">Serier</a>,
+	<a href="/what/">Taggar</a>,
+	<a href="/who/">Serieskapare</a>.
+      </nav>
+      }
       <h1>@title</h1>
       @:inhead()
     </header>
