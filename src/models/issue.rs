@@ -187,6 +187,18 @@ pub struct Nr {
     number: i16,
     nr_str: String,
 }
+impl Nr {
+    pub fn first(&self) -> i16 {
+        self.number
+    }
+    pub fn last(&self) -> i16 {
+        if self.nr_str.contains("-") {
+            self.number + 1
+        } else {
+            self.number
+        }
+    }
+}
 
 impl fmt::Display for Nr {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
