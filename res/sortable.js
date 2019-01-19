@@ -6,28 +6,16 @@
 
 document.addEventListener( 'click', function ( e ) {
 
-    var down_class = ' dir-d ';
-    var up_class = ' dir-u ';
-    var regex_dir = / dir-(u|d) /;
-    var regex_table = /\bsortable\b/;
+    var down_class = 'dir-d';
+    var up_class = 'dir-u';
     var element = e.target;
-
-    /**
-     * So google closure doesn't throw a fit over the sometimes empty dir argument
-     * @param {EventTarget} element
-     * @param  {string=} dir
-     * @return void
-     */
-    function reclassify( element, dir ) {
-        element.className = element.className.replace( regex_dir, '' ) + dir || '';
-    }
 
     if ( element.nodeName == 'TH' ) {
 
         var table = element.offsetParent;
 
         // make sure it is a sortable table
-        if ( regex_table.test( table.className ) ) {
+        if ( table.classList.contains('sortable') ) {
 
             var column_index;
             var tr = element.parentNode;
@@ -38,18 +26,21 @@ document.addEventListener( 'click', function ( e ) {
                 if ( nodes[ i ] === element ) {
                     column_index = i;
                 } else {
-                    reclassify( nodes[ i ] );
+                    nodes[i].classList.remove(down_class);
+                    nodes[i].classList.remove(up_class);
                 }
             }
 
             var dir = down_class;
 
             // check if we're sorting up or down, and update the css accordingly
-            if ( element.className.indexOf( down_class ) !== -1 ) {
+            if ( element.classList.contains( down_class ) ) {
                 dir = up_class;
             }
 
-            reclassify( element, dir );
+            element.classList.remove(down_class);
+            element.classList.remove(up_class);
+            element.classList.add(dir);
 
             // extract all table rows, so the sorting can start.
             var org_tbody = table.tBodies[ 0 ];
@@ -59,10 +50,10 @@ document.addEventListener( 'click', function ( e ) {
 
             var reverse = ( dir == up_class );
 
-	    function getValue(x) {
-		return x.getAttribute('data-sort') || x.innerText;
-	    }
-	    
+            function getValue(x) {
+                return x.getAttribute('data-sort') || x.innerText;
+            }
+
             // sort them using custom built in array sort.
             rows.sort( function ( a, b ) {
                 a = getValue(a.cells[column_index]);
@@ -79,13 +70,10 @@ document.addEventListener( 'click', function ( e ) {
             var clone_tbody = org_tbody.cloneNode();
 
             // Build a sorted table body and replace the old one.
+            // (IE 11 dont support for row of rows)
             for ( i = 0; i < rows.length; i++ ) {
                 clone_tbody.appendChild( rows[ i ] );
             }
-
-            // for ( i in rows ) { apparently bad practice
-            //     clone_tbody.appendChild( rows[ i ] );
-            // }
 
             // And finally insert the end result
             table.replaceChild( clone_tbody, org_tbody );
