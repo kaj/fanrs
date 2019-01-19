@@ -1,10 +1,11 @@
 use super::{Part, RefKey, Title};
 use crate::templates::ToHtml;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use std::fmt;
 use std::io::{self, Write};
 
 #[derive(Debug, Queryable)]
@@ -18,6 +19,8 @@ pub struct Episode {
     orig_lang: Option<String>,
     orig_episode: Option<String>,
     pub orig_date: Option<NaiveDate>,
+    pub orig_to_date: Option<NaiveDate>,
+    pub sun: bool,
 }
 
 impl Episode {
@@ -182,6 +185,13 @@ impl Episode {
             None
         }
     }
+    pub fn orig_dates(&self) -> OrigDates {
+        OrigDates {
+            from: self.orig_date,
+            to: self.orig_to_date,
+            sun: self.sun,
+        }
+    }
 }
 
 pub struct OrigEpisode<'a> {
@@ -205,3 +215,76 @@ impl<'a> ToHtml for OrigEpisode<'a> {
         out.write_all(b"</i>")
     }
 }
+
+pub struct OrigDates {
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    sun: bool,
+}
+
+impl OrigDates {
+    pub fn date(date: NaiveDate) -> Self {
+        OrigDates {
+            from: Some(date),
+            to: None,
+            sun: false,
+        }
+    }
+}
+
+impl ToHtml for OrigDates {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        match (self.from, self.to) {
+            (Some(from), Some(to)) => write!(
+                out,
+                "<p class='info dates'>{} {} - {}.</p>",
+                if self.sun {
+                    "Söndagssidor"
+                } else {
+                    "Dagstrippar"
+                },
+                SvDate(&from),
+                SvDate(&to),
+            ),
+            (Some(date), None) => write!(
+                out,
+                "<p class='info date'>Först publicerad {}.</p>",
+                SvDate(&date),
+            ),
+            (None, _) => Ok(()),
+        }
+    }
+}
+
+struct SvDate<'a>(&'a NaiveDate);
+
+impl<'a> fmt::Display for SvDate<'a> {
+    fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            out,
+            "{} den {} {} {}",
+            LONG_WEEKDAYS[self.0.weekday().num_days_from_monday() as usize],
+            self.0.day(),
+            LONG_MONTHS[(self.0.month() - 1) as usize],
+            self.0.year(),
+        )
+    }
+}
+
+static LONG_WEEKDAYS: [&'static str; 7] = [
+    "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag",
+];
+static LONG_MONTHS: [&'static str; 12] = [
+    "januari",
+    "februari",
+    "mars",
+    "april",
+    "maj",
+    "juni",
+    "juli",
+    "augusti",
+    "september",
+    "oktober",
+    "november",
+    "december",
+];

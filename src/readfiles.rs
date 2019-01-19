@@ -206,15 +206,31 @@ fn register_serie(
                     let date: NaiveDate =
                         get_text(e, "date").unwrap().parse()?;
                     diesel::update(e::episodes)
-                        .set(e::orig_date.eq(Some(date)))
+                        .set((
+                            e::orig_date.eq(date),
+                            // TODO? e::orig_to_date.is_null(),
+                            e::orig_sundays.eq(false),
+                        ))
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 }
                 Some("magazine") => eprintln!("Got magazine date {:?}", e),
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
             },
-            "label" => (),    // TODO
-            "daystrip" => (), // TODO
+            "label" => (), // TODO
+            "daystrip" => {
+                let from: NaiveDate = get_req_text(e, "from")?.parse()?;
+                let to: NaiveDate = get_req_text(e, "to")?.parse()?;
+                let sun = e.attributes.get("d") == Some(&"sun".to_string());
+                diesel::update(e::episodes)
+                    .set((
+                        e::orig_date.eq(Some(from)),
+                        e::orig_to_date.eq(Some(to)),
+                        e::orig_sundays.eq(sun),
+                    ))
+                    .filter(e::id.eq(episode.id))
+                    .execute(db)?;
+            }
             _other => Err(format_err!("Unknown {:?} in serie", e))?,
         }
     }

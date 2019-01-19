@@ -87,6 +87,8 @@ table! {
         orig_lang -> Nullable<Varchar>,
         orig_episode -> Nullable<Varchar>,
         orig_date -> Nullable<Date>,
+        orig_to_date -> Nullable<Date>,
+        orig_sundays -> Bool,
     }
 }
 
