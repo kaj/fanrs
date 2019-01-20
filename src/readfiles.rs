@@ -139,9 +139,13 @@ fn register_serie(
         get_text_norm(c, "copyright").as_ref().map(|t| t.as_ref()),
         db,
     )?;
-    episode.publish_part(
-        Part::of(&c).as_ref(),
-        issue.id,
+    let part = c.get_child("part");
+    Part::publish(
+        &episode,
+        part.and_then(|p| p.attributes.get("no"))
+            .and_then(|n| n.parse().ok()),
+        part.and_then(|p| p.text.as_ref()).map(|s| s.as_ref()),
+        &issue,
         Some(seqno as i16),
         get_best_plac(c),
         db,
@@ -191,9 +195,11 @@ fn register_serie(
                         .parse()?;
                     let issue =
                         Issue::get_or_create(year, nr, None, None, None, db)?;
-                    episode.publish_part(
+                    Part::publish(
+                        &episode,
                         None,
-                        issue.id,
+                        None,
+                        &issue,
                         None,
                         get_best_plac(c),
                         db,
@@ -214,7 +220,7 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 }
-                Some("magazine") => eprintln!("Got magazine date {:?}", e),
+                Some("magazine") => eprintln!("Got magazine prevpub {:?}", e),
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
             },
             "label" => (), // TODO

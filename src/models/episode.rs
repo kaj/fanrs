@@ -1,4 +1,4 @@
-use super::{Part, RefKey, Title};
+use super::{RefKey, Title};
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
 use diesel;
@@ -106,72 +106,6 @@ impl Episode {
         Ok(())
     }
 
-    /// A specific part of this episode (None for the whole episode) is
-    /// published in a specific issue.
-    pub fn publish_part(
-        &self,
-        part: Option<&Part>,
-        issue: i32,
-        seqno: Option<i16>,
-        best_plac: Option<i16>,
-        db: &PgConnection,
-    ) -> Result<(), Error> {
-        use crate::schema::episode_parts::dsl as e;
-        let part_no = part.and_then(|p| p.no.map(i16::from));
-        let part_name = part.and_then(|p| p.name.as_ref());
-        let epq = e::episode_parts
-            .select(e::id)
-            .filter(e::episode.eq(self.id))
-            .into_boxed();
-        let epq = if let Some(part_no) = part_no {
-            epq.filter(e::part_no.eq(part_no))
-        } else {
-            epq.filter(e::part_no.is_null())
-        };
-        let epq = if let Some(part_name) = part_name {
-            epq.filter(e::part_name.eq(part_name))
-        } else {
-            epq.filter(e::part_name.is_null())
-        };
-
-        let part_id = if let Some(part_id) =
-            epq.first::<i32>(db).optional()?
-        {
-            part_id
-        } else {
-            diesel::insert_into(e::episode_parts)
-                .values((
-                    e::episode.eq(self.id),
-                    e::part_no.eq(part_no),
-                    e::part_name.eq(part_name),
-                ))
-                .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?
-                .0
-        };
-        use crate::schema::publications::dsl as p;
-        if let Some((id, old_seqno)) = p::publications
-            .filter(p::issue.eq(issue))
-            .filter(p::episode_part.eq(part_id))
-            .select((p::id, p::seqno))
-            .first::<(i32, Option<i16>)>(db)
-            .optional()?
-        {
-            if seqno.is_some() && old_seqno != seqno {
-                eprintln!("TODO: Should update seqno for {}", id);
-            }
-            Ok(())
-        } else {
-            diesel::insert_into(p::publications)
-                .values((
-                    p::issue.eq(issue),
-                    p::episode_part.eq(part_id),
-                    p::seqno.eq(seqno),
-                    p::best_plac.eq(best_plac),
-                ))
-                .execute(db)?;
-            Ok(())
-        }
-    }
     /// Return original language and title, if known.
     pub fn orig(&self) -> Option<OrigEpisode> {
         if let (Some(lang), Some(episode)) =
