@@ -82,6 +82,9 @@ impl Part {
     fn is_some(&self) -> bool {
         self.no.is_some() || self.name.is_some()
     }
+    pub fn is_first(&self) -> bool {
+        self.no.map(|n| n == 1).unwrap_or(true)
+    }
 }
 
 impl ToHtml for Part {

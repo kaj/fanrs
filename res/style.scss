@@ -141,18 +141,18 @@ section.searchresults.tags {
 	flex-flow: row wrap;
 	flex-grow: 1;
 	div {
-	    flex-basis: 23em;
+	    flex-basis: 28em;
 	    flex-grow: 2;
 	    &.episode.main {
 		flex-basis: 42em;
 		flex-grow: 5;
 	    }
 	    &.episode.noteaser {
-		flex-basis: 17em;
+		flex-basis: 20em;
 		flex-grow: 1.5;
 	    }
 	    &.article {
-		flex-basis: 14em;
+		flex-basis: 15em;
 		flex-grow: 1;
 		background: rgba(white, 0.7);
 	    }

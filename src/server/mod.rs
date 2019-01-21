@@ -321,6 +321,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                 .filter(cb::issue_id.eq(issue.id))
                 .load(&db)
                 .unwrap();
+            let mut have_main = false;
             let content = p::publications
                 .left_outer_join(
                     ep::episode_parts
@@ -349,14 +350,17 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                 .unwrap()
                 .into_iter()
                 .map(|row| match row {
-                    (Some((t, e, part)), None, seqno, b) => {
-                        let classnames = if t.title == "Fantomen" {
-                            "episode main"
-                        } else if e.teaser.is_none() {
-                            "episode noteaser"
-                        } else {
-                            "episode"
-                        };
+                    (Some((t, mut e, part)), None, seqno, b) => {
+                        let classnames =
+                            if e.teaser.is_none() || !part.is_first() {
+                                e.teaser = None;
+                                "episode noteaser"
+                            } else if t.title == "Fantomen" && !have_main {
+                                have_main = true;
+                                "episode main"
+                            } else {
+                                "episode"
+                            };
                         let refs = RefKeySet::for_episode(&e, &db).unwrap();
                         let creators =
                             CreatorSet::for_episode(&e, &db).unwrap();
