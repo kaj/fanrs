@@ -127,15 +127,14 @@ impl SearchQuery {
         for word in &sql_words {
             titles = titles.filter(t::title.ilike(word));
             creators = creators.filter(ca::name.ilike(word));
-            // TODO Every `like` here should be `ilike` when supported!
-            refkeys = refkeys.filter(r::title.like(word));
+            refkeys = refkeys.filter(r::title.ilike(word));
             episodes = episodes.filter(
                 e::episode
-                    .like(word)
-                    .or(e::orig_episode.like(word))
-                    .or(e::teaser.like(word))
-                    .or(e::note.like(word))
-                    .or(e::copyright.like(word)),
+                    .ilike(word)
+                    .or(e::orig_episode.ilike(word))
+                    .or(e::teaser.ilike(word))
+                    .or(e::note.ilike(word))
+                    .or(e::copyright.ilike(word)),
             );
         }
 
