@@ -106,7 +106,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and(path::param())
             .and(end())
-            .and_then(list_year));
+            .and_then(list_year))
+        .or(get()
+            .and(s())
+            .and(path::param())
+            .and(end())
+            .and_then(oldslug_title));
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
 }
@@ -170,10 +175,7 @@ fn cover_image(
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
         .first::<Vec<u8>>(&db)
-        .map_err(|e| match e {
-            diesel::result::Error::NotFound => not_found(),
-            e => custom(e),
-        })?;
+        .map_err(custom_or_404)?;
     let medium_expires = Utc::now() + Duration::days(90);
     Ok(Response::builder()
         .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
@@ -521,10 +523,7 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
                 .collect::<Vec<_>>();
             Ok((title, articles, episodes))
         })
-        .map_err(|e| match e {
-            diesel::result::Error::NotFound => not_found(),
-            e => custom(e),
-        })?;
+        .map_err(custom_or_404)?;
     Response::builder()
         .html(|o| templates::title(o, &title, &articles, &episodes))
 }
@@ -652,10 +651,7 @@ fn one_ref_impl(
                 .collect::<Vec<_>>();
             Ok((refkey.refkey, articles, episodes))
         })
-        .map_err(|e| match e {
-            diesel::result::Error::NotFound => not_found(),
-            e => custom(e),
-        })?;
+        .map_err(custom_or_404)?;
     Response::builder()
         .html(|o| templates::refkey(o, &refkey, &articles, &episodes))
 }
@@ -728,10 +724,7 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     let creator = c::creators
         .filter(c::slug.eq(slug))
         .first::<Creator>(&db)
-        .map_err(|e| match e {
-            diesel::result::Error::NotFound => not_found(),
-            e => custom(e),
-        })?;
+        .map_err(custom_or_404)?;
 
     let about = a::articles
         .select(all_columns)
@@ -878,6 +871,61 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             &oe,
         )
     })
+}
+
+fn oldslug_title(
+    db: PooledPg,
+    slug: String,
+) -> Result<impl Reply, Rejection> {
+    use crate::schema::titles::dsl as t;
+    use diesel::dsl::count_star;
+    // Special case:
+    if slug == "favicon.ico" {
+        use templates::statics::goda_svg;
+        return Ok(redirect(format!("/s/{}", goda_svg.name)));
+    }
+    let target = slug.replace("_", "-").replace(".html", "");
+
+    let n = t::titles
+        .filter(t::slug.eq(&target))
+        .select(count_star())
+        .first::<i64>(&db)
+        .map_err(custom)?;
+    if n == 1 {
+        return Ok(redirect(format!("/titles/{}", target)));
+    }
+    let target = t::titles
+        .filter(
+            t::slug.ilike(
+                &target
+                    .replace("-", "")
+                    .chars()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join("%"),
+            ),
+        )
+        .select(t::slug)
+        .first::<String>(&db)
+        .map_err(custom_or_404)?;
+    Ok(redirect(format!("/titles/{}", target)))
+}
+
+fn custom_or_404(e: diesel::result::Error) -> Rejection {
+    match e {
+        diesel::result::Error::NotFound => not_found(),
+        e => custom(e),
+    }
+}
+
+fn redirect(url: String) -> impl Reply {
+    use warp::http::header::LOCATION;
+    use warp::http::status::StatusCode;
+    let msg = format!("Try {:?}", url);
+    Response::builder()
+        .status(StatusCode::PERMANENT_REDIRECT)
+        .header(LOCATION, url)
+        .body(msg)
 }
 
 use diesel::expression::SqlLiteral;
