@@ -3,11 +3,18 @@ use crate::models::{
     Creator, CreatorSet, Episode, IdRefKey, RefKey, RefKeySet, Title,
 };
 // Article, Issue, IssueRef, Part
+use crate::schema::creator_aliases::dsl as ca;
+use crate::schema::creators::dsl as c;
+use crate::schema::refkeys::dsl as r;
+use crate::schema::titles::dsl as t;
 use crate::templates;
+use diesel::dsl::{any, sql};
 use diesel::prelude::*;
-use diesel::QueryDsl;
+use diesel::sql_types::Text;
 use failure::Error;
+use serde_derive::Serialize;
 use warp::http::Response;
+use warp::reply::json;
 use warp::{self, reject::custom, Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
@@ -21,6 +28,80 @@ pub fn search(
     Response::builder().html(|o| {
         templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
     })
+}
+
+pub fn search_autocomplete(
+    db: PooledPg,
+    query: AcQuery,
+) -> Result<impl Reply, Rejection> {
+    let q = format!("%{}%", query.q);
+    let mut titles = t::titles
+        .select((t::title, t::slug))
+        .filter(t::title.ilike(&q))
+        .order_by(t::title)
+        .limit(10)
+        .load::<(String, String)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|(t, s)| Completion::title(t, s))
+        .collect::<Vec<_>>();
+    titles.append(
+        &mut ca::creator_aliases
+            .inner_join(c::creators)
+            .select((sql::<Text>("min(creator_aliases.name)"), c::slug))
+            .filter(ca::name.ilike(&q))
+            .group_by(c::slug)
+            .order(sql::<Text>("min(creator_aliases.name)"))
+            .limit(10)
+            .load::<(String, String)>(&db)
+            .map_err(custom)?
+            .into_iter()
+            .map(|(t, s)| Completion::creator(t, s))
+            .collect(),
+    );
+    titles.append(
+        &mut r::refkeys
+            .select((r::kind, r::title, r::slug))
+            .filter(r::title.ilike(&q))
+            .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
+            .order(r::title)
+            .limit(10)
+            .load::<(i16, Option<String>, String)>(&db)
+            .map_err(custom)?
+            .into_iter()
+            .map(|(k, t, s)| Completion::refkey(k, t, s))
+            .collect(),
+    );
+    titles.sort_by(|a, b| a.t.cmp(&b.t));
+    titles.truncate(10);
+    Ok(json(&titles))
+}
+
+#[derive(Deserialize)]
+pub struct AcQuery {
+    pub q: String,
+}
+
+#[derive(Serialize)]
+pub struct Completion {
+    k: &'static str,
+    t: String,
+    s: String,
+}
+impl Completion {
+    fn title(t: String, s: String) -> Self {
+        Completion { k: "t", t, s }
+    }
+    fn creator(t: String, s: String) -> Self {
+        Completion { k: "p", t, s }
+    }
+    fn refkey(k: i16, t: Option<String>, s: String) -> Self {
+        Completion {
+            k: if k == RefKey::FA_ID { "f" } else { "k" },
+            t: t.unwrap_or(s.clone()),
+            s,
+        }
+    }
 }
 
 #[derive(Debug)]

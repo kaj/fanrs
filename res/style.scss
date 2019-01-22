@@ -224,12 +224,12 @@ section #search {
         position: absolute;
         z-index: 17;
         :link, :visited {
-            background: rgba(255,255,255,0.95) no-repeat scroll 0.3em 50% / contain;
+            background: rgba(white,0.95);
             border-color: #888;
             border-style: solid;
             border-width: 1px 1px 0;
             display: block;
-            padding: .2em .5em .2em 2.2em;
+            padding: .2em .5em;
             color: black;
             text-decoration: none;
         }
@@ -247,27 +247,30 @@ section #search {
             line-height: 1.2;
             margin: .2em .3em .2em 0;
             padding: .1em .3em; // .1em 1.9em;
-            &:before {
-                display: inline-block;
-                line-height: 1;
-                margin-right: .2em;
-                vertical-align: middle;
-                height: 1.1em;
-                width: 1.1em;
-            }
-            &.f:before, &.k:before {
-                content: url(static_name("goda.svg"));
-            }
-            &.t:before {
-                content: url(static_name("prat.svg"));
-            }
-            &.p:before {
-                content: url(static_name("creator.svg"));
-            }
             input {
                 line-height: 1;
                 vertical-align: middle;
             }
+        }
+    }
+    div.list a.hit,
+    div.refs label {
+        &:before {
+            display: inline-block;
+            line-height: 1;
+            margin-right: .2em;
+            vertical-align: middle;
+            height: 1.1em;
+            width: 1.1em;
+        }
+        &.f:before, &.k:before {
+            content: url(static_name("goda.svg"));
+        }
+        &.t:before {
+            content: url(static_name("prat.svg"));
+        }
+        &.p:before {
+            content: url(static_name("creator.svg"));
         }
     }
     .help {

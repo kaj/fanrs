@@ -4,7 +4,7 @@ pub mod search;
 
 pub use self::publist::PartsPublished;
 use self::render_ructe::RenderRucte;
-use self::search::search;
+use self::search::{search, search_autocomplete};
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
     RefKey, RefKeySet, Title,
@@ -57,6 +57,12 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and(query())
             .and_then(search))
+        .or(get()
+            .and(path("ac"))
+            .and(end())
+            .and(s())
+            .and(query())
+            .and_then(search_autocomplete))
         .or(get()
             .and(path("titles"))
             .and(end())

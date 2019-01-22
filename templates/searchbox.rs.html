@@ -1,4 +1,5 @@
 @use crate::server::search::SearchQuery;
+@use super::statics::search_js;
 
 @(query: &SearchQuery)
 <form id="search" action="/search">
@@ -17,5 +18,11 @@
     }
   </div>
   <p class="help">Du kan fritextsöka i de texter som beskriver serierna.
-    För närvarande går det bara att söka efter serier; inte artiklar, noveller, etc.</p>
+    För närvarande går det bara att söka efter serier; inte artiklar,
+    noveller, etc.
+    <span class="js">Du verkar ha javascript avstängt.
+    Det går bra att söka ändå, men med javascript kan du
+    filtrera sökningen smidigare.</span>
+  </p>
+  <script type="application/javascript" async src="/s/@search_js.name"></script>
 </form>
