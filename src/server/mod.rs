@@ -9,13 +9,32 @@ use crate::models::{
     Article, Creator, CreatorSet, Episode, IdRefKey, Issue, IssueRef, Part,
     RefKey, RefKeySet, Title,
 };
+use crate::schema::article_refkeys::dsl as ar;
+use crate::schema::articles::dsl as a;
+use crate::schema::articles_by::dsl as ab;
+use crate::schema::covers_by::dsl as cb;
+use crate::schema::creator_aliases::dsl as ca;
+use crate::schema::creators::dsl as c;
+use crate::schema::episode_parts::dsl as ep;
+use crate::schema::episode_refkeys::dsl as er;
+use crate::schema::episodes::dsl as e;
+use crate::schema::episodes_by::dsl as eb;
+use crate::schema::issues::dsl as i;
+use crate::schema::publications::dsl as p;
+use crate::schema::refkeys::dsl as r;
+use crate::schema::titles::dsl as t;
 use crate::templates;
 use chrono::{Duration, Utc};
+use diesel::dsl::{all, any, count_star, min, not, sql};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::sql_types::{BigInt, Integer};
 use diesel::QueryDsl;
 use failure::Error;
+use mime::IMAGE_JPEG;
+use std::collections::BTreeMap;
+use std::str::FromStr;
 use warp::http::Response;
 use warp::path::Tail;
 use warp::{
@@ -144,7 +163,6 @@ struct CoverRef {
     number: i16,
 }
 
-use std::str::FromStr;
 impl FromStr for CoverRef {
     type Err = u8;
     /// expect fYYYY-NN.jpg
@@ -167,8 +185,6 @@ fn cover_image(
     issue: CoverRef,
 ) -> Result<impl Reply, Rejection> {
     use crate::schema::covers::dsl as c;
-    use crate::schema::issues::dsl as i;
-    use mime::IMAGE_JPEG;
     let data = i::issues
         .inner_join(c::covers)
         .select(c::image)
@@ -185,19 +201,6 @@ fn cover_image(
 
 #[allow(clippy::needless_pass_by_value)]
 fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::creator_aliases::dsl as ca;
-    use crate::schema::creators::dsl as c;
-    use crate::schema::episode_parts::dsl as ep;
-    use crate::schema::episode_refkeys::dsl as er;
-    use crate::schema::episodes::dsl as e;
-    use crate::schema::episodes_by::dsl as eb;
-    use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
-    use crate::schema::refkeys::dsl as r;
-    use crate::schema::titles::dsl as t;
-    use diesel::dsl::{any, not, sql};
-    use diesel::sql_types::{BigInt, Integer};
-
     let n = p::publications
         .select(sql("count(distinct issue)"))
         .filter(not(p::seqno.is_null()))
@@ -306,7 +309,6 @@ pub enum PublishedContent {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
-    use crate::schema::issues::dsl as i;
     let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
@@ -314,14 +316,6 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .map_err(custom)?
         .into_iter()
         .map(|issue: Issue| {
-            use crate::schema::articles::dsl as a;
-            use crate::schema::covers_by::dsl as cb;
-            use crate::schema::creator_aliases::dsl as ca;
-            use crate::schema::creators::dsl as c;
-            use crate::schema::episode_parts::dsl as ep;
-            use crate::schema::episodes::dsl as e;
-            use crate::schema::publications::dsl as p;
-            use crate::schema::titles::dsl as t;
             let c_columns = (c::id, ca::name, c::slug);
             let cover_by = c::creators
                 .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
@@ -427,14 +421,6 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::episode_parts::dsl as ep;
-    use crate::schema::episodes::dsl as e;
-    use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
-    use crate::schema::titles::dsl as t;
-    use diesel::dsl::sql;
-    use diesel::sql_types::SmallInt;
-
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -463,29 +449,19 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
-    use crate::schema::titles::dsl::{slug, titles};
-    let (title, articles, episodes) = titles
-        .filter(slug.eq(tslug))
+fn one_title(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+    let (title, articles, episodes) = t::titles
+        .filter(t::slug.eq(slug))
         .first::<Title>(&db)
         .and_then(|title| {
-            use crate::schema::article_refkeys::dsl as ar;
-            use crate::schema::articles::{all_columns, dsl as a};
-            use crate::schema::episode_parts::dsl as ep;
-            use crate::schema::episodes::dsl as e;
-            use crate::schema::issues::dsl as i;
-            use crate::schema::publications::dsl as p;
-            use crate::schema::refkeys::dsl as r;
-            use diesel::dsl::{min, sql};
-            use diesel::sql_types::SmallInt;
             let articles = a::articles
-                .select(all_columns)
+                .select(a::articles::all_columns())
                 .left_join(ar::article_refkeys.left_join(r::refkeys))
                 .filter(r::kind.eq(RefKey::TITLE_ID))
                 .filter(r::slug.eq(&title.slug))
                 .inner_join(p::publications.inner_join(i::issues))
                 .order(min(sortable_issue()))
-                .group_by(all_columns)
+                .group_by(a::articles::all_columns())
                 .load::<Article>(&db)?
                 .into_iter()
                 .map(|article| {
@@ -530,14 +506,6 @@ fn one_title(db: PooledPg, tslug: String) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::episode_parts::dsl as ep;
-    use crate::schema::episode_refkeys::dsl as er;
-    use crate::schema::episodes::dsl as e;
-    use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
-    use crate::schema::refkeys::dsl as r;
-    use diesel::dsl::sql;
-
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
         .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
@@ -582,30 +550,18 @@ fn one_ref_impl(
     tslug: String,
     kind: i16,
 ) -> Result<impl Reply, Rejection> {
-    use crate::schema::refkeys::dsl as r;
     let (refkey, articles, episodes) = r::refkeys
         .filter(r::kind.eq(kind))
         .filter(r::slug.eq(tslug))
         .first::<IdRefKey>(&db)
         .and_then(|refkey| {
-            use crate::schema::article_refkeys::dsl as ar;
-            use crate::schema::articles::{all_columns, dsl as a};
-            use crate::schema::episode_parts::dsl as ep;
-            use crate::schema::episode_refkeys::dsl as er;
-            use crate::schema::episodes::dsl as e;
-            use crate::schema::issues::dsl as i;
-            use crate::schema::publications::dsl as p;
-            use crate::schema::refkeys::dsl as r;
-            use crate::schema::titles::dsl as t;
-            use diesel::dsl::{min, sql};
-            use diesel::sql_types::SmallInt;
             let articles = a::articles
-                .select(all_columns)
+                .select(a::articles::all_columns())
                 .left_join(ar::article_refkeys.left_join(r::refkeys))
                 .filter(ar::refkey_id.eq(refkey.id))
                 .inner_join(p::publications.inner_join(i::issues))
                 .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-                .group_by(all_columns)
+                .group_by(a::articles::all_columns())
                 .load::<Article>(&db)?
                 .into_iter()
                 .map(|article| {
@@ -658,15 +614,6 @@ fn one_ref_impl(
 
 #[allow(clippy::needless_pass_by_value)]
 fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
-    use crate::schema::creator_aliases::dsl as ca;
-    use crate::schema::creators::dsl as c;
-    use crate::schema::episode_parts::dsl as ep;
-    use crate::schema::episodes::dsl as e;
-    use crate::schema::episodes_by::dsl as eb;
-    use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
-    use diesel::dsl::sql;
-
     let all = c::creators
         .left_join(
             ca::creator_aliases.left_join(
@@ -705,35 +652,19 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
-    use crate::schema::article_refkeys::dsl as ar;
-    use crate::schema::articles::{all_columns, dsl as a};
-    use crate::schema::articles_by::dsl as ab;
-    use crate::schema::covers_by::dsl as cb;
-    use crate::schema::creator_aliases::dsl as ca;
-    use crate::schema::creators::dsl as c;
-    use crate::schema::episode_parts::dsl as ep;
-    use crate::schema::episodes::dsl as e;
-    use crate::schema::episodes_by::dsl as eb;
-    use crate::schema::issues::dsl as i;
-    use crate::schema::publications::dsl as p;
-    use crate::schema::refkeys::dsl as r;
-    use crate::schema::titles::dsl as t;
-    use diesel::dsl::{all, any, min, sql};
-    use diesel::sql_types::SmallInt;
-
     let creator = c::creators
         .filter(c::slug.eq(slug))
         .first::<Creator>(&db)
         .map_err(custom_or_404)?;
 
     let about = a::articles
-        .select(all_columns)
+        .select(a::articles::all_columns())
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(r::kind.eq(RefKey::WHO_ID))
         .filter(r::slug.eq(&creator.slug))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-        .group_by(all_columns)
+        .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?
         .into_iter()
@@ -793,12 +724,12 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .collect::<Vec<_>>();
 
     let articles_by = a::articles
-        .select(all_columns)
+        .select(a::articles::all_columns())
         .inner_join(ab::articles_by.inner_join(ca::creator_aliases))
         .filter(ca::creator_id.eq(creator.id))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-        .group_by(all_columns)
+        .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?
         .into_iter()
@@ -831,7 +762,6 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .load::<(Title, i32, Option<String>)>(&db)
         .map_err(custom)?;
 
-    use std::collections::BTreeMap;
     let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
     for (title, episode_id, episode) in other_episodes {
         let published =
@@ -877,8 +807,6 @@ fn oldslug_title(
     db: PooledPg,
     slug: String,
 ) -> Result<impl Reply, Rejection> {
-    use crate::schema::titles::dsl as t;
-    use diesel::dsl::count_star;
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;
