@@ -58,12 +58,11 @@ document.addEventListener( 'click', function ( e ) {
             rows.sort( function ( a, b ) {
                 a = getValue(a.cells[column_index]);
                 b = getValue(b.cells[column_index]);
-                if ( reverse ) {
-                    var c = a;
-                    a = b;
-                    b = c;
+                var result = a - b;
+                if (isNaN(result)) {
+                    result = a.localeCompare(b);
                 }
-                return isNaN( a - b ) ? a.localeCompare( b ) : a - b;
+                return reverse ? -result : result;
             } );
 
             // Make a clone without contents
