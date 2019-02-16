@@ -66,7 +66,7 @@ pub fn search_autocomplete(
             .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
             .order(r::title)
             .limit(10)
-            .load::<(i16, Option<String>, String)>(&db)
+            .load::<(i16, String, String)>(&db)
             .map_err(custom)?
             .into_iter()
             .map(|(k, t, s)| Completion::refkey(k, t, s))
@@ -95,10 +95,10 @@ impl Completion {
     fn creator(t: String, s: String) -> Self {
         Completion { k: "p", t, s }
     }
-    fn refkey(k: i16, t: Option<String>, s: String) -> Self {
+    fn refkey(k: i16, t: String, s: String) -> Self {
         Completion {
             k: if k == RefKey::FA_ID { "f" } else { "k" },
-            t: t.unwrap_or(s.clone()),
+            t,
             s,
         }
     }

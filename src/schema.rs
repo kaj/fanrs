@@ -128,7 +128,7 @@ table! {
     refkeys (id) {
         id -> Int4,
         kind -> Int2,
-        title -> Nullable<Varchar>,
+        title -> Varchar,
         slug -> Varchar,
     }
 }

@@ -91,20 +91,20 @@ impl RefKey {
 
     pub fn get_or_create_id(&self, db: &PgConnection) -> Result<i32, Error> {
         let (kind, title, slug) = match self {
-            RefKey::Fa(s) => (RefKey::FA_ID, "", s.clone()),
-            RefKey::Key(t, s) => (RefKey::KEY_ID, t.as_ref(), s.clone()),
+            RefKey::Fa(s) => (RefKey::FA_ID, self.name(), s.clone()),
+            RefKey::Key(t, s) => (RefKey::KEY_ID, t.clone(), s.clone()),
             RefKey::Who(n, _s) => {
                 use super::Creator;
                 let creator = Creator::get_or_create(&n, db)?;
-                (RefKey::WHO_ID, n.as_ref(), creator.slug)
+                (RefKey::WHO_ID, n.clone(), creator.slug)
             }
-            RefKey::Title(n, s) => (RefKey::TITLE_ID, n.as_ref(), s.clone()),
+            RefKey::Title(n, s) => (RefKey::TITLE_ID, n.clone(), s.clone()),
         };
         use crate::schema::refkeys::dsl;
         dsl::refkeys
             .select(dsl::id)
             .filter(dsl::kind.eq(kind))
-            .filter(dsl::title.eq(title))
+            .filter(dsl::title.eq(&title))
             .filter(dsl::slug.eq(&slug))
             .first(db)
             .optional()?
@@ -179,16 +179,16 @@ impl RefKey {
 }
 
 impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
-    type Row = (i32, i16, Option<String>, String);
+    type Row = (i32, i16, String, String);
 
     fn build(row: Self::Row) -> Self {
         IdRefKey {
             id: row.0,
             refkey: match (row.1, row.2, row.3) {
-                (RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
+                (RefKey::KEY_ID, t, s) => RefKey::Key(t, s),
                 (RefKey::FA_ID, _, s) => RefKey::Fa(s),
-                (RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
-                (RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
+                (RefKey::WHO_ID, t, s) => RefKey::Who(t, s),
+                (RefKey::TITLE_ID, t, s) => RefKey::Title(t, s),
                 (k, t, s) => panic!(
                     "Bad refkey #{} kind {} ({:?}, {:?})",
                     row.0, k, t, s,
@@ -198,16 +198,16 @@ impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
     }
 }
 
-use diesel::sql_types::{Nullable, SmallInt, Text};
-impl Queryable<(SmallInt, Nullable<Text>, Text), Pg> for RefKey {
-    type Row = (i16, Option<String>, String);
+use diesel::sql_types::{SmallInt, Text};
+impl Queryable<(SmallInt, Text, Text), Pg> for RefKey {
+    type Row = (i16, String, String);
 
     fn build(row: Self::Row) -> Self {
         match row {
-            (RefKey::KEY_ID, Some(t), s) => RefKey::Key(t, s),
+            (RefKey::KEY_ID, t, s) => RefKey::Key(t, s),
             (RefKey::FA_ID, _, s) => RefKey::Fa(s),
-            (RefKey::WHO_ID, Some(t), s) => RefKey::Who(t, s),
-            (RefKey::TITLE_ID, Some(t), s) => RefKey::Title(t, s),
+            (RefKey::WHO_ID, t, s) => RefKey::Who(t, s),
+            (RefKey::TITLE_ID, t, s) => RefKey::Title(t, s),
             (k, t, s) => panic!("Bad refkey kind {} ({:?}, {:?})", k, t, s),
         }
     }
