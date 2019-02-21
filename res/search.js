@@ -17,7 +17,6 @@
 	let s = document.createElement('label');
 	s.innerHTML = title + ' <input type="checkbox" checked name="' + kind +
 	    '" value="' + slug + '">';
-	s.tabIndex = 4;
 	s.className = kind;
 	tags.appendChild(s);
 	list.innerHTML = '';
@@ -37,7 +36,6 @@
 		    a.innerHTML = x.t + ' <small>(' + kindname[x.k] + ')</small>';
 		    a.className='hit ' + x.k;
 		    a.href = x.s;
-		    a.tabIndex = 2;
 		    a.onclick = function() { return addTag(x.t, x.k, x.s) }
 		    list.appendChild(a)
 		})
