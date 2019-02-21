@@ -1,0 +1,21 @@
+@use crate::server::search::SearchQuery;
+@use super::{page, searchbox};
+@use warp::http::status::StatusCode;
+
+@(code: StatusCode)
+@:page("Du hittar inte Fantomen …", {
+  <h2>… han hittar dig!</h2>
+}, {
+  <section class="front error">
+    <h2 lang="en">@code</h2>
+    <p class="article">Antingen kan du gå tillbaks till
+      <a href="/">fantomenindexets förstasida</a> och leta,
+      eller så kan du helt enkelt gå ut i djungeln och ropa efter
+      <a href="rasmus@@krats.se">rasmus@@krats.se</a>.</p>
+  </section>
+
+  <section class="front search">
+    <h2>Sök</h2>
+    @:searchbox(&SearchQuery::empty())
+  </section>
+})

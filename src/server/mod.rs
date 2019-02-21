@@ -36,6 +36,7 @@ use mime::IMAGE_JPEG;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use warp::http::Response;
+use warp::http::status::StatusCode;
 use warp::path::Tail;
 use warp::{
     self,
@@ -130,7 +131,8 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and(path::param())
             .and(end())
-            .and_then(oldslug_title));
+            .and_then(oldslug_title))
+        .recover(customize_error);
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
 }
@@ -854,6 +856,27 @@ fn redirect(url: String) -> impl Reply {
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
         .body(msg)
+}
+
+fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
+    match err.status() {
+        StatusCode::NOT_FOUND => {
+            eprintln!("Got a 404: {:?}", err);
+            // We have a custom 404 page!
+            Response::builder().status(StatusCode::NOT_FOUND).html(|o| {
+                templates::notfound(
+                    o,
+                    StatusCode::NOT_FOUND,
+                )
+            })
+        }
+        code => {
+            eprintln!("Got a {}: {:?}", code.as_u16(), err);
+            Response::builder()
+                .status(code)
+                .html(|o| templates::error(o, code))
+        }
+    }
 }
 
 use diesel::expression::SqlLiteral;

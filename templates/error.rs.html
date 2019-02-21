@@ -1,0 +1,16 @@
+@use super::page;
+@use warp::http::status::StatusCode;
+
+@(code: StatusCode)
+@:page("Något gick snett", {}, {
+  <section>
+    <h2 lang="en">@code</h2>
+    <p class="article">Något gick snett.
+      Du kanske kan försöka igen om en stund?
+      Eller gå tillbaks till
+      <a href="/">fantomenindexets förstasida</a>?
+      Om det fortfarande verkar trasigt så får du gärna rapportera
+      felet till
+      <a href="rasmus@@krats.se">rasmus@@krats.se</a>.</p>
+  </section>
+})
