@@ -23,6 +23,23 @@ body {
             margin: .2em 0 0;
             font-size: 2.6em;
         }
+        @media (min-width: 650px) {
+            background-image: url(static_name("fa_lindahl_9915_png"));
+            background-position: 100% 100%;
+            background-repeat: no-repeat;
+            background-size: 23vw auto;
+            min-height: calc(#{"15vw - 2ex"});
+            padding-right: 22vw;
+            position: relative;
+            &:after {
+                content: "Vinjettbild: Hans Lindahl, ur Guldmakaren, Fa 15, 1999.";
+                display: block;
+                font: 60%/1 sans-serif;
+                position: absolute;
+                right: 20.2vw;
+                bottom: 1px;
+            }
+        }
     }
     > footer {
         border-top: solid .5px black;
@@ -60,39 +77,39 @@ section {
     background: #eee;
 
     section, .episode, .article, table, .covers .cover {
-	background: white;
-	border: solid .5px rgba(black, 0.5);
-	border-radius: .2em;
-	margin: 0 0 .2em .2em;
-	padding: .2em;
-	h3, p {
-	    margin: 0 0 .2em 0;
-	}
-	p.teaser {
-	    font-style: italic;
-	}
-	p.info {
-	    font-size: 80%;
-	}
+        background: white;
+        border: solid .5px rgba(black, 0.5);
+        border-radius: .2em;
+        margin: 0 0 .2em .2em;
+        padding: .2em;
+        h3, p {
+            margin: 0 0 .2em 0;
+        }
+        p.teaser {
+            font-style: italic;
+        }
+        p.info {
+            font-size: 80%;
+        }
     }
     table {
-	border-collapse: collapse;
-	margin: .2em;
-	width: -moz-available;
-	tr:nth-child(2n+1) {
-	    background: #fbfbfb;
-	}
-	tr:hover {
-	    background: #eee;
-	}
-	th, td {
-	    border: solid .4px rgba(black, 0.3);
-	    padding: .1em .5em;
-	    text-align: left;
-	    &:nth-child(2) {
-		text-align: right;
-	    }
-	}
+        border-collapse: collapse;
+        margin: .2em;
+        width: -moz-available;
+        tr:nth-child(2n+1) {
+            background: #fbfbfb;
+        }
+        tr:hover {
+            background: #eee;
+        }
+        th, td {
+            border: solid .4px rgba(black, 0.3);
+            padding: .1em .5em;
+            text-align: left;
+            &:nth-child(2) {
+                text-align: right;
+            }
+        }
     }
 }
 
@@ -101,14 +118,14 @@ section.searchresults.tags {
     flex-flow: row wrap;
     h2 { flex-basis: 100%; }
     section {
-	flex-basis: 19em;
-	flex-grow: 1;
-	h3 { display: inline }
-	button {
-	    background: #eee;
-	    border: outset 0.6px #eee;
-	    border-radius: .2em;
-	}
+        flex-basis: 19em;
+        flex-grow: 1;
+        h3 { display: inline }
+        button {
+            background: #eee;
+            border: outset 0.6px #eee;
+            border-radius: .2em;
+        }
     }
 }
 
@@ -117,56 +134,56 @@ section.searchresults.tags {
     flex-flow: row wrap;
     justify-content: space-around;
     .cover {
-	flex-grow: .1;
-	text-align: center;
-	img { width: 10em; }
+        flex-grow: .1;
+        text-align: center;
+        img { width: 10em; }
     }
 }
 
 .issue {
     display: flex;
     > header {
-	flex-basis: 10em;
-	flex-shrink: 0;
-	img {
-	    width: 10em;
-	    height: auto;
-	}
-	p {
-	    font-size: 90%;
-	}
+        flex-basis: 10em;
+        flex-shrink: 0;
+        img {
+            width: 10em;
+            height: auto;
+        }
+        p {
+            font-size: 90%;
+        }
     }
     .content {
-	display: flex;
-	flex-flow: row wrap;
-	flex-grow: 1;
-	div {
-	    flex-basis: 28em;
-	    flex-grow: 2;
-	    &.episode.main {
-		flex-basis: 42em;
-		flex-grow: 5;
-	    }
-	    &.episode.noteaser {
-		flex-basis: 20em;
-		flex-grow: 1.5;
-	    }
-	    &.article {
-		flex-basis: 15em;
-		flex-grow: 1;
-		background: rgba(white, 0.7);
-	    }
-	}
+        display: flex;
+        flex-flow: row wrap;
+        flex-grow: 1;
+        div {
+            flex-basis: 28em;
+            flex-grow: 2;
+            &.episode.main {
+                flex-basis: 42em;
+                flex-grow: 5;
+            }
+            &.episode.noteaser {
+                flex-basis: 20em;
+                flex-grow: 1.5;
+            }
+            &.article {
+                flex-basis: 15em;
+                flex-grow: 1;
+                background: rgba(white, 0.7);
+            }
+        }
     }
 }
 
 section.front {
     header {
-	margin: 0 .3em;
-	display: flex;
-	flex-flow: row wrap;
-	align-items: baseline;
-	p { margin: 0 1em; }
+        margin: 0 .3em;
+        display: flex;
+        flex-flow: row wrap;
+        align-items: baseline;
+        p { margin: 0 1em; }
     }
 }
 section.titles h2::before {
