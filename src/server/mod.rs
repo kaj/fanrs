@@ -35,8 +35,8 @@ use failure::Error;
 use mime::IMAGE_JPEG;
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use warp::http::Response;
 use warp::http::status::StatusCode;
+use warp::http::Response;
 use warp::path::Tail;
 use warp::{
     self,
@@ -863,12 +863,9 @@ fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
         StatusCode::NOT_FOUND => {
             eprintln!("Got a 404: {:?}", err);
             // We have a custom 404 page!
-            Response::builder().status(StatusCode::NOT_FOUND).html(|o| {
-                templates::notfound(
-                    o,
-                    StatusCode::NOT_FOUND,
-                )
-            })
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
         }
         code => {
             eprintln!("Got a {}: {:?}", code.as_u16(), err);
