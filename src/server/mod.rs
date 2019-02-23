@@ -563,14 +563,47 @@ fn one_ref(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
 #[allow(clippy::needless_pass_by_value)]
 fn one_ref_impl(
     db: PooledPg,
-    tslug: String,
+    slug: String,
     kind: i16,
 ) -> Result<impl Reply, Rejection> {
     let refkey = r::refkeys
-        .filter(r::kind.eq(kind))
-        .filter(r::slug.eq(tslug))
+        .filter(r::kind.eq(&kind))
+        .filter(r::slug.eq(&slug))
         .first::<IdRefKey>(&db)
-        .map_err(custom_or_404)?;
+        .optional()
+        .map_err(custom)?;
+    let refkey = if let Some(refkey) = refkey {
+        refkey
+    } else {
+        if kind == RefKey::FA_ID {
+            // Some special cases
+            if slug == "17.1" {
+                return redirect("/fa/17j");
+            } else if slug == "22.1" {
+                return redirect("/fa/22k");
+            } else if slug == "22.2" {
+                return redirect("/fa/22j");
+            }
+        }
+        let target = slug.replace("_", "-").replace(".html", "");
+        if target != slug {
+            eprintln!("Trying refkey redirect {:?} -> {:?}", slug, target);
+            let n = r::refkeys
+                .filter(r::kind.eq(&kind))
+                .filter(r::slug.eq(&target))
+                .select(count_star())
+                .first::<i64>(&db)
+                .map_err(custom)?;
+            if n == 1 {
+                return redirect(&format!(
+                    "/{}/{}",
+                    if kind == RefKey::FA_ID { "fa" } else { "what" },
+                    target,
+                ));
+            }
+        }
+        return Err(not_found());
+    };
 
     let articles = a::articles
         .select(a::articles::all_columns())
@@ -810,7 +843,7 @@ fn oldslug_title(
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;
-        return Ok(redirect(format!("/s/{}", goda_svg.name)));
+        return redirect(&format!("/s/{}", goda_svg.name));
     }
     let target = slug.replace("_", "-").replace(".html", "");
 
@@ -820,7 +853,7 @@ fn oldslug_title(
         .first::<i64>(&db)
         .map_err(custom)?;
     if n == 1 {
-        return Ok(redirect(format!("/titles/{}", target)));
+        return redirect(&format!("/titles/{}", target));
     }
     let target = t::titles
         .filter(
@@ -836,7 +869,7 @@ fn oldslug_title(
         .select(t::slug)
         .first::<String>(&db)
         .map_err(custom_or_404)?;
-    Ok(redirect(format!("/titles/{}", target)))
+    redirect(&format!("/titles/{}", target))
 }
 
 fn custom_or_404(e: diesel::result::Error) -> Rejection {
@@ -846,14 +879,15 @@ fn custom_or_404(e: diesel::result::Error) -> Rejection {
     }
 }
 
-fn redirect(url: String) -> impl Reply {
+fn redirect(url: &str) -> Result<Response<Vec<u8>>, Rejection> {
     use warp::http::header::LOCATION;
     use warp::http::status::StatusCode;
     let msg = format!("Try {:?}", url);
     Response::builder()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
-        .body(msg)
+        .body(msg.into_bytes())
+        .map_err(custom)
 }
 
 fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
