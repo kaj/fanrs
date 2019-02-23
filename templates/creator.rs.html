@@ -1,9 +1,9 @@
-@use crate::models::{Article, Creator, CreatorSet, Episode, IssueRef, RefKeySet, Title};
-@use crate::server::PartsPublished;
+@use crate::models::{Article, Creator, CreatorSet, IssueRef, RefKeySet, Title};
+@use crate::server::{FullEpisode, PartsPublished};
 @use super::{epmisc, page};
 @use std::collections::BTreeMap;
 
-@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, PartsPublished)>>)
+@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, FullEpisode)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, PartsPublished)>>)
 @:page(&creator.name, {}, {
   @if !about.is_empty() {
   <section>
@@ -49,11 +49,11 @@
   @if !episodes.is_empty() {
   <section>
     <h2>Episoder</h2>
-    @for (title, episode, refs, creators, pubs) in episodes {
-    <div class="episode">
-      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = episode.episode {: @h}</h3>
-      @:epmisc(episode, refs, creators, pubs)
-    </div>
+    @for (title, fe) in episodes {
+    <section class="episode">
+      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
+      @:epmisc(&fe)
+    </section>
     }
   </section>
   }

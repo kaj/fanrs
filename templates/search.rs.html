@@ -1,9 +1,9 @@
-@use crate::models::{Article, Creator, CreatorSet, Episode, RefKey, RefKeySet, Title};
+@use crate::models::{Article, Creator, RefKey, Title};
 @use crate::server::search::SearchQuery;
-@use crate::server::PartsPublished;
+@use crate::server::FullEpisode;
 @use super::{epmisc, page, searchbox};
 
-@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)])
+@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, FullEpisode)])
 @:page("Sök", {@:searchbox(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
@@ -41,10 +41,10 @@
   @if !episodes.is_empty() {
   <section class="searchresults">
     <h2>Episoder</h2>
-    @for (title, episode, refs, creators, pubs) in episodes {
+    @for (title, fe) in episodes {
     <section class="episode">
-      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = episode.episode {: @h}</h3>
-      @:epmisc(episode, refs, creators, pubs)
+      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
+      @:epmisc(&fe)
     </section>
     }
   </section>

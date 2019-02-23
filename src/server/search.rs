@@ -1,16 +1,21 @@
-use super::{PartsPublished, PooledPg, RenderRucte};
-use crate::models::{
-    Creator, CreatorSet, Episode, IdRefKey, RefKey, RefKeySet, Title,
-};
+use super::{FullEpisode, PooledPg, RenderRucte};
+use crate::models::{Creator, Episode, IdRefKey, RefKey, Title};
 // Article, Issue, IssueRef, Part
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
+use crate::schema::episode_parts::dsl as ep;
+use crate::schema::episode_refkeys::dsl as er;
+use crate::schema::episodes::dsl as e;
+use crate::schema::episodes_by::dsl as eb;
+use crate::schema::issues::dsl as i;
+use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates;
-use diesel::dsl::{any, sql};
+use diesel::dsl::{any, max, sql};
 use diesel::prelude::*;
-use diesel::sql_types::Text;
+use diesel::sql_types::{SmallInt, Text};
+use diesel::PgTextExpressionMethods;
 use failure::Error;
 use serde_derive::Serialize;
 use warp::http::Response;
@@ -152,26 +157,10 @@ impl SearchQuery {
             Vec<Title>,
             Vec<Creator>,
             Vec<RefKey>,
-            Vec<(Title, Episode, RefKeySet, CreatorSet, PartsPublished)>,
+            Vec<(Title, FullEpisode)>,
         ),
         Error,
     > {
-        use crate::schema::creator_aliases::dsl as ca;
-        use crate::schema::creators::dsl as c;
-        //use crate::schema::article_refkeys::dsl as ar;
-        //use crate::schema::articles::dsl as a;
-        use crate::schema::episode_parts::dsl as ep;
-        use crate::schema::episode_refkeys::dsl as er;
-        use crate::schema::episodes::dsl as e;
-        use crate::schema::episodes_by::dsl as eb;
-        use crate::schema::issues::dsl as i;
-        use crate::schema::publications::dsl as p;
-        use crate::schema::refkeys::dsl as r;
-        use crate::schema::titles::dsl as t;
-        use diesel::dsl::{any, max, sql};
-        use diesel::sql_types::SmallInt;
-        use diesel::PgTextExpressionMethods;
-
         let max_hits = 25;
         if self.is_empty() {
             return Ok((vec![], vec![], vec![], vec![]));
@@ -305,14 +294,8 @@ impl SearchQuery {
             .limit(max_hits)
             .load::<(Title, Episode)>(db)?
             .into_iter()
-            .map(|(title, episode)| {
-                let refs = RefKeySet::for_episode(&episode, db).unwrap();
-                let creators = CreatorSet::for_episode(&episode, db).unwrap();
-                let published =
-                    PartsPublished::for_episode(&episode, db).unwrap();
-                (title, episode, refs, creators, published)
-            })
-            .collect::<Vec<_>>();
+            .map(|(t, ep)| FullEpisode::load_details(ep, db).map(|e| (t, e)))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((titles, creators, refkeys, episodes))
     }
 }

@@ -192,7 +192,7 @@ impl Nr {
         self.number
     }
     pub fn last(&self) -> i16 {
-        if self.nr_str.contains("-") {
+        if self.nr_str.contains('-') {
             self.number + 1
         } else {
             self.number

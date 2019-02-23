@@ -1,8 +1,8 @@
-@use crate::models::{Article, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title};
-@use crate::server::PartsPublished;
+@use crate::models::{Article, CreatorSet, IssueRef, RefKey, RefKeySet, Title};
+@use crate::server::FullEpisode;
 @use super::{epmisc, page};
 
-@(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, Episode, RefKeySet, CreatorSet, PartsPublished)])
+@(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
 @:page(&refkey.name(), {}, {
   @if !articles.is_empty() {
   <section>
@@ -22,11 +22,11 @@
   @if !episodes.is_empty() {
   <section>
     <h2>Episoder</h2>
-    @for (title, episode, refs, creators, pubs) in episodes {
-    <div class="episode">
-      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = episode.episode {: @h}</h3>
-      @:epmisc(episode, refs, creators, pubs)
-    </div>
+    @for (title, fe) in episodes {
+    <section class="episode">
+      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
+      @:epmisc(&fe)
+    </section>
     }
   </section>
   }

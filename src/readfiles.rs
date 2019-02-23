@@ -336,8 +336,8 @@ pub fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
                 let slug = e
                     .attributes
                     .get("slug")
-                    .map(|s| s.clone())
-                    .unwrap_or(slugify(&name));
+                    .cloned()
+                    .unwrap_or_else(|| slugify(&name));
                 let creator = c::creators
                     .select((c::id, c::name, c::slug))
                     .filter(c::name.eq(&name))

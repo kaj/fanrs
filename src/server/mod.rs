@@ -288,25 +288,63 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
 /// Information about an episode / part or article, as published in an issue.
 pub struct PublishedInfo {
     pub content: PublishedContent,
-    pub creators: CreatorSet,
-    pub refs: RefKeySet,
     pub seqno: Option<i16>,
     pub classnames: &'static str,
 }
 
 pub enum PublishedContent {
     Text {
-        title: String,
-        subtitle: Option<String>,
-        note: Option<String>,
+        article: Article,
+        refs: RefKeySet,
+        creators: CreatorSet,
     },
     EpisodePart {
         title: Title,
-        episode: Episode,
+        episode: FullEpisode,
         part: Part,
-        published: PartsPublished,
         best_plac: Option<i16>,
     },
+}
+
+pub struct FullEpisode {
+    pub episode: Episode,
+    pub refs: RefKeySet,
+    pub creators: CreatorSet,
+    pub published: PartsPublished,
+}
+
+impl FullEpisode {
+    fn load_details(
+        episode: Episode,
+        db: &PgConnection,
+    ) -> Result<FullEpisode, Error> {
+        let refs = RefKeySet::for_episode(&episode, db)?;
+        let creators = CreatorSet::for_episode(&episode, db)?;
+        let published = PartsPublished::for_episode(&episode, db)?;
+        Ok(FullEpisode {
+            episode,
+            refs,
+            creators,
+            published,
+        })
+    }
+
+    fn in_issue(
+        episode: Episode,
+        issue: &Issue,
+        db: &PgConnection,
+    ) -> Result<FullEpisode, Error> {
+        let refs = RefKeySet::for_episode(&episode, db)?;
+        let creators = CreatorSet::for_episode(&episode, db)?;
+        let published =
+            PartsPublished::for_episode_except(&episode, issue, db)?;
+        Ok(FullEpisode {
+            episode,
+            refs,
+            creators,
+            published,
+        })
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -323,8 +361,8 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                 .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
                 .select(c_columns)
                 .filter(cb::issue_id.eq(issue.id))
-                .load(&db)
-                .unwrap();
+                .load(&db)?;
+
             let mut have_main = false;
             let content = p::publications
                 .left_outer_join(
@@ -350,8 +388,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     Option<Article>,
                     Option<i16>,
                     Option<i16>,
-                )>(&db)
-                .unwrap()
+                )>(&db)?
                 .into_iter()
                 .map(|row| match row {
                     (Some((t, mut e, part)), None, seqno, b) => {
@@ -365,56 +402,38 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             } else {
                                 "episode"
                             };
-                        let refs = RefKeySet::for_episode(&e, &db).unwrap();
-                        let creators =
-                            CreatorSet::for_episode(&e, &db).unwrap();
-                        let published = PartsPublished::for_episode_except(
-                            &e, &issue, &db,
-                        )
-                        .unwrap();
-                        PublishedInfo {
-                            content: PublishedContent::EpisodePart {
-                                title: t,
-                                episode: e,
-                                part,
-                                published,
-                                best_plac: b,
-                            },
-                            creators,
-                            refs,
+                        let content = PublishedContent::EpisodePart {
+                            title: t,
+                            episode: FullEpisode::in_issue(e, &issue, &db)?,
+                            part,
+                            best_plac: b,
+                        };
+                        Ok(PublishedInfo {
+                            content,
                             seqno,
                             classnames,
-                        }
+                        })
                     }
                     (None, Some(a), seqno, None) => {
-                        let refs = RefKeySet::for_article(&a, &db).unwrap();
-                        let creators =
-                            CreatorSet::for_article(&a, &db).unwrap();
-                        let Article {
-                            title,
-                            subtitle,
-                            note,
-                            ..
-                        } = a;
-                        PublishedInfo {
+                        let refs = RefKeySet::for_article(&a, &db)?;
+                        let creators = CreatorSet::for_article(&a, &db)?;
+                        Ok(PublishedInfo {
                             content: PublishedContent::Text {
-                                title,
-                                subtitle,
-                                note,
+                                article: a,
+                                refs,
+                                creators,
                             },
-                            creators,
-                            refs,
                             seqno,
                             classnames: "article",
-                        }
+                        })
                     }
                     row => panic!("Strange row: {:?}", row),
                 })
-                .collect();
-            (issue, cover_by, content)
+                .collect::<Result<_, Error>>()?;
+            Ok((issue, cover_by, content))
         })
-        .collect::<Vec<(Issue, Vec<_>, Vec<_>)>>();
-
+        .collect::<Result<Vec<(Issue, Vec<_>, Vec<_>)>, Error>>()
+        .map_err(custom)?;
     if issues.is_empty() {
         return Err(not_found());
     }
@@ -452,56 +471,51 @@ fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn one_title(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
-    let (title, articles, episodes) = t::titles
+    let title = t::titles
         .filter(t::slug.eq(slug))
         .first::<Title>(&db)
-        .and_then(|title| {
-            let articles = a::articles
-                .select(a::articles::all_columns())
-                .left_join(ar::article_refkeys.left_join(r::refkeys))
-                .filter(r::kind.eq(RefKey::TITLE_ID))
-                .filter(r::slug.eq(&title.slug))
-                .inner_join(p::publications.inner_join(i::issues))
-                .order(min(sortable_issue()))
-                .group_by(a::articles::all_columns())
-                .load::<Article>(&db)?
-                .into_iter()
-                .map(|article| {
-                    let refs = RefKeySet::for_article(&article, &db).unwrap();
-                    let creators =
-                        CreatorSet::for_article(&article, &db).unwrap();
-                    let published = i::issues
-                        .inner_join(p::publications)
-                        .select((i::year, (i::number, i::number_str)))
-                        .filter(p::article_id.eq(article.id))
-                        .load::<IssueRef>(&db)
-                        .unwrap();
-                    (article, refs, creators, published)
-                })
-                .collect::<Vec<_>>();
-            let episodes = e::episodes
-                .filter(e::title.eq(title.id))
-                .select(crate::schema::episodes::all_columns)
-                .inner_join(
-                    ep::episode_parts
-                        .inner_join(p::publications.inner_join(i::issues)),
-                )
-                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-                .group_by(crate::schema::episodes::all_columns)
-                .load::<Episode>(&db)?
-                .into_iter()
-                .map(|episode| {
-                    let refs = RefKeySet::for_episode(&episode, &db).unwrap();
-                    let creators =
-                        CreatorSet::for_episode(&episode, &db).unwrap();
-                    let published =
-                        PartsPublished::for_episode(&episode, &db).unwrap();
-                    (episode, refs, creators, published)
-                })
-                .collect::<Vec<_>>();
-            Ok((title, articles, episodes))
-        })
         .map_err(custom_or_404)?;
+
+    let articles = a::articles
+        .select(a::articles::all_columns())
+        .left_join(ar::article_refkeys.left_join(r::refkeys))
+        .filter(r::kind.eq(RefKey::TITLE_ID))
+        .filter(r::slug.eq(&title.slug))
+        .inner_join(p::publications.inner_join(i::issues))
+        .order(min(sortable_issue()))
+        .group_by(a::articles::all_columns())
+        .load::<Article>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|article| {
+            let refs = RefKeySet::for_article(&article, &db).unwrap();
+            let creators = CreatorSet::for_article(&article, &db).unwrap();
+            let published = i::issues
+                .inner_join(p::publications)
+                .select((i::year, (i::number, i::number_str)))
+                .filter(p::article_id.eq(article.id))
+                .load::<IssueRef>(&db)
+                .unwrap();
+            (article, refs, creators, published)
+        })
+        .collect::<Vec<_>>();
+
+    let episodes = e::episodes
+        .filter(e::title.eq(title.id))
+        .select(crate::schema::episodes::all_columns)
+        .inner_join(
+            ep::episode_parts
+                .inner_join(p::publications.inner_join(i::issues)),
+        )
+        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .group_by(crate::schema::episodes::all_columns)
+        .load::<Episode>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|episode| FullEpisode::load_details(episode, &db))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(custom)?;
+
     Response::builder()
         .html(|o| templates::title(o, &title, &articles, &episodes))
 }
@@ -552,66 +566,55 @@ fn one_ref_impl(
     tslug: String,
     kind: i16,
 ) -> Result<impl Reply, Rejection> {
-    let (refkey, articles, episodes) = r::refkeys
+    let refkey = r::refkeys
         .filter(r::kind.eq(kind))
         .filter(r::slug.eq(tslug))
         .first::<IdRefKey>(&db)
-        .and_then(|refkey| {
-            let articles = a::articles
-                .select(a::articles::all_columns())
-                .left_join(ar::article_refkeys.left_join(r::refkeys))
-                .filter(ar::refkey_id.eq(refkey.id))
-                .inner_join(p::publications.inner_join(i::issues))
-                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-                .group_by(a::articles::all_columns())
-                .load::<Article>(&db)?
-                .into_iter()
-                .map(|article| {
-                    let refs = RefKeySet::for_article(&article, &db).unwrap();
-                    let creators =
-                        CreatorSet::for_article(&article, &db).unwrap();
-                    let published = i::issues
-                        .inner_join(p::publications)
-                        .select((i::year, (i::number, i::number_str)))
-                        .filter(p::article_id.eq(article.id))
-                        .load::<IssueRef>(&db)
-                        .unwrap();
-                    (article, refs, creators, published)
-                })
-                .collect::<Vec<_>>();
-            let episodes = e::episodes
-                .left_join(er::episode_refkeys)
-                .inner_join(t::titles)
-                .filter(er::refkey_id.eq(refkey.id))
-                .select((
-                    t::titles::all_columns(),
-                    e::episodes::all_columns(),
-                ))
-                .inner_join(
-                    ep::episode_parts
-                        .inner_join(p::publications.inner_join(i::issues)),
-                )
-                .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-                .group_by((
-                    t::titles::all_columns(),
-                    e::episodes::all_columns(),
-                ))
-                .load::<(Title, Episode)>(&db)?
-                .into_iter()
-                .map(|(title, episode)| {
-                    let refs = RefKeySet::for_episode(&episode, &db).unwrap();
-                    let creators =
-                        CreatorSet::for_episode(&episode, &db).unwrap();
-                    let published =
-                        PartsPublished::for_episode(&episode, &db).unwrap();
-                    (title, episode, refs, creators, published)
-                })
-                .collect::<Vec<_>>();
-            Ok((refkey.refkey, articles, episodes))
-        })
         .map_err(custom_or_404)?;
+
+    let articles = a::articles
+        .select(a::articles::all_columns())
+        .left_join(ar::article_refkeys.left_join(r::refkeys))
+        .filter(ar::refkey_id.eq(refkey.id))
+        .inner_join(p::publications.inner_join(i::issues))
+        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .group_by(a::articles::all_columns())
+        .load::<Article>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|article| {
+            let refs = RefKeySet::for_article(&article, &db)?;
+            let creators = CreatorSet::for_article(&article, &db)?;
+            let published = i::issues
+                .inner_join(p::publications)
+                .select((i::year, (i::number, i::number_str)))
+                .filter(p::article_id.eq(article.id))
+                .load::<IssueRef>(&db)?;
+            Ok((article, refs, creators, published))
+        })
+        .collect::<Result<Vec<_>, Error>>()
+        .map_err(custom)?;
+
+    let episodes = e::episodes
+        .left_join(er::episode_refkeys)
+        .inner_join(t::titles)
+        .filter(er::refkey_id.eq(refkey.id))
+        .select((t::titles::all_columns(), e::episodes::all_columns()))
+        .inner_join(
+            ep::episode_parts
+                .inner_join(p::publications.inner_join(i::issues)),
+        )
+        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .group_by((t::titles::all_columns(), e::episodes::all_columns()))
+        .load::<(Title, Episode)>(&db)
+        .map_err(custom)?
+        .into_iter()
+        .map(|(t, ep)| FullEpisode::load_details(ep, &db).map(|e| (t, e)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(custom)?;
+
     Response::builder()
-        .html(|o| templates::refkey(o, &refkey, &articles, &episodes))
+        .html(|o| templates::refkey(o, &refkey.refkey, &articles, &episodes))
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -716,14 +719,9 @@ fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
         .load::<(Title, Episode)>(&db)
         .map_err(custom)?
         .into_iter()
-        .map(|(title, episode)| {
-            let refs = RefKeySet::for_episode(&episode, &db).unwrap();
-            let creators = CreatorSet::for_episode(&episode, &db).unwrap();
-            let published =
-                PartsPublished::for_episode(&episode, &db).unwrap();
-            (title, episode, refs, creators, published)
-        })
-        .collect::<Vec<_>>();
+        .map(|(t, ep)| FullEpisode::load_details(ep, &db).map(|e| (t, e)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(custom)?;
 
     let articles_by = a::articles
         .select(a::articles::all_columns())
