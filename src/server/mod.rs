@@ -123,6 +123,13 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and_then(list_creators))
         .or(get()
+            .and(path("static"))
+            .and(s())
+            .and(path::param())
+            .and(path::param())
+            .and(end())
+            .and_then(redirect_cover))
+        .or(get()
             .and(s())
             .and(path::param())
             .and(end())
@@ -199,6 +206,49 @@ fn cover_image(
         .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
         .header(EXPIRES, medium_expires.to_rfc2822())
         .body(data))
+}
+
+struct CYear(i16);
+impl FromStr for CYear {
+    type Err = u8;
+    /// expect cYYYY
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !s.starts_with('c') {
+            return Err(0);
+        }
+        Ok(CYear(s[1..].parse().map_err(|_| 3)?))
+    }
+}
+
+struct SIssue(i16);
+impl FromStr for SIssue {
+    type Err = u8;
+    /// expect sNN.jpg
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !s.starts_with('s') {
+            return Err(0);
+        }
+        let p = s.find(".jpg").ok_or(2)?;
+        Ok(SIssue(s[1..p].parse().map_err(|_| 3)?))
+    }
+}
+
+fn redirect_cover(
+    db: PooledPg,
+    year: CYear,
+    issue: SIssue,
+) -> Result<impl Reply, Rejection> {
+    let exists = i::issues
+        .filter(i::year.eq(&year.0))
+        .filter(i::number.eq(&issue.0))
+        .count()
+        .get_result::<i64>(&db)
+        .map_err(custom)?;
+    if exists > 0 {
+        redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))
+    } else {
+        Err(not_found())
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
