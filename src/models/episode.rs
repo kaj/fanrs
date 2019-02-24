@@ -169,7 +169,7 @@ impl OrigDates {
 impl ToHtml for OrigDates {
     fn to_html(&self, out: &mut Write) -> io::Result<()> {
         match (self.from, self.to) {
-            (Some(from), Some(to)) => write!(
+            (Some(from), Some(to)) if from != to => write!(
                 out,
                 "<p class='info dates'>{} {} - {}.</p>",
                 if self.sun {
@@ -180,7 +180,7 @@ impl ToHtml for OrigDates {
                 SvDate(&from),
                 SvDate(&to),
             ),
-            (Some(date), None) => write!(
+            (Some(date), _) => write!(
                 out,
                 "<p class='info date'>Först publicerad {}.</p>",
                 SvDate(&date),
