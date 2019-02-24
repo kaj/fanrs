@@ -3,7 +3,26 @@
 @use super::{epmisc, page};
 
 @(title: &Title, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[FullEpisode])
-@:page(&title.title, {}, {
+@:page(&title.title, {
+  <p>Här listas de gånger serien <strong>@title.title</strong>
+    (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
+	title="Sök &quot;@title.title&quot; i Seriewikin">Seriewikin</a>,
+    <a href="http://sv.wikipedia.org/wiki/Special:Search?search=@title.title&amp;go=go"
+       title="Sök &quot;@title.title&quot; i Svenska Wikipedia">wikipedia</a>)
+    förekommer i mina indexerade fantomentidningar.</p>
+
+  @if title.has_daystrip() || title.has_sundays() {
+  <p>Du kan lista serierna efter
+    <a href="/titles/@title.slug">publikation i Fantomentidningen</a>
+    @if title.has_daystrip() { eller efter originalpublicerig som
+    <a href="/titles/weekdays-@title.slug">dagstripp</a>
+    }
+    @if title.has_sundays() { eller
+    <a href="/titles/sundays-@title.slug">söndagssidor</a>
+    }
+    (så långt information om ursprungspublicering finns med i indexet).</p>
+  }
+}, {
   @if !articles.is_empty() {
   <section>
     <h2>Artiklar</h2>

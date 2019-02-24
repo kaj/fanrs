@@ -4,6 +4,7 @@ extern crate diesel;
 #[macro_use]
 extern crate serde_derive;
 
+mod checkstrips;
 mod fetchcovers;
 mod listissues;
 mod models;
@@ -11,6 +12,7 @@ mod readfiles;
 mod schema;
 mod server;
 
+use crate::checkstrips::check_strips;
 use crate::fetchcovers::fetch_covers;
 use crate::listissues::list_issues;
 use diesel::pg::PgConnection;
@@ -52,6 +54,13 @@ enum Fanrs {
 
     /// Fetch missing cover images from phantomwiki.
     FetchCovers,
+
+    /// Check assumptions about which titles has daystrips and/or sunday pages.
+    ///
+    /// The code contains hardcoded lists of which comics has
+    /// daystrips or sunday pages, this routine checks that those
+    /// assumptions are correct with the database values.
+    CheckStrips,
 }
 
 fn main() {
@@ -98,6 +107,7 @@ fn run() -> Result<(), failure::Error> {
         Fanrs::ListIssues => list_issues(&db),
         Fanrs::RunServer => server::run(&db_url),
         Fanrs::FetchCovers => fetch_covers(&db),
+        Fanrs::CheckStrips => check_strips(&db),
     }
 }
 

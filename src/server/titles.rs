@@ -75,6 +75,13 @@ pub fn one_title(
     db: PooledPg,
     slug: String,
 ) -> Result<impl Reply, Rejection> {
+    let (slug, strip) = if slug.starts_with("weekdays-") {
+        (&slug["weekdays-".len()..], Some(false))
+    } else if slug.starts_with("sundays-") {
+        (&slug["sundays-".len()..], Some(true))
+    } else {
+        (slug.as_ref(), None)
+    };
     let title = t::titles
         .filter(t::slug.eq(slug))
         .first::<Title>(&db)
@@ -106,13 +113,23 @@ pub fn one_title(
 
     let episodes = e::episodes
         .filter(e::title.eq(title.id))
-        .select(crate::schema::episodes::all_columns)
+        .select(e::episodes::all_columns())
         .inner_join(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),
         )
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
         .group_by(crate::schema::episodes::all_columns)
+        .into_boxed();
+    let episodes = match strip {
+        Some(sun) => episodes
+            .filter(e::orig_sundays.eq(sun))
+            .filter(e::orig_date.is_not_null())
+            .order(e::orig_date),
+        None => {
+            episodes.order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        }
+    };
+    let episodes = episodes
         .load::<Episode>(&db)
         .map_err(custom)?
         .into_iter()
