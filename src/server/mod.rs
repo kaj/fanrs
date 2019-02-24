@@ -691,9 +691,28 @@ fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
 #[allow(clippy::needless_pass_by_value)]
 fn one_creator(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     let creator = c::creators
-        .filter(c::slug.eq(slug))
+        .filter(c::slug.eq(&slug))
         .first::<Creator>(&db)
-        .map_err(custom_or_404)?;
+        .optional()
+        .map_err(custom)?;
+    let creator = if let Some(creator) = creator {
+        creator
+    } else {
+        let target = slug
+            .replace('_', "%")
+            .replace('-', "%")
+            .replace(".html", "");
+        eprintln!("Looking for creator fallback {:?} -> {:?}", slug, target);
+        let found = ca::creator_aliases
+            .inner_join(c::creators)
+            .filter(ca::name.ilike(&target))
+            .or_filter(c::slug.ilike(&target))
+            .select(c::slug)
+            .first::<String>(&db)
+            .map_err(custom_or_404)?;
+        eprintln!("Found replacement: {:?}", found);
+        return redirect(&format!("/who/{}", found));
+    };
 
     let about = a::articles
         .select(a::articles::all_columns())
