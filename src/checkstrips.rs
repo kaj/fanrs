@@ -22,7 +22,7 @@ pub fn check_strips(db: &PgConnection) -> Result<(), Error> {
         .group_by(t::titles::all_columns())
         .load::<(Title, Option<NaiveDate>, Option<NaiveDate>)>(db)?;
     for (title, daystrip, sundays) in data {
-        if title.has_daystrip() && !daystrip.is_some() {
+        if title.has_daystrip() && daystrip.is_none() {
             return Err(format_err!(
                 "Expected daystrips for {} ({}) not found",
                 title.title,
@@ -37,7 +37,7 @@ pub fn check_strips(db: &PgConnection) -> Result<(), Error> {
             ));
         }
 
-        if title.has_sundays() && !sundays.is_some() {
+        if title.has_sundays() && sundays.is_none() {
             return Err(format_err!(
                 "Expected sundays for {} ({}) not found",
                 title.title,
