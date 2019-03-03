@@ -44,7 +44,7 @@ pub fn search_autocomplete(
         .select((t::title, t::slug))
         .filter(t::title.ilike(&q))
         .order_by(t::title)
-        .limit(10)
+        .limit(8)
         .load::<(String, String)>(&db)
         .map_err(custom)?
         .into_iter()
@@ -57,7 +57,7 @@ pub fn search_autocomplete(
             .filter(ca::name.ilike(&q))
             .group_by(c::slug)
             .order(sql::<Text>("min(creator_aliases.name)"))
-            .limit(10)
+            .limit(std::cmp::max(2, 8 - titles.len() as i64))
             .load::<(String, String)>(&db)
             .map_err(custom)?
             .into_iter()
@@ -70,7 +70,7 @@ pub fn search_autocomplete(
             .filter(r::title.ilike(&q))
             .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
             .order(r::title)
-            .limit(10)
+            .limit(std::cmp::max(2, 8 - titles.len() as i64))
             .load::<(i16, String, String)>(&db)
             .map_err(custom)?
             .into_iter()
@@ -78,7 +78,6 @@ pub fn search_autocomplete(
             .collect(),
     );
     titles.sort_by(|a, b| a.t.cmp(&b.t));
-    titles.truncate(10);
     Ok(json(&titles))
 }
 

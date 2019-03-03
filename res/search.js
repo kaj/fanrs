@@ -26,6 +26,9 @@
     }
     input.addEventListener('keyup', e => {
 	let v = e.target.value;
+	if (new Set(['ArrowUp', 'ArrowDown', 'Escape']).has(e.code)) {
+	    return;
+	}
 	if (v.length > 1) {
 	    let r = new XMLHttpRequest();
 	    r.onload = function() {
@@ -46,7 +49,7 @@
 	    list.innerHTML = '';
 	}
     })
-    form.addEventListener('keypress', e => {
+    form.addEventListener('keyup', e => {
 	let t = e.target;
 	switch(e.code) {
 	case 'ArrowUp':
@@ -57,6 +60,7 @@
 	    break;
 	case 'Escape':
 	    input.focus();
+	    list.innerHTML = '';
 	    break;
 	default:
 	    return true;
