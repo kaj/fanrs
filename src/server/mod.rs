@@ -28,14 +28,17 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates;
+use crate::templates::{self, ToHtml};
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
+use diesel::expression::SqlLiteral;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
 use failure::Error;
+use std::io::{self, Write};
 use warp::http::status::StatusCode;
 use warp::http::Response;
 use warp::path::Tail;
@@ -350,7 +353,12 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     if issues.is_empty() {
         return Err(not_found());
     }
-    Response::builder().html(|o| templates::year(o, year, &issues))
+    let years = i::issues
+        .select((sql::<SmallInt>("min(year)"), sql::<SmallInt>("max(year)")))
+        .first::<(i16, i16)>(&db)
+        .map_err(custom)?;
+    let years = YearLinks::new(years.0 as u16, year, years.1 as u16);
+    Response::builder().html(|o| templates::year(o, year, &years, &issues))
 }
 
 fn custom_or_404(e: diesel::result::Error) -> Rejection {
@@ -389,9 +397,6 @@ fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
     }
 }
 
-use diesel::expression::SqlLiteral;
-use diesel::sql_types::SmallInt;
-
 fn named<T>(
     query: SqlLiteral<T>,
     name: &str,
@@ -403,4 +408,54 @@ fn named<T>(
 fn sortable_issue() -> SqlLiteral<SmallInt> {
     use diesel::dsl::sql;
     sql("(year-1950)*64 + number")
+}
+
+pub struct YearLinks {
+    first: u16,
+    shown: u16,
+    last: u16,
+}
+
+impl YearLinks {
+    fn new(first: u16, shown: u16, last: u16) -> Self {
+        YearLinks { first, shown, last }
+    }
+}
+
+impl ToHtml for YearLinks {
+    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+        let shown = self.shown;
+        let one = |out: &mut Write, y: u16| -> io::Result<()> {
+            if y == shown {
+                write!(out, "<b>{}</b>", y)?;
+            } else {
+                write!(out, "<a href='/{}'>{}</a>", y, y)?;
+            }
+            Ok(())
+        };
+        let from = if self.shown > self.first + 7 {
+            self.shown - 5
+        } else {
+            self.first
+        };
+        let to = if self.shown + 7 < self.last {
+            self.shown + 5
+        } else {
+            self.last
+        };
+        if from > self.first {
+            one(out, self.first)?;
+            write!(out, " … ")?;
+        }
+        one(out, from)?;
+        for y in from + 1..=to {
+            write!(out, ", ")?;
+            one(out, y)?;
+        }
+        if to < self.last {
+            write!(out, " … ")?;
+            one(out, self.last)?;
+        }
+        Ok(())
+    }
 }

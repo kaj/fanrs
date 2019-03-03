@@ -4,7 +4,14 @@
 @use std::collections::BTreeMap;
 
 @(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, FullEpisode)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, PartsPublished)>>)
-@:page(&creator.name, {}, {
+@:page(&creator.name, {
+  <p>Här listas vad <strong>@creator.name</strong>
+    (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@creator.name&amp;go=go"
+	title="Sök &quot;@creator.name&quot; i Seriewikin">Seriewikin</a>,
+    <a href="http://sv.wikipedia.org/wiki/Special:Search?search=@creator.name&amp;go=go"
+       title="Sök &quot;@creator.name&quot; i Svenska Wikipedia">wikipedia</a>)
+    varit med att skapa som förekommer i mina indexerade fantomentidningar.</p>
+}, {
   @if !about.is_empty() {
   <section>
     <h2>Artiklar</h2>
