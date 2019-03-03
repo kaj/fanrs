@@ -1,5 +1,6 @@
 mod covers;
 mod creators;
+mod paginator;
 mod publist;
 mod refs;
 mod render_ructe;
@@ -8,6 +9,7 @@ mod titles;
 
 use self::covers::{cover_image, redirect_cover};
 use self::creators::{creator_cloud, list_creators, one_creator};
+pub use self::paginator::Paginator;
 pub use self::publist::PartsPublished;
 use self::refs::{get_all_fa, list_refs, one_fa, one_ref, refkey_cloud};
 use self::render_ructe::RenderRucte;
@@ -92,6 +94,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(s())
             .and(path::param())
             .and(end())
+            .and(query())
             .and_then(one_title))
         .or(get()
             .and(path("fa"))

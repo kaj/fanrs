@@ -1,6 +1,6 @@
 use super::PooledPg;
 use super::{custom, custom_or_404, sortable_issue};
-use super::{named, redirect, FullEpisode, RenderRucte};
+use super::{named, redirect, FullEpisode, Paginator, RenderRucte};
 use crate::models::{
     Article, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
 };
@@ -19,6 +19,7 @@ use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
 use failure::Error;
 use warp::http::Response;
+use warp::reject::not_found;
 use warp::{self, Rejection, Reply};
 
 pub fn title_cloud(
@@ -70,10 +71,16 @@ pub fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
     Response::builder().html(|o| templates::titles(o, &all))
 }
 
+#[derive(Deserialize)]
+pub struct PageParam {
+    p: Option<usize>,
+}
+
 #[allow(clippy::needless_pass_by_value)]
 pub fn one_title(
     db: PooledPg,
     slug: String,
+    page: PageParam,
 ) -> Result<impl Reply, Rejection> {
     let (slug, strip) = if slug.starts_with("weekdays-") {
         (&slug["weekdays-".len()..], Some(false))
@@ -129,16 +136,20 @@ pub fn one_title(
             episodes.order(min(sql::<SmallInt>("(year-1950)*64 + number")))
         }
     };
+    let episodes = episodes.load::<Episode>(&db).map_err(custom)?;
+
+    let (episodes, pages) =
+        Paginator::if_needed(episodes, page.p).map_err(|()| not_found())?;
+
     let episodes = episodes
-        .load::<Episode>(&db)
-        .map_err(custom)?
         .into_iter()
         .map(|episode| FullEpisode::load_details(episode, &db))
         .collect::<Result<Vec<_>, _>>()
         .map_err(custom)?;
 
-    Response::builder()
-        .html(|o| templates::title(o, &title, &articles, &episodes))
+    Response::builder().html(|o| {
+        templates::title(o, &title, pages.as_ref(), &articles, &episodes)
+    })
 }
 
 pub fn oldslug_title(

@@ -1,8 +1,8 @@
 @use crate::models::{Article, CreatorSet, IssueRef, RefKeySet, Title};
-@use crate::server::FullEpisode;
+@use crate::server::{Paginator, FullEpisode};
 @use super::{epmisc, page};
 
-@(title: &Title, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[FullEpisode])
+@(title: &Title, pages: Option<&Paginator>, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[FullEpisode])
 @:page(&title.title, {
   <p>Här listas de gånger serien <strong>@title.title</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
@@ -21,6 +21,9 @@
     <a href="/titles/sundays-@title.slug">söndagssidor</a>
     }
     (så långt information om ursprungspublicering finns med i indexet).</p>
+  }
+  @if let Some(pages) = pages {
+    <p>Episoderna kräver flera sidor: @pages.</p>
   }
 }, {
   @if !articles.is_empty() {
