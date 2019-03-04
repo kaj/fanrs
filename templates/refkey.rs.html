@@ -5,7 +5,7 @@
 @(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
 @:page(&refkey.name(), {}, {
   @if !articles.is_empty() {
-  <section>
+  <section class="articles">
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in articles {
     <div class="article">

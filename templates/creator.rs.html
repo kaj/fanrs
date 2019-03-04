@@ -13,7 +13,7 @@
     varit med att skapa som förekommer i mina indexerade fantomentidningar.</p>
 }, {
   @if !about.is_empty() {
-  <section>
+  <section class="articles">
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in about {
     <div class="article">
@@ -62,7 +62,7 @@
   </section>
   }
   @if !articles_by.is_empty() {
-  <section>
+  <section class="articles">
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in articles_by {
     <div class="article">
