@@ -21,6 +21,7 @@ pub struct Episode {
     pub orig_date: Option<NaiveDate>,
     pub orig_to_date: Option<NaiveDate>,
     pub sun: bool,
+    pub orig_mag_id: Option<i32>,
 }
 
 impl Episode {

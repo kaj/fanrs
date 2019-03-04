@@ -1,4 +1,6 @@
-use crate::models::{Article, Creator, Episode, Issue, Part, RefKey, Title};
+use crate::models::{
+    Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
+};
 use chrono::NaiveDate;
 use diesel::prelude::*;
 use failure::{format_err, Error};
@@ -220,7 +222,21 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 }
-                Some("magazine") => eprintln!("Got magazine prevpub {:?}", e),
+                Some("magazine") => {
+                    let om = OtherMag::get_or_create(
+                        get_text_norm(e, "magazine").unwrap(),
+                        get_text(e, "issue")
+                            .map(|s| s.parse())
+                            .transpose()?,
+                        get_text(e, "of").map(|s| s.parse()).transpose()?,
+                        get_text(e, "year").map(|s| s.parse()).transpose()?,
+                        db,
+                    )?;
+                    diesel::update(e::episodes)
+                        .set(e::orig_mag.eq(om.id))
+                        .filter(e::id.eq(episode.id))
+                        .execute(db)?;
+                }
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
             },
             "label" => (), // TODO

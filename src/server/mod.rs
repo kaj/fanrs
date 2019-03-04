@@ -17,7 +17,7 @@ use self::search::{search, search_autocomplete};
 use self::titles::{list_titles, oldslug_title, one_title, title_cloud};
 
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, Part, RefKeySet, Title,
+    Article, CreatorSet, Episode, Issue, OtherMag, Part, RefKeySet, Title,
 };
 use crate::schema::articles::dsl as a;
 use crate::schema::covers_by::dsl as cb;
@@ -227,6 +227,7 @@ pub struct FullEpisode {
     pub refs: RefKeySet,
     pub creators: CreatorSet,
     pub published: PartsPublished,
+    pub orig_mag: Option<OtherMag>,
 }
 
 impl FullEpisode {
@@ -237,11 +238,16 @@ impl FullEpisode {
         let refs = RefKeySet::for_episode(&episode, db)?;
         let creators = CreatorSet::for_episode(&episode, db)?;
         let published = PartsPublished::for_episode(&episode, db)?;
+        let orig_mag = episode
+            .orig_mag_id
+            .map(|id| OtherMag::get_by_id(id, db))
+            .transpose()?;
         Ok(FullEpisode {
             episode,
             refs,
             creators,
             published,
+            orig_mag,
         })
     }
 
@@ -254,11 +260,16 @@ impl FullEpisode {
         let creators = CreatorSet::for_episode(&episode, db)?;
         let published =
             PartsPublished::for_episode_except(&episode, issue, db)?;
+        let orig_mag = episode
+            .orig_mag_id
+            .map(|id| OtherMag::get_by_id(id, db))
+            .transpose()?;
         Ok(FullEpisode {
             episode,
             refs,
             creators,
             published,
+            orig_mag,
         })
     }
 }

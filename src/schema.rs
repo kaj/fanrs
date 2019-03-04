@@ -89,6 +89,7 @@ table! {
         orig_date -> Nullable<Date>,
         orig_to_date -> Nullable<Date>,
         orig_sundays -> Bool,
+        orig_mag -> Nullable<Int4>,
     }
 }
 
@@ -110,6 +111,16 @@ table! {
         pages -> Nullable<Int2>,
         price -> Nullable<Numeric>,
         cover_best -> Nullable<Int2>,
+    }
+}
+
+table! {
+    other_mags (id) {
+        id -> Int4,
+        name -> Varchar,
+        issue -> Nullable<Int2>,
+        i_of -> Nullable<Int2>,
+        year -> Nullable<Int2>,
     }
 }
 
@@ -152,6 +163,7 @@ joinable!(creator_aliases -> creators (creator_id));
 joinable!(episode_parts -> episodes (episode));
 joinable!(episode_refkeys -> episodes (episode_id));
 joinable!(episode_refkeys -> refkeys (refkey_id));
+joinable!(episodes -> other_mags (orig_mag));
 joinable!(episodes -> titles (title));
 joinable!(episodes_by -> creator_aliases (by_id));
 joinable!(episodes_by -> episodes (episode_id));
@@ -172,6 +184,7 @@ allow_tables_to_appear_in_same_query!(
     episodes,
     episodes_by,
     issues,
+    other_mags,
     publications,
     refkeys,
     titles,
