@@ -1,4 +1,7 @@
 use super::RefKey;
+use crate::schema::article_refkeys::dsl as ar;
+use crate::schema::articles::dsl as a;
+use crate::schema::publications::dsl as p;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -19,21 +22,20 @@ impl Article {
         note: Option<&str>,
         db: &PgConnection,
     ) -> Result<Article, Error> {
-        use crate::schema::articles::dsl;
-        if let Some(article) = dsl::articles
-            .filter(dsl::title.eq(title))
-            .filter(dsl::subtitle.eq(subtitle))
-            .filter(dsl::note.eq(note))
+        if let Some(article) = a::articles
+            .filter(a::title.eq(title))
+            .filter(a::subtitle.eq(subtitle))
+            .filter(a::note.eq(note))
             .first::<Article>(db)
             .optional()?
         {
             Ok(article)
         } else {
-            Ok(diesel::insert_into(dsl::articles)
+            Ok(diesel::insert_into(a::articles)
                 .values((
-                    dsl::title.eq(title),
-                    dsl::subtitle.eq(subtitle),
-                    dsl::note.eq(note),
+                    a::title.eq(title),
+                    a::subtitle.eq(subtitle),
+                    a::note.eq(note),
                 ))
                 .get_result(db)?)
         }
@@ -46,7 +48,6 @@ impl Article {
         seqno: i16,
         db: &PgConnection,
     ) -> Result<(), Error> {
-        use crate::schema::publications::dsl as p;
         if let Some((id, old_seqno)) = p::publications
             .filter(p::issue.eq(issue))
             .filter(p::article_id.eq(self.id))
@@ -76,7 +77,6 @@ impl Article {
         db: &PgConnection,
     ) -> Result<(), Error> {
         for r in refs {
-            use crate::schema::article_refkeys::dsl as ar;
             let id = r.get_or_create_id(db).map_err(|e| {
                 format_err!("Failed to get id for {:?}: {}", r, e)
             })?;
