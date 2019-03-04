@@ -1,5 +1,3 @@
-#![allow(proc_macro_derive_resolution_fallback)]
-
 table! {
     article_refkeys (id) {
         id -> Int4,
@@ -132,6 +130,7 @@ table! {
         episode_part -> Nullable<Int4>,
         best_plac -> Nullable<Int2>,
         article_id -> Nullable<Int4>,
+        label -> Varchar,
     }
 }
 

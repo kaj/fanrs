@@ -219,6 +219,7 @@ pub enum PublishedContent {
         episode: FullEpisode,
         part: Part,
         best_plac: Option<i16>,
+        label: String,
     },
 }
 
@@ -307,6 +308,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     a::articles::all_columns().nullable(),
                     p::seqno,
                     p::best_plac,
+                    p::label,
                 ))
                 .filter(p::issue.eq(issue.id))
                 .order(p::seqno)
@@ -315,10 +317,11 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                     Option<Article>,
                     Option<i16>,
                     Option<i16>,
+                    String,
                 )>(&db)?
                 .into_iter()
                 .map(|row| match row {
-                    (Some((t, mut e, part)), None, seqno, b) => {
+                    (Some((t, mut e, part)), None, seqno, b, label) => {
                         let classnames =
                             if e.teaser.is_none() || !part.is_first() {
                                 e.teaser = None;
@@ -334,6 +337,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             episode: FullEpisode::in_issue(e, &issue, &db)?,
                             part,
                             best_plac: b,
+                            label,
                         };
                         Ok(PublishedInfo {
                             content,
@@ -341,7 +345,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                             classnames,
                         })
                     }
-                    (None, Some(a), seqno, None) => {
+                    (None, Some(a), seqno, None, _label) => {
                         let refs = RefKeySet::for_article(&a, &db)?;
                         let creators = CreatorSet::for_article(&a, &db)?;
                         Ok(PublishedInfo {

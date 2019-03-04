@@ -150,6 +150,7 @@ fn register_serie(
         &issue,
         Some(seqno as i16),
         get_best_plac(c),
+        &get_text_norm(c, "label").unwrap_or_default(),
         db,
     )?;
     for e in &c.children {
@@ -169,7 +170,7 @@ fn register_serie(
                     .filter(e::id.eq(episode.id))
                     .execute(db)?;
             }
-            "title" | "episode" | "teaser" | "part" | "note"
+            "label" | "title" | "episode" | "teaser" | "part" | "note"
             | "copyright" | "best" => (), // handled above
             "by" => {
                 let role = e
@@ -204,6 +205,7 @@ fn register_serie(
                         &issue,
                         None,
                         get_best_plac(c),
+                        &get_text_norm(c, "label").unwrap_or_default(),
                         db,
                     )?;
                 }
@@ -239,7 +241,6 @@ fn register_serie(
                 }
                 _other => Err(format_err!("Unknown prevpub {:?}", e))?,
             },
-            "label" => (), // TODO
             "daystrip" => {
                 if let Some(from) = get_text(e, "from") {
                     let from: NaiveDate = from.parse()?;

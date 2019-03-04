@@ -20,6 +20,7 @@ impl Part {
         issue: &Issue,
         seqno: Option<i16>,
         best_plac: Option<i16>,
+        label: &str,
         db: &PgConnection,
     ) -> Result<(), Error> {
         use crate::schema::episode_parts::dsl as e;
@@ -55,15 +56,21 @@ impl Part {
                 .0
         };
         use crate::schema::publications::dsl as p;
-        if let Some((id, old_seqno)) = p::publications
+        if let Some((id, old_seqno, old_label)) = p::publications
             .filter(p::issue.eq(issue.id))
             .filter(p::episode_part.eq(part_id))
-            .select((p::id, p::seqno))
-            .first::<(i32, Option<i16>)>(db)
+            .select((p::id, p::seqno, p::label))
+            .first::<(i32, Option<i16>, String)>(db)
             .optional()?
         {
             if seqno.is_some() && old_seqno != seqno {
                 eprintln!("TODO: Should update seqno for {}", id);
+            }
+            if label != "" && old_label != label {
+                diesel::update(p::publications)
+                    .set(p::label.eq(label))
+                    .filter(p::id.eq(id))
+                    .execute(db)?;
             }
             Ok(())
         } else {
@@ -73,6 +80,7 @@ impl Part {
                     p::episode_part.eq(part_id),
                     p::seqno.eq(seqno),
                     p::best_plac.eq(best_plac),
+                    p::label.eq(label),
                 ))
                 .execute(db)?;
             Ok(())
