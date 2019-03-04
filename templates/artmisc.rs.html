@@ -1,0 +1,8 @@
+@use crate::models::{Article, CreatorSet, RefKeySet};
+
+@(article: &Article, refs: &RefKeySet, creators: &CreatorSet)
+
+<h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
+@refs
+@creators
+@if let Some(ref note) = article.note { <p class="info note">@note</p> }

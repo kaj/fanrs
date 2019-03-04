@@ -1,6 +1,6 @@
 @use crate::models::{Creator, Issue};
 @use crate::server::{PublishedInfo, PublishedContent::{EpisodePart, Text}, YearLinks};
-@use super::{epmisc, page};
+@use super::{artmisc, epmisc, page};
 
 @(year: u16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<PublishedInfo>)])
 @:page(&format!("Årgång {}", year), {
@@ -26,10 +26,7 @@
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
 	@if let Text{article, refs, creators} = content {
-	<h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
-	@refs
-	@creators
-	@if let Some(ref note) = article.note {<p class="info note">@note</p>}
+	@:artmisc(article, refs, creators)
 	}
       </div>
       }

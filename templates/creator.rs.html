@@ -1,6 +1,6 @@
 @use crate::models::{Article, Creator, CreatorSet, IssueRef, RefKeySet, Title};
 @use crate::server::{FullEpisode, PartsPublished};
-@use super::{epmisc, page};
+@use super::{artmisc, epmisc, page};
 @use std::collections::BTreeMap;
 
 @(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, FullEpisode)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], o_roles: &str, other: &BTreeMap<Title, Vec<(Option<String>, PartsPublished)>>)
@@ -17,10 +17,7 @@
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in about {
     <div class="article">
-      <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
-      @refs
-      @creators
-      @if let Some(ref note) = article.note { <p class="info note">@note</p> }
+      @:artmisc(article, refs, creators)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
@@ -69,10 +66,7 @@
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in articles_by {
     <div class="article">
-      <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
-      @refs
-      @creators
-      @if let Some(ref note) = article.note { <p class="info note">@note</p> }
+      @:artmisc(article, refs, creators)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>

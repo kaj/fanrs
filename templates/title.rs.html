@@ -1,6 +1,6 @@
 @use crate::models::{Article, CreatorSet, IssueRef, RefKeySet, Title};
 @use crate::server::{Paginator, FullEpisode};
-@use super::{epmisc, page};
+@use super::{artmisc, epmisc, page};
 
 @(title: &Title, pages: Option<&Paginator>, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[FullEpisode])
 @:page(&title.title, {
@@ -31,10 +31,7 @@
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in articles {
     <div class="article">
-      <h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
-      @refs
-      @creators
-      @if let Some(ref note) = article.note { <p class="info note">@note</p> }
+      @:artmisc(article, refs, creators)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
