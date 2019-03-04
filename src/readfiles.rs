@@ -214,7 +214,7 @@ fn register_serie(
                     diesel::update(e::episodes)
                         .set((
                             e::orig_date.eq(date),
-                            // TODO? e::orig_to_date.is_null(),
+                            e::orig_to_date.eq(Option::<NaiveDate>::None),
                             e::orig_sundays.eq(false),
                         ))
                         .filter(e::id.eq(episode.id))

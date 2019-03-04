@@ -95,8 +95,9 @@ impl RefKey {
             RefKey::Key(t, s) => (RefKey::KEY_ID, t.clone(), s.clone()),
             RefKey::Who(n, _s) => {
                 use super::Creator;
-                let creator = Creator::get_or_create(&n, db)?;
-                (RefKey::WHO_ID, n.clone(), creator.slug)
+                let alias = Creator::get_or_create(&n, db)?;
+                let actual = Creator::from_slug(&alias.slug, db)?;
+                (RefKey::WHO_ID, actual.name, actual.slug)
             }
             RefKey::Title(n, s) => (RefKey::TITLE_ID, n.clone(), s.clone()),
         };
