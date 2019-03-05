@@ -74,18 +74,18 @@ h3 .part {
 p { margin: 0 0 1ex; }
 
 section {
-    border-radius: .4em;
+    border-radius: .5em;
     border: solid .5px black;
     margin: 1em 0;
-    padding: .2em .2em 0;
+    padding: .2em .2em 0 0;
     background: rgba(#eee, 0.6);
 
-    section, .episode, .article, table, .covers .cover {
+    section, .article, table, .covers .cover {
         background: white;
         border: solid .5px rgba(black, 0.5);
-        border-radius: .2em;
+        border-radius: .3em;
         margin: 0 0 .2em .2em;
-        padding: .2em;
+        padding: .1em .2em .1em .4em;
         h3, p {
             margin: 0 0 .2em 0;
         }
@@ -94,6 +94,11 @@ section {
         }
         p.info {
             font-size: 80%;
+        }
+        p.info.label {
+            margin: 0;
+            line-height: 1.2;
+            font-style: italic;
         }
     }
     table {
@@ -161,7 +166,7 @@ section.searchresults.tags {
         display: flex;
         flex-flow: row wrap;
         flex-grow: 1;
-        div {
+        section {
             flex-basis: 28em;
             flex-grow: 2;
             &.episode.main {

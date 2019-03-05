@@ -16,11 +16,11 @@
   <section class="articles">
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in about {
-    <div class="article">
+    <section class="article">
       @:artmisc(article, refs, creators)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
-    </div>
+    </section>
     }
   </section>
   }
@@ -65,11 +65,11 @@
   <section class="articles">
     <h2>Artiklar</h2>
     @for (article, refs, creators, pubs) in articles_by {
-    <div class="article">
+    <section class="article">
       @:artmisc(article, refs, creators)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
-    </div>
+    </section>
     }
   </section>
   }

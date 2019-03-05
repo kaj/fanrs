@@ -19,7 +19,7 @@
     </header>
     <div class="content">
       @for PublishedInfo{content, seqno, classnames} in contents {
-      <div class="@classnames" @if let Some(seqno) = seqno {data-seq="@seqno"}>
+      <section class="@classnames" @if let Some(seqno) = seqno {data-seq="@seqno"}>
 	@if let EpisodePart{title, episode, part, best_plac, label} = content {
 	@if label != "" {<p class="info label">@label:</p> }
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>
@@ -29,7 +29,7 @@
 	@if let Text{article, refs, creators} = content {
 	@:artmisc(article, refs, creators)
 	}
-      </div>
+      </section>
       }
     </div>
   </section>
