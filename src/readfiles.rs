@@ -256,12 +256,15 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 } else if let Some(from) = get_text(e, "fromnr") {
-                    let from: u32 = from.parse()?;
-                    let to: u32 = get_req_text(e, "tonr")?.parse()?;
-                    println!(
-                        "TODO Episode {:?} is daystrip #{} - #{}.",
-                        episode.episode, from, to,
-                    );
+                    diesel::update(e::episodes)
+                        .set((
+                            e::strip_from.eq(from.parse::<i32>()?),
+                            e::strip_to
+                                .eq(get_req_text(e, "tonr")?
+                                    .parse::<i32>()?),
+                        ))
+                        .filter(e::id.eq(episode.id))
+                        .execute(db)?;
                 } else {
                     Err(format_err!("Unknown daystrip {:?}", e))?;
                 }

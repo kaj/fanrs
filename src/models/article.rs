@@ -24,8 +24,8 @@ impl Article {
     ) -> Result<Article, Error> {
         if let Some(article) = a::articles
             .filter(a::title.eq(title))
-            .filter(a::subtitle.eq(subtitle))
-            .filter(a::note.eq(note))
+            .filter(a::subtitle.is_not_distinct_from(subtitle))
+            .filter(a::note.is_not_distinct_from(note))
             .first::<Article>(db)
             .optional()?
         {

@@ -9,5 +9,7 @@
 @episode.published
 @if let Some(ref mag) = episode.orig_mag {<p class="info mag">Tidigare publicerad i @mag.</p>}
 @episode.episode.orig_dates()
+@if let (Some(from), Some(to)) = (episode.episode.strip_from, episode.episode.strip_to)
+{<p class="info orig">Stripp nr @from - @to.</p>}
 @if let Some(ref note) = episode.episode.note {<p class="info note">@note</p>}
 @if let Some(ref copyright) = episode.episode.copyright {<p class="info copyright">Copyright @copyright</p>}

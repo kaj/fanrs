@@ -88,6 +88,8 @@ table! {
         orig_to_date -> Nullable<Date>,
         orig_sundays -> Bool,
         orig_mag -> Nullable<Int4>,
+        strip_from -> Nullable<Int4>,
+        strip_to -> Nullable<Int4>,
     }
 }
 
