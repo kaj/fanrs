@@ -19,7 +19,6 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::format_err;
-use std::env;
 use std::path::PathBuf;
 use std::process::exit;
 use structopt::StructOpt;
@@ -31,7 +30,18 @@ use time;
     about = "Manage and serve index of the Phantom comic books.",
     rename_all = "kebab-case"
 )]
-enum Fanrs {
+struct Fanrs {
+    /// How to connect to the postgres database.
+    #[structopt(long, env = "DATABASE_URL")]
+    db_url: String,
+
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+enum Command {
     /// Read data from xml content files.
     ReadFiles {
         /// The directory containing the data files.
@@ -63,6 +73,14 @@ enum Fanrs {
     CheckStrips,
 }
 
+impl Fanrs {
+    fn get_db(&self) -> Result<PgConnection, failure::Error> {
+        PgConnection::establish(&self.db_url).map_err(|e| {
+            format_err!("Failed to establish postgres connection: {}", e)
+        })
+    }
+}
+
 fn main() {
     match run() {
         Ok(()) => (),
@@ -76,17 +94,16 @@ fn main() {
 fn run() -> Result<(), failure::Error> {
     opt_dotenv()?;
     let opt = Fanrs::from_args();
-    let db_url = env::var("DATABASE_URL")?;
-    let db = PgConnection::establish(&db_url)?;
 
-    match opt {
-        Fanrs::ReadFiles {
-            basedir,
-            all,
-            years,
+    match opt.cmd {
+        Command::ReadFiles {
+            ref basedir,
+            ref all,
+            ref years,
         } => {
+            let db = opt.get_db()?;
             readfiles::read_persondata(&basedir, &db)?;
-            if all {
+            if *all {
                 let current_year = 1900 + time::now().tm_year as i16;
                 for year in 1950..=current_year {
                     readfiles::load_year(&basedir, year, &db)?;
@@ -98,16 +115,16 @@ fn run() -> Result<(), failure::Error> {
                     ));
                 }
                 for year in years {
-                    readfiles::load_year(&basedir, year as i16, &db)?;
+                    readfiles::load_year(&basedir, *year as i16, &db)?;
                 }
             }
             readfiles::delete_unpublished(&db)?;
             Ok(())
         }
-        Fanrs::ListIssues => list_issues(&db),
-        Fanrs::RunServer => server::run(&db_url),
-        Fanrs::FetchCovers => fetch_covers(&db),
-        Fanrs::CheckStrips => check_strips(&db),
+        Command::ListIssues => list_issues(&opt.get_db()?),
+        Command::RunServer => server::run(&opt.db_url),
+        Command::FetchCovers => fetch_covers(&opt.get_db()?),
+        Command::CheckStrips => check_strips(&opt.get_db()?),
     }
 }
 
