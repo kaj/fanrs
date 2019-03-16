@@ -3,7 +3,6 @@ mod creators;
 mod paginator;
 mod publist;
 mod refs;
-mod render_ructe;
 pub mod search;
 mod titles;
 
@@ -12,7 +11,6 @@ use self::creators::{creator_cloud, list_creators, one_creator};
 pub use self::paginator::Paginator;
 pub use self::publist::PartsPublished;
 use self::refs::{get_all_fa, list_refs, one_fa, one_ref, refkey_cloud};
-use self::render_ructe::RenderRucte;
 use self::search::{search, search_autocomplete};
 use self::titles::{list_titles, oldslug_title, one_title, title_cloud};
 
@@ -28,7 +26,7 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, ToHtml};
+use crate::templates::{self, RenderRucte, ToHtml};
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
 use diesel::expression::SqlLiteral;

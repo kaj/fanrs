@@ -1,4 +1,3 @@
-use super::render_ructe::RenderRucte;
 use super::{custom, custom_or_404, named, redirect, sortable_issue};
 use super::{FullEpisode, PartsPublished, PooledPg};
 use crate::models::{
@@ -17,7 +16,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates;
+use crate::templates::{self, RenderRucte};
 use diesel::dsl::{all, any, min, sql};
 use diesel::prelude::*;
 use diesel::result::Error;
