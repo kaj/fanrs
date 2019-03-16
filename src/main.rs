@@ -32,7 +32,7 @@ use time;
 )]
 struct Fanrs {
     /// How to connect to the postgres database.
-    #[structopt(long, env = "DATABASE_URL")]
+    #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
     db_url: String,
 
     #[structopt(subcommand)]
