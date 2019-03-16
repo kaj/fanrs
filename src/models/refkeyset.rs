@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use failure::Error;
 use std::io::{self, Write};
 
+#[derive(Debug)]
 pub struct RefKeySet(Vec<RefKey>);
 
 impl RefKeySet {

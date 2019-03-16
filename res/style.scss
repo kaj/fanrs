@@ -185,6 +185,25 @@ section.searchresults.tags {
         }
     }
 }
+.searchresults {
+    display: flex;
+    flex-flow: row wrap;
+
+    h2 {
+	flex-basis: 100%;
+    }
+    section {
+        flex-basis: 20em;
+        flex-grow: 2;
+        &.episode {
+            flex-basis: 42em;
+            flex-grow: 5;
+        }
+        &.article {
+            background: rgba(white, 0.7);
+        }
+    }
+}
 
 section.front {
     header {

@@ -115,7 +115,7 @@ impl ToHtml for Part {
 }
 
 #[derive(Debug, Queryable)]
-pub struct PartInIssue(IssueRef, Part);
+pub struct PartInIssue(pub IssueRef, pub Part);
 
 impl ToHtml for PartInIssue {
     fn to_html(&self, out: &mut Write) -> io::Result<()> {

@@ -1,9 +1,8 @@
 @use crate::models::{Creator, RefKey, Title};
-@use crate::server::search::SearchQuery;
-@use crate::server::FullEpisode;
-@use super::{epmisc, page, searchbox};
+@use crate::server::search::{Hit, SearchQuery};
+@use super::{artmisc, epmisc, page, searchbox};
 
-@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], episodes: &[(Title, FullEpisode)])
+@(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], hits: &[Hit])
 @:page("Sök", {@:searchbox(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
@@ -38,14 +37,23 @@
     }
   </section>
   }
-  @if !episodes.is_empty() {
+  @if !hits.is_empty() {
   <section class="searchresults">
-    <h2>Episoder</h2>
-    @for (title, fe) in episodes {
-    <section class="episode">
-      <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
-      @:epmisc(&fe)
-    </section>
+    <h2>Episoder och artiklar</h2>
+    @for hit in hits {
+      @if let Hit::Episode{ title, fe } = hit {
+        <section class="episode">
+          <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
+          @:epmisc(&fe)
+        </section>
+      }
+      @if let Hit::Article{ article, refs, creators, published } = hit {
+        <section class="article">
+          @:artmisc(article, refs, creators)
+          @if let Some((last_pub, pubs)) = published.split_last()
+          {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
+        </section>
+      }
     }
   </section>
   }

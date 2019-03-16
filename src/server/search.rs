@@ -1,6 +1,11 @@
 use super::{FullEpisode, PooledPg, RenderRucte};
-use crate::models::{Creator, Episode, IdRefKey, RefKey, Title};
-// Article, Issue, IssueRef, Part
+use crate::models::{
+    Article, Creator, CreatorSet, Episode, IdRefKey, IssueRef, RefKey,
+    RefKeySet, Title,
+};
+use crate::schema::article_refkeys::dsl as ar;
+use crate::schema::articles::dsl as a;
+use crate::schema::articles_by::dsl as ab;
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
 use crate::schema::episode_parts::dsl as ep;
@@ -151,15 +156,8 @@ impl SearchQuery {
     fn do_search(
         &self,
         db: &PooledPg,
-    ) -> Result<
-        (
-            Vec<Title>,
-            Vec<Creator>,
-            Vec<RefKey>,
-            Vec<(Title, FullEpisode)>,
-        ),
-        Error,
-    > {
+    ) -> Result<(Vec<Title>, Vec<Creator>, Vec<RefKey>, Vec<Hit>), Error>
+    {
         let max_hits = 25;
         if self.is_empty() {
             return Ok((vec![], vec![], vec![], vec![]));
@@ -193,6 +191,11 @@ impl SearchQuery {
             )
             .into_boxed();
 
+        let mut articles = a::articles
+            .select(a::articles::all_columns())
+            .inner_join(p::publications.inner_join(i::issues))
+            .into_boxed();
+
         for word in &sql_words {
             titles = titles.filter(t::title.ilike(word));
             creators = creators.filter(ca::name.ilike(word));
@@ -204,6 +207,12 @@ impl SearchQuery {
                     .or(e::teaser.ilike(word))
                     .or(e::note.ilike(word))
                     .or(e::copyright.ilike(word)),
+            );
+            articles = articles.filter(
+                a::title
+                    .ilike(word)
+                    .or(a::subtitle.ilike(word))
+                    .or(a::note.like(word)),
             );
         }
 
@@ -221,6 +230,13 @@ impl SearchQuery {
                     .filter(e::title.eq(title.id)))),
             );
             episodes = episodes.filter(e::title.eq(title.id));
+            articles = articles.filter(
+                a::id.eq(any(ar::article_refkeys
+                    .select(ar::article_id)
+                    .inner_join(r::refkeys)
+                    .filter(r::kind.eq(RefKey::TITLE_ID))
+                    .filter(r::slug.eq(&title.slug)))),
+            );
         }
         for creator in &self.p {
             titles = titles.filter(
@@ -245,6 +261,19 @@ impl SearchQuery {
                     .inner_join(ca::creator_aliases)
                     .filter(ca::creator_id.eq(creator.id)))),
             );
+            articles = articles
+                .filter(
+                    a::id.eq(any(ab::articles_by
+                        .select(ab::article_id)
+                        .inner_join(ca::creator_aliases)
+                        .filter(ca::creator_id.eq(creator.id)))),
+                )
+                .or_filter(
+                    a::id.eq(any(ar::article_refkeys
+                        .select(ar::article_id)
+                        .inner_join(r::refkeys)
+                        .filter(r::slug.eq(&creator.slug)))),
+                );
         }
         for key in &self.k {
             titles = titles.filter(
@@ -263,6 +292,11 @@ impl SearchQuery {
                 e::id.eq(any(er::episode_refkeys
                     .select(er::episode_id)
                     .filter(er::refkey_id.eq(key.id)))),
+            );
+            articles = articles.filter(
+                a::id.eq(any(ar::article_refkeys
+                    .select(ar::article_id)
+                    .filter(ar::refkey_id.eq(key.id)))),
             );
         }
 
@@ -287,14 +321,75 @@ impl SearchQuery {
             refkeys.limit(max_hits).load(db)?
         };
 
-        let episodes = episodes
+        let mut episodes = episodes
             .order(max(sql::<SmallInt>("(year-1950)*64 + number")).desc())
             .group_by((t::titles::all_columns(), e::episodes::all_columns()))
             .limit(max_hits)
             .load::<(Title, Episode)>(db)?
             .into_iter()
-            .map(|(t, ep)| FullEpisode::load_details(ep, db).map(|e| (t, e)))
+            .map(|(title, ep)| Hit::episode(title, ep, db))
             .collect::<Result<Vec<_>, _>>()?;
+
+        let articles = articles
+            .order(max(sql::<SmallInt>("(year-1950)*64 + number")).desc())
+            .group_by(a::articles::all_columns())
+            .limit(max_hits)
+            .load(db)?
+            .into_iter()
+            .map(|article| Hit::article(article, db))
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        episodes.extend(articles.into_iter());
+        episodes.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
+        episodes.truncate(max_hits as usize);
+
         Ok((titles, creators, refkeys, episodes))
+    }
+}
+
+pub enum Hit {
+    Episode {
+        title: Title,
+        fe: FullEpisode,
+    },
+    Article {
+        article: Article,
+        refs: RefKeySet,
+        creators: CreatorSet,
+        published: Vec<IssueRef>,
+    },
+}
+
+impl Hit {
+    fn episode(
+        title: Title,
+        episode: Episode,
+        db: &PgConnection,
+    ) -> Result<Hit, Error> {
+        FullEpisode::load_details(episode, db)
+            .map(|fe| Hit::Episode { title, fe })
+    }
+
+    fn article(article: Article, db: &PgConnection) -> Result<Hit, Error> {
+        let refs = RefKeySet::for_article(&article, db)?;
+        let creators = CreatorSet::for_article(&article, db)?;
+        let published = i::issues
+            .inner_join(p::publications)
+            .select((i::year, (i::number, i::number_str)))
+            .filter(p::article_id.eq(article.id))
+            .load::<IssueRef>(db)?;
+        Ok(Hit::Article {
+            article,
+            refs,
+            creators,
+            published,
+        })
+    }
+
+    fn lastpub(&self) -> Option<&IssueRef> {
+        match self {
+            Hit::Episode { fe, .. } => fe.published.last(),
+            Hit::Article { published, .. } => published.last(),
+        }
     }
 }

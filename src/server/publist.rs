@@ -1,4 +1,4 @@
-use crate::models::{Episode, Issue, PartInIssue};
+use crate::models::{Episode, Issue, IssueRef, PartInIssue};
 use crate::schema::episode_parts::dsl as ep;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
@@ -59,6 +59,9 @@ impl PartsPublished {
     }
     pub fn small(&self) -> SmallPartsPublished {
         SmallPartsPublished(&self)
+    }
+    pub fn last(&self) -> Option<&IssueRef> {
+        self.issues.last().map(|p| &p.0)
     }
 }
 

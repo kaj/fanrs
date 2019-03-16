@@ -92,8 +92,8 @@ fn register_article(
 ) -> Result<()> {
     let article = Article::get_or_create(
         get_req_text(c, "title")?,
-        get_text(c, "subtitle"),
-        get_text(c, "note"),
+        get_text_norm(c, "subtitle").as_ref().map(|s| s.as_ref()),
+        get_text_norm(c, "note").as_ref().map(|s| s.as_ref()),
         db,
     )?;
     article.publish(issue.id, seqno as i16, db)?;
