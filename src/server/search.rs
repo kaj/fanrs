@@ -5,7 +5,7 @@ use crate::models::{
 };
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
-use crate::schema::articles_by::dsl as ab;
+//use crate::schema::articles_by::dsl as ab;
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
 use crate::schema::episode_parts::dsl as ep;
@@ -261,19 +261,28 @@ impl SearchQuery {
                     .inner_join(ca::creator_aliases)
                     .filter(ca::creator_id.eq(creator.id)))),
             );
-            articles = articles
-                .filter(
-                    a::id.eq(any(ab::articles_by
-                        .select(ab::article_id)
-                        .inner_join(ca::creator_aliases)
-                        .filter(ca::creator_id.eq(creator.id)))),
-                )
-                .or_filter(
-                    a::id.eq(any(ar::article_refkeys
-                        .select(ar::article_id)
-                        .inner_join(r::refkeys)
-                        .filter(r::slug.eq(&creator.slug)))),
-                );
+            articles = articles.filter(a::id.eq(any(
+                // Can this be done as a union in diesel?
+                sql(&format!(
+                    "select article_id from articles_by \
+                     inner join creator_aliases ca on by_id=ca.id \
+                     where ca.creator_id={} \
+                     union \
+                     select article_id from article_refkeys ar \
+                     inner join refkeys r on r.id = ar.refkey_id \
+                     where slug='{}'",
+                    creator.id, creator.slug
+                )),
+                // ab::articles_by
+                //     .select(ab::article_id)
+                //     .inner_join(ca::creator_aliases)
+                //     .filter(ca::creator_id.eq(creator.id)),
+                // **union**
+                // ar::article_refkeys
+                //     .select(ar::article_id)
+                //     .inner_join(r::refkeys)
+                //     .filter(r::slug.eq(&creator.slug)),
+            )));
         }
         for key in &self.k {
             titles = titles.filter(
