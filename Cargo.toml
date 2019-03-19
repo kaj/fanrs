@@ -1,6 +1,6 @@
 [package]
 name = "fanrs"
-version = "0.2.1-PRE"
+version = "0.2.2"
 authors = ["Rasmus Kaj <kaj@kth.se>"]
 description = "Rust version of fantomenindex.krats.se"
 edition = "2018"
