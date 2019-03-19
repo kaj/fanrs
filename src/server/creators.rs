@@ -105,6 +105,9 @@ pub fn one_creator(
             .replace('-', "%")
             .replace(".html", "");
         eprintln!("Looking for creator fallback {:?} -> {:?}", slug, target);
+        if target == "anderas_eriksson" || target == "andreas_erikssson" {
+            return redirect("/who/andreas_eriksson");
+        }
         let found = ca::creator_aliases
             .inner_join(c::creators)
             .filter(ca::name.ilike(&target))

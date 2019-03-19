@@ -161,7 +161,24 @@ pub fn oldslug_title(
         use templates::statics::goda_svg;
         return redirect(&format!("/s/{}", goda_svg.name));
     }
+    if slug == "apple-touch-icon.png"
+        || slug == "/apple-touch-icon-precomposed.png"
+    {
+        use templates::statics::sc_png;
+        return redirect(&format!("/s/{}", sc_png.name));
+    }
     let target = slug.replace("_", "-").replace(".html", "");
+
+    if let Ok(year) = target.parse::<i16>() {
+        let issues = i::issues
+            .filter(i::year.eq(year))
+            .select(count_star())
+            .first::<i64>(&db)
+            .map_err(custom)?;
+        if issues > 0 {
+            return redirect(&format!("/{}", year));
+        }
+    }
 
     let n = t::titles
         .filter(t::slug.eq(&target))

@@ -125,7 +125,17 @@ fn one_ref_impl(
                 return redirect("/fa/22j");
             }
         }
-        let target = slug.replace("_", "-").replace(".html", "");
+        if kind == RefKey::KEY_ID {
+            if slug == "christophe_derrant" {
+                return redirect("/what/christophe-d-errant");
+            } else if slug == "olangofolket" {
+                return redirect("/what/olango-folket");
+            } else if slug == "/what/piratpete" {
+                return redirect("/what/pirat-pete");
+            }
+        }
+        let target =
+            slug.to_lowercase().replace("_", "-").replace(".html", "");
         if target != slug {
             eprintln!("Trying refkey redirect {:?} -> {:?}", slug, target);
             let n = r::refkeys

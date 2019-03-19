@@ -85,12 +85,21 @@ pub struct SIssue(i16);
 
 impl FromStr for SIssue {
     type Err = u8;
-    /// expect sNN.jpg
+    /// expect sNN.jpg or sN-M.jpg where M = N + 1
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.starts_with('s') {
             return Err(0);
         }
-        let p = s.find(".jpg").ok_or(2)?;
-        Ok(SIssue(s[1..p].parse().map_err(|_| 3)?))
+        if let Some(p) = s.find("-") {
+            if let Ok(n) = s[1..p].parse::<i16>() {
+                if format!("s{}-{}.jpg", n, n + 1) == s {
+                    return Ok(SIssue(n));
+                }
+            }
+            Err(4)
+        } else {
+            let p = s.find(".jpg").ok_or(2)?;
+            Ok(SIssue(s[1..p].parse().map_err(|_| 3)?))
+        }
     }
 }
