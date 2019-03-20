@@ -162,7 +162,7 @@ pub fn oldslug_title(
         return redirect(&format!("/s/{}", goda_svg.name));
     }
     if slug == "apple-touch-icon.png"
-        || slug == "/apple-touch-icon-precomposed.png"
+        || slug == "apple-touch-icon-precomposed.png"
     {
         use templates::statics::sc_png;
         return redirect(&format!("/s/{}", sc_png.name));

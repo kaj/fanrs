@@ -36,6 +36,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
 use failure::Error;
+use mime::TEXT_PLAIN;
 use std::io::{self, Write};
 use warp::http::status::StatusCode;
 use warp::http::Response;
@@ -133,6 +134,10 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(end())
             .and_then(redirect_cover))
         .or(get()
+            .and(path("robots.txt"))
+            .and(end())
+            .and_then(robots_txt))
+        .or(get()
             .and(s())
             .and(path::param())
             .and(end())
@@ -163,6 +168,12 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
         println!("Static file {:?} not found", name);
         Err(not_found())
     }
+}
+
+fn robots_txt() -> Result<impl Reply, Rejection> {
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
+        .body("User-agent: *\nDisallow: /search\nDisallow: /ac\n"))
 }
 
 fn pg_pool(database_url: &str) -> PgPool {
