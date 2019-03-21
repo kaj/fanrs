@@ -77,14 +77,14 @@
   <section>
     <h2>Medverkat som @o_roles</h2>
     @for (title, episodes) in other {
-    <div class="episode">
+    <section>
       <h3><a href="/titles/@title.slug">@title.title</a></h3>
-      <ul>
+      <ul class="shortepisodes">
 	@for (episode, pubs) in episodes {
 	<li>@if let Some(e) = episode {@e }@pubs.small()</li>
 	}
       </ul>
-    </div>
+    </section>
     }
   </section>
   }
