@@ -1,4 +1,4 @@
-use super::{custom, custom_or_404, goh, named, redirect, sortable_issue};
+use super::{custom, custom_or_404, goh, redirect, sortable_issue};
 use super::{FullEpisode, Paginator, PgFilter, PooledPg, RenderRucte};
 use crate::models::{
     Article, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
@@ -13,10 +13,8 @@ use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates;
 use diesel::dsl::{count_star, min, sql};
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
-use failure::Error;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::reject::not_found;
@@ -34,26 +32,6 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
         .and(query())
         .and_then(one_title);
     list.or(one).unify().boxed()
-}
-
-pub fn cloud(
-    num: i64,
-    db: &PgConnection,
-) -> Result<Vec<(Title, i64, u8)>, Error> {
-    let (c_def, c) = named(sql("count(*)"), "c");
-    let mut titles = t::titles
-        .left_join(e::episodes.left_join(ep::episode_parts))
-        .select((t::titles::all_columns(), c_def))
-        .group_by(t::titles::all_columns())
-        .order(c.desc())
-        .limit(num)
-        .load::<(Title, i64)>(db)?
-        .into_iter()
-        .enumerate()
-        .map(|(n, (title, c))| (title, c, (8 * (num - n as i64) / num) as u8))
-        .collect::<Vec<_>>();
-    titles.sort_by(|a, b| a.0.title.cmp(&b.0.title));
-    Ok(titles)
 }
 
 #[allow(clippy::needless_pass_by_value)]

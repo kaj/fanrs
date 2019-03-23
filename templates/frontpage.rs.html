@@ -1,8 +1,8 @@
-@use crate::models::{Creator, RefKey, Title};
+@use crate::models::{Cloud, Creator, RefKey, Title};
 @use crate::server::search::SearchQuery;
 @use super::{page, searchbox};
 
-@(n: i64, all_fa: &[RefKey], years: &[i16], titles: &[(Title, i64, u8)], refkeys: &[(RefKey, i64, u8)], creators: &[(Creator, i64, u8)])
+@(n: i64, all_fa: &[RefKey], years: &[i16], titles: &Cloud<Title>, refkeys: &Cloud<RefKey>, creators: &Cloud<Creator>)
 @:page("Rasmus Fantomenindex", {
   <p>Här listas innehållet i @n av de drygt 1600 svenska Fantomentidningar som kommit ut. Du kan välja att titta på en årgång, någon företeelse i Fantomenserien, eller någon serieskapare i listorna nedan.</p>
 }, {
@@ -45,35 +45,20 @@
       <h2>Serier</h2>
       <p>(<a href="/titles/">Alla förekommande serier</a>)</p>
     </header>
-    <p class="article cloud">
-      @if let Some(((title, n, w), titles)) = titles.split_last()
-      {@for (title, n, w) in titles
-      {<a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>, }
-      <a href="/titles/@title.slug" class="w@w" data-n="@n">@title.title</a>. }
-    </p>
+    <p class="article cloud">@titles</p>
   </section>
   <section class="front refkeys">
     <header>
       <h2>Personer och företeelser i Fantomens värld</h2>
       <p>(<a href="/what/">Alla taggar</a>)</p>
     </header>
-    <p class="article cloud">
-      @if let Some(((refkey, n, w), refkeys)) = refkeys.split_last()
-      {@for (refkey, n, w) in refkeys
-      {<a href="@refkey.url()" class="w@w" data-n="@n">@refkey.name()</a>, }
-      <a href="@refkey.url()" class="w@w" data-n="@n">@refkey.name()</a>. }
-    </p>
+    <p class="article cloud">@refkeys</p>
   </section>
   <section class="front creators">
     <header>
       <h2>Serieskapare</h2>
       <p>(<a href="/who/">Alla serieskapare</a>)</p>
     </header>
-    <p class="article cloud">
-      @if let Some(((creator, n, w), creators)) = creators.split_last()
-      {@for (creator, n, w) in creators
-      {<a href="/who/@creator.slug" class="w@w" data-n="@n">@creator.name</a>, }
-      <a href="/who/@creator.slug" class="w@w" data-n="@n">@creator.name</a>. }
-    </p>
+    <p class="article cloud">@creators</p>
   </section>
 })

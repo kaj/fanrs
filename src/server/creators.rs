@@ -1,4 +1,4 @@
-use super::{custom, custom_or_404, goh, named, redirect, sortable_issue};
+use super::{custom, custom_or_404, goh, redirect, sortable_issue};
 use super::{FullEpisode, PartsPublished, PgFilter, PooledPg};
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
@@ -19,8 +19,7 @@ use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte};
 use diesel::dsl::{all, any, min, sql};
 use diesel::prelude::*;
-use diesel::result::Error;
-use diesel::sql_types::{BigInt, SmallInt};
+use diesel::sql_types::SmallInt;
 use std::collections::BTreeMap;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
@@ -31,30 +30,6 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     let list = goh().and(end()).and(s.clone()).and_then(list_creators);
     let one = goh().and(s).and(param()).and(end()).and_then(one_creator);
     list.or(one).unify().boxed()
-}
-
-pub fn cloud(
-    num: i64,
-    db: &PgConnection,
-) -> Result<Vec<(Creator, i64, u8)>, Error> {
-    let (c_ep, c_ep_n) =
-        named(sql::<BigInt>("count(distinct episode_id)"), "n");
-    let mut creators = c::creators
-        .left_join(ca::creator_aliases.left_join(eb::episodes_by))
-        .filter(eb::role.eq(any(CreatorSet::MAIN_ROLES)))
-        .select((c::creators::all_columns(), c_ep))
-        .group_by(c::creators::all_columns())
-        .order(c_ep_n.desc())
-        .limit(num)
-        .load::<(Creator, i64)>(db)?
-        .into_iter()
-        .enumerate()
-        .map(|(n, (creator, c))| {
-            (creator, c, (8 * (num - n as i64) / num) as u8)
-        })
-        .collect::<Vec<_>>();
-    creators.sort_by(|a, b| a.0.name.cmp(&b.0.name));
-    Ok(creators)
 }
 
 #[allow(clippy::needless_pass_by_value)]

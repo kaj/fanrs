@@ -1,5 +1,4 @@
-use super::{goh, named, redirect};
-use super::{FullEpisode, PgFilter, PooledPg, RenderRucte};
+use super::{goh, redirect, FullEpisode, PgFilter, PooledPg, RenderRucte};
 use crate::models::{
     Article, CreatorSet, Episode, IdRefKey, IssueRef, RefKey, RefKeySet,
     Title,
@@ -42,29 +41,6 @@ pub fn get_all_fa(db: &PgConnection) -> Result<Vec<RefKey>, Error> {
         .into_iter()
         .map(|rk| rk.refkey)
         .collect())
-}
-
-pub fn refkey_cloud(
-    num: i64,
-    db: &PgConnection,
-) -> Result<Vec<(RefKey, i64, u8)>, Error> {
-    let (c_def, c) = named(sql("count(*)"), "c");
-    let mut refkeys = r::refkeys
-        .left_join(er::episode_refkeys.left_join(e::episodes))
-        .select((r::refkeys::all_columns(), c_def))
-        .filter(r::kind.eq(RefKey::KEY_ID))
-        .group_by(r::refkeys::all_columns())
-        .order(c.desc())
-        .limit(num)
-        .load::<(IdRefKey, i64)>(db)?
-        .into_iter()
-        .enumerate()
-        .map(|(n, (rk, c))| {
-            (rk.refkey, c, (8 * (num - n as i64) / num) as u8)
-        })
-        .collect::<Vec<_>>();
-    refkeys.sort_by(|a, b| a.0.name().cmp(&b.0.name()));
-    Ok(refkeys)
 }
 
 #[allow(clippy::needless_pass_by_value)]

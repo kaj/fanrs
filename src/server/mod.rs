@@ -9,11 +9,12 @@ mod titles;
 use self::covers::{cover_image, redirect_cover};
 pub use self::paginator::Paginator;
 pub use self::publist::PartsPublished;
-use self::refs::{get_all_fa, one_fa, refkey_cloud};
+use self::refs::{get_all_fa, one_fa};
 use self::search::{search, search_autocomplete};
 
 use crate::models::{
-    Article, CreatorSet, Episode, Issue, OtherMag, Part, RefKeySet, Title,
+    Article, Creator, CreatorSet, Episode, Issue, OtherMag, Part, RefKey,
+    RefKeySet, Title,
 };
 use crate::schema::articles::dsl as a;
 use crate::schema::covers_by::dsl as cb;
@@ -170,9 +171,9 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     let all_fa = get_all_fa(&db).map_err(custom)?;
 
     let num = 50;
-    let titles = titles::cloud(num, &db).map_err(custom)?;
-    let refkeys = refkey_cloud(num, &db).map_err(custom)?;
-    let creators = creators::cloud(num, &db).map_err(custom)?;
+    let titles = Title::cloud(num, &db).map_err(custom)?;
+    let refkeys = RefKey::cloud(num, &db).map_err(custom)?;
+    let creators = Creator::cloud(num, &db).map_err(custom)?;
 
     Response::builder().html(|o| {
         templates::frontpage(
@@ -390,14 +391,6 @@ fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
                 .html(|o| templates::error(o, code))
         }
     }
-}
-
-fn named<T>(
-    query: SqlLiteral<T>,
-    name: &str,
-) -> (SqlLiteral<T, SqlLiteral<T>>, SqlLiteral<T>) {
-    use diesel::dsl::sql;
-    (query.sql(&format!(" {}", name)), sql::<T>(name))
 }
 
 fn sortable_issue() -> SqlLiteral<SmallInt> {

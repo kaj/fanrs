@@ -1,10 +1,16 @@
+use super::{Cloud, CloudItem};
 use crate::schema;
+use crate::schema::episode_refkeys::dsl as er;
+use crate::schema::episodes::dsl as e;
+use crate::schema::refkeys::dsl as r;
 use crate::templates::ToHtml;
 use diesel;
+use diesel::dsl::sql;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::result::Error;
 use slug::slugify;
+use std::cmp::Ordering;
 use std::io::{self, Write};
 
 #[derive(Debug)]
@@ -31,7 +37,6 @@ impl IdRefKey {
         kind: i16,
         db: &PgConnection,
     ) -> Result<Self, Error> {
-        use crate::schema::refkeys::dsl as r;
         r::refkeys
             .select(r::refkeys::all_columns())
             .filter(r::kind.eq(kind))
@@ -49,7 +54,7 @@ impl IdRefKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, Eq, PartialEq)]
 pub enum RefKey {
     /// slug
     Fa(String),
@@ -101,23 +106,22 @@ impl RefKey {
             }
             RefKey::Title(n, s) => (RefKey::TITLE_ID, n.clone(), s.clone()),
         };
-        use crate::schema::refkeys::dsl;
-        dsl::refkeys
-            .select(dsl::id)
-            .filter(dsl::kind.eq(kind))
-            .filter(dsl::title.eq(&title))
-            .filter(dsl::slug.eq(&slug))
+        r::refkeys
+            .select(r::id)
+            .filter(r::kind.eq(kind))
+            .filter(r::title.eq(&title))
+            .filter(r::slug.eq(&slug))
             .first(db)
             .optional()?
             .ok_or(0)
             .or_else(|_| {
-                diesel::insert_into(dsl::refkeys)
+                diesel::insert_into(r::refkeys)
                     .values((
-                        dsl::kind.eq(kind),
-                        dsl::title.eq(title),
-                        dsl::slug.eq(&slug),
+                        r::kind.eq(kind),
+                        r::title.eq(title),
+                        r::slug.eq(&slug),
                     ))
-                    .returning(dsl::id)
+                    .returning(r::id)
                     .get_result::<i32>(db)
             })
     }
@@ -177,6 +181,22 @@ impl RefKey {
             RefKey::Title(..) => 't',
         }
     }
+
+    pub fn cloud(
+        num: i64,
+        db: &PgConnection,
+    ) -> Result<Cloud<RefKey>, Error> {
+        let c = sql("count(*)");
+        let refkeys = r::refkeys
+            .left_join(er::episode_refkeys.left_join(e::episodes))
+            .select(((r::kind, r::title, r::slug), c.clone()))
+            .filter(r::kind.eq(RefKey::KEY_ID))
+            .group_by(r::refkeys::all_columns())
+            .order(c.desc())
+            .limit(num)
+            .load(db)?;
+        Ok(Cloud::from_ordered(refkeys))
+    }
 }
 
 impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
@@ -230,5 +250,26 @@ impl ToHtml for RefKey {
         )?;
         self.name().to_html(out)?;
         out.write_all(b"</a>")
+    }
+}
+
+impl PartialOrd for RefKey {
+    fn partial_cmp(&self, rhs: &RefKey) -> Option<Ordering> {
+        // Note: Should sort by kind first, but only used inside same kind.
+        Some(self.name().cmp(&rhs.name()))
+    }
+}
+
+impl CloudItem for RefKey {
+    fn write_item(&self, out: &mut Write, n: i64, w: u8) -> io::Result<()> {
+        write!(
+            out,
+            "<a href='{}' class='w{}' data-n='{}'>",
+            self.url(),
+            w,
+            n,
+        )?;
+        self.name().to_html(out)?;
+        write!(out, "</a>")
     }
 }
