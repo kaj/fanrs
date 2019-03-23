@@ -90,8 +90,8 @@ impl FromStr for SIssue {
         if !s.starts_with('s') {
             return Err(0);
         }
-        if let Some(p) = s.find("-") {
-            if let Ok(n) = s[1..p].parse::<i16>() {
+        if let Some(p) = s.find('-') {
+            if let Ok(n) = s[1..p].parse() {
                 if format!("s{}-{}.jpg", n, n + 1) == s {
                     return Ok(SIssue(n));
                 }
