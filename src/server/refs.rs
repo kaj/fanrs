@@ -1,5 +1,5 @@
-use super::PooledPg;
-use super::{named, redirect, FullEpisode, RenderRucte};
+use super::{goh, named, redirect};
+use super::{FullEpisode, PgFilter, PooledPg, RenderRucte};
 use crate::models::{
     Article, CreatorSet, Episode, IdRefKey, IssueRef, RefKey, RefKeySet,
     Title,
@@ -20,12 +20,19 @@ use diesel::prelude::*;
 use diesel::sql_types::{Integer, SmallInt};
 use diesel::QueryDsl;
 use failure::Error;
+use warp::filters::BoxedFilter;
 use warp::http::Response;
-use warp::{
-    self,
-    reject::{custom, not_found},
-    Rejection, Reply,
-};
+use warp::reject::{custom, not_found};
+use warp::{self, Filter, Rejection};
+
+type ByteResponse = Response<Vec<u8>>;
+
+pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
+    use warp::path::{end, param};
+    let list = goh().and(end()).and(s.clone()).and_then(list_refs);
+    let one = goh().and(s).and(param()).and(end()).and_then(one_ref);
+    list.or(one).unify().boxed()
+}
 
 pub fn get_all_fa(db: &PgConnection) -> Result<Vec<RefKey>, Error> {
     Ok(r::refkeys
@@ -61,7 +68,7 @@ pub fn refkey_cloud(
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
+fn list_refs(db: PooledPg) -> Result<ByteResponse, Rejection> {
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
         .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
@@ -92,11 +99,11 @@ pub fn list_refs(db: PooledPg) -> Result<impl Reply, Rejection> {
     Response::builder().html(|o| templates::refkeys(o, &all))
 }
 
-pub fn one_fa(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+pub fn one_fa(db: PooledPg, slug: String) -> Result<ByteResponse, Rejection> {
     one_ref_impl(db, slug, RefKey::FA_ID)
 }
 
-pub fn one_ref(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+fn one_ref(db: PooledPg, slug: String) -> Result<ByteResponse, Rejection> {
     one_ref_impl(db, slug, RefKey::KEY_ID)
 }
 
@@ -105,7 +112,7 @@ fn one_ref_impl(
     db: PooledPg,
     slug: String,
     kind: i16,
-) -> Result<impl Reply, Rejection> {
+) -> Result<ByteResponse, Rejection> {
     let refkey = r::refkeys
         .filter(r::kind.eq(&kind))
         .filter(r::slug.eq(&slug))

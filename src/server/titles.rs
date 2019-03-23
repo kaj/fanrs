@@ -1,6 +1,5 @@
-use super::PooledPg;
-use super::{custom, custom_or_404, sortable_issue};
-use super::{named, redirect, FullEpisode, Paginator, RenderRucte};
+use super::{custom, custom_or_404, goh, named, redirect, sortable_issue};
+use super::{FullEpisode, Paginator, PgFilter, PooledPg, RenderRucte};
 use crate::models::{
     Article, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
 };
@@ -18,11 +17,26 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
 use failure::Error;
+use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::reject::not_found;
-use warp::{self, Rejection, Reply};
+use warp::{self, Filter, Rejection, Reply};
 
-pub fn title_cloud(
+pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
+    use warp::filters::query::query;
+    use warp::path::{end, param};
+    let s = || s.clone();
+    let list = goh().and(end()).and(s()).and_then(list_titles);
+    let one = goh()
+        .and(s())
+        .and(param())
+        .and(end())
+        .and(query())
+        .and_then(one_title);
+    list.or(one).unify().boxed()
+}
+
+pub fn cloud(
     num: i64,
     db: &PgConnection,
 ) -> Result<Vec<(Title, i64, u8)>, Error> {
@@ -43,7 +57,7 @@ pub fn title_cloud(
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn list_titles(db: PooledPg) -> Result<impl Reply, Rejection> {
+fn list_titles(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -77,11 +91,11 @@ pub struct PageParam {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn one_title(
+fn one_title(
     db: PooledPg,
     slug: String,
     page: PageParam,
-) -> Result<impl Reply, Rejection> {
+) -> Result<Response<Vec<u8>>, Rejection> {
     let (slug, strip) = if slug.starts_with("weekdays-") {
         (&slug["weekdays-".len()..], Some(false))
     } else if slug.starts_with("sundays-") {
@@ -152,10 +166,7 @@ pub fn one_title(
     })
 }
 
-pub fn oldslug_title(
-    db: PooledPg,
-    slug: String,
-) -> Result<impl Reply, Rejection> {
+pub fn oldslug(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;

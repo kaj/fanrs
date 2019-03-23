@@ -1,5 +1,5 @@
-use super::{custom, custom_or_404, named, redirect, sortable_issue};
-use super::{FullEpisode, PartsPublished, PooledPg};
+use super::{custom, custom_or_404, goh, named, redirect, sortable_issue};
+use super::{FullEpisode, PartsPublished, PgFilter, PooledPg};
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
 };
@@ -22,10 +22,18 @@ use diesel::prelude::*;
 use diesel::result::Error;
 use diesel::sql_types::{BigInt, SmallInt};
 use std::collections::BTreeMap;
+use warp::filters::BoxedFilter;
 use warp::http::Response;
-use warp::{self, Rejection, Reply};
+use warp::{self, Filter, Rejection, Reply};
 
-pub fn creator_cloud(
+pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
+    use warp::path::{end, param};
+    let list = goh().and(end()).and(s.clone()).and_then(list_creators);
+    let one = goh().and(s).and(param()).and(end()).and_then(one_creator);
+    list.or(one).unify().boxed()
+}
+
+pub fn cloud(
     num: i64,
     db: &PgConnection,
 ) -> Result<Vec<(Creator, i64, u8)>, Error> {
@@ -50,7 +58,7 @@ pub fn creator_cloud(
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
+fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
     let all = c::creators
         .left_join(
             ca::creator_aliases.left_join(
@@ -88,10 +96,10 @@ pub fn list_creators(db: PooledPg) -> Result<impl Reply, Rejection> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn one_creator(
+fn one_creator(
     db: PooledPg,
     slug: String,
-) -> Result<impl Reply, Rejection> {
+) -> Result<Response<Vec<u8>>, Rejection> {
     let creator = c::creators
         .filter(c::slug.eq(&slug))
         .first::<Creator>(&db)

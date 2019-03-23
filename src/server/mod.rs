@@ -7,12 +7,10 @@ pub mod search;
 mod titles;
 
 use self::covers::{cover_image, redirect_cover};
-use self::creators::{creator_cloud, list_creators, one_creator};
 pub use self::paginator::Paginator;
 pub use self::publist::PartsPublished;
-use self::refs::{get_all_fa, list_refs, one_fa, one_ref, refkey_cloud};
+use self::refs::{get_all_fa, one_fa, refkey_cloud};
 use self::search::{search, search_autocomplete};
-use self::titles::{list_titles, oldslug_title, one_title, title_cloud};
 
 use crate::models::{
     Article, CreatorSet, Episode, Issue, OtherMag, Part, RefKeySet, Title,
@@ -38,6 +36,7 @@ use diesel::QueryDsl;
 use failure::Error;
 use mime::TEXT_PLAIN;
 use std::io::{self, Write};
+use warp::filters::BoxedFilter;
 use warp::http::status::StatusCode;
 use warp::http::Response;
 use warp::path::Tail;
@@ -50,6 +49,13 @@ use warp::{
 
 type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
 type PgPool = Pool<ConnectionManager<PgConnection>>;
+type PgFilter = BoxedFilter<(PooledPg,)>;
+
+/// Get or head - a filter matching GET and HEAD requests only.
+fn goh() -> BoxedFilter<()> {
+    use warp::{get2 as get, head};
+    get().or(head()).unify().boxed()
+}
 
 pub fn run(db_url: &str) -> Result<(), Error> {
     let pool = pg_pool(db_url);
@@ -64,89 +70,54 @@ pub fn run(db_url: &str) -> Result<(), Error> {
         .boxed();
     let s = move || s.clone();
     use warp::filters::query::query;
-    use warp::{get2 as get, path, path::end};
+    use warp::{path, path::end, path::param, path::tail};
     let routes = warp::any()
-        .and(get().and(path("s")).and(path::tail()).and_then(static_file))
-        .or(get()
+        .and(goh().and(path("s")).and(tail()).and_then(static_file))
+        .or(goh()
             .and(path("c"))
             .and(s())
-            .and(path::param())
+            .and(param())
             .and(end())
             .and_then(cover_image))
-        .or(get().and(end()).and(s()).and_then(frontpage))
-        .or(get()
+        .or(goh().and(end()).and(s()).and_then(frontpage))
+        .or(goh()
             .and(path("search"))
             .and(end())
             .and(s())
             .and(query())
             .and_then(search))
-        .or(get()
+        .or(goh()
             .and(path("ac"))
             .and(end())
             .and(s())
             .and(query())
             .and_then(search_autocomplete))
-        .or(get()
-            .and(path("titles"))
-            .and(end())
-            .and(s())
-            .and_then(list_titles))
-        .or(get()
-            .and(path("titles"))
-            .and(s())
-            .and(path::param())
-            .and(end())
-            .and(query())
-            .and_then(one_title))
-        .or(get()
+        .or(path("titles").and(titles::routes(s())))
+        .or(goh()
             .and(path("fa"))
             .and(s())
-            .and(path::param())
+            .and(param())
             .and(end())
             .and_then(one_fa))
-        .or(get()
-            .and(path("what"))
-            .and(s())
-            .and(path::param())
-            .and(end())
-            .and_then(one_ref))
-        .or(get()
-            .and(path("what"))
-            .and(end())
-            .and(s())
-            .and_then(list_refs))
-        .or(get()
-            .and(path("who"))
-            .and(s())
-            .and(path::param())
-            .and(end())
-            .and_then(one_creator))
-        .or(get()
-            .and(path("who"))
-            .and(end())
-            .and(s())
-            .and_then(list_creators))
-        .or(get()
+        .or(path("what").and(refs::what_routes(s())))
+        .or(path("who").and(creators::routes(s())))
+        .or(goh()
             .and(path("static"))
             .and(s())
-            .and(path::param())
-            .and(path::param())
+            .and(param())
+            .and(param())
             .and(end())
             .and_then(redirect_cover))
-        .or(get()
+        .or(goh()
             .and(path("robots.txt"))
             .and(end())
             .and_then(robots_txt))
-        .or(get()
+        .or(goh().and(s()).and(param()).and(end()).and_then(list_year))
+        .or(goh()
             .and(s())
-            .and(path::param())
+            .and(param())
             .and(end())
-            .and_then(list_year))
-        .or(get()
-            .and(s())
-            .and(path::param())
-            .and(end())
-            .and_then(oldslug_title))
+            .and_then(titles::oldslug))
         .recover(customize_error);
     warp::serve(routes).run(([127, 0, 0, 1], 1536));
     Ok(())
@@ -199,9 +170,9 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     let all_fa = get_all_fa(&db).map_err(custom)?;
 
     let num = 50;
-    let titles = title_cloud(num, &db).map_err(custom)?;
+    let titles = titles::cloud(num, &db).map_err(custom)?;
     let refkeys = refkey_cloud(num, &db).map_err(custom)?;
-    let creators = creator_cloud(num, &db).map_err(custom)?;
+    let creators = creators::cloud(num, &db).map_err(custom)?;
 
     Response::builder().html(|o| {
         templates::frontpage(
