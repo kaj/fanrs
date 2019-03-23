@@ -1,4 +1,6 @@
 use super::{Episode, Issue, IssueRef};
+use crate::schema::episode_parts::dsl as ep;
+use crate::schema::publications::dsl as p;
 use crate::templates::ToHtml;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -23,39 +25,25 @@ impl Part {
         label: &str,
         db: &PgConnection,
     ) -> Result<(), Error> {
-        use crate::schema::episode_parts::dsl as e;
-        //let part_no = part.and_then(|p| p.no.map(i16::from));
-        //let part_name = part.and_then(|p| p.name.as_ref());
-        let epq = e::episode_parts
-            .select(e::id)
-            .filter(e::episode.eq(episode.id))
-            .into_boxed();
-        let epq = if let Some(part_no) = part_no {
-            epq.filter(e::part_no.eq(part_no))
-        } else {
-            epq.filter(e::part_no.is_null())
-        };
-        let epq = if let Some(part_name) = part_name {
-            epq.filter(e::part_name.eq(part_name))
-        } else {
-            epq.filter(e::part_name.is_null())
-        };
-
-        let part_id = if let Some(part_id) =
-            epq.first::<i32>(db).optional()?
+        let part_id = if let Some(part_id) = ep::episode_parts
+            .select(ep::id)
+            .filter(ep::episode.eq(episode.id))
+            .filter(ep::part_no.is_not_distinct_from(part_no))
+            .filter(ep::part_name.is_not_distinct_from(part_name))
+            .first::<i32>(db)
+            .optional()?
         {
             part_id
         } else {
-            diesel::insert_into(e::episode_parts)
+            diesel::insert_into(ep::episode_parts)
                 .values((
-                    e::episode.eq(episode.id),
-                    e::part_no.eq(part_no),
-                    e::part_name.eq(part_name),
+                    ep::episode.eq(episode.id),
+                    ep::part_no.eq(part_no),
+                    ep::part_name.eq(part_name),
                 ))
-                .get_result::<(i32, i32, Option<i16>, Option<String>)>(db)?
-                .0
+                .returning(ep::id)
+                .get_result(db)?
         };
-        use crate::schema::publications::dsl as p;
         if let Some((id, old_seqno, old_label)) = p::publications
             .filter(p::issue.eq(issue.id))
             .filter(p::episode_part.eq(part_id))
@@ -64,7 +52,7 @@ impl Part {
             .optional()?
         {
             if seqno.is_some() && old_seqno != seqno {
-                eprintln!("TODO: Should update seqno for {}", id);
+                unimplemented!("Should update seqno for {}", id);
             }
             if label != "" && old_label != label {
                 diesel::update(p::publications)
@@ -72,7 +60,6 @@ impl Part {
                     .filter(p::id.eq(id))
                     .execute(db)?;
             }
-            Ok(())
         } else {
             diesel::insert_into(p::publications)
                 .values((
@@ -83,8 +70,8 @@ impl Part {
                     p::label.eq(label),
                 ))
                 .execute(db)?;
-            Ok(())
         }
+        Ok(())
     }
 
     fn is_some(&self) -> bool {
