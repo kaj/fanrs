@@ -125,23 +125,6 @@ fn one_creator(
         })
         .collect::<Vec<_>>();
 
-    let mut covers = i::issues
-        .select(((i::year, (i::number, i::number_str)), i::cover_best))
-        .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
-        .filter(ca::creator_id.eq(creator.id))
-        .order((i::cover_best, i::year, i::number))
-        .load::<(IssueRef, Option<i16>)>(&db)
-        .map_err(custom)?;
-
-    let (covers, all_covers) = if covers.len() > 20 {
-        let best = covers[0..15].to_vec();
-        covers.sort_by(|a, b| a.0.cmp(&b.0));
-        (best, covers)
-    } else {
-        covers.sort_by(|a, b| a.0.cmp(&b.0));
-        (covers, vec![])
-    };
-
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
     let main_episodes = e::episodes
         .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
@@ -185,6 +168,7 @@ fn one_creator(
         })
         .collect::<Vec<_>>();
 
+    let covers = CoverSet::by(&creator, &db).map_err(custom)?;
     let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;
 
     Response::builder().html(|o| {
@@ -193,10 +177,52 @@ fn one_creator(
             &creator,
             &about,
             &covers,
-            &all_covers,
             &main_episodes,
             &articles_by,
             &others,
         )
     })
+}
+
+pub struct CoverSet {
+    pub best: Vec<(IssueRef, Option<i16>)>,
+    pub all: Vec<(IssueRef, Option<i16>)>,
+}
+impl CoverSet {
+    fn by(
+        creator: &Creator,
+        db: &PgConnection,
+    ) -> Result<CoverSet, diesel::result::Error> {
+        let mut covers = i::issues
+            .select(((i::year, (i::number, i::number_str)), i::cover_best))
+            .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
+            .filter(ca::creator_id.eq(creator.id))
+            .order((i::cover_best, i::year, i::number))
+            .load::<(IssueRef, Option<i16>)>(db)?;
+
+        if covers.len() > 20 {
+            let best = covers[0..15].to_vec();
+            covers.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(CoverSet { best, all: covers })
+        } else {
+            covers.sort_by(|a, b| a.0.cmp(&b.0));
+            Ok(CoverSet {
+                best: covers,
+                all: vec![],
+            })
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.best.is_empty()
+    }
+    pub fn is_many(&self) -> bool {
+        !self.all.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        if self.all.is_empty() {
+            self.best.len()
+        } else {
+            self.all.len()
+        }
+    }
 }

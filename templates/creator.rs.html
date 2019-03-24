@@ -1,8 +1,8 @@
 @use crate::models::{Article, Creator, CreatorSet, IssueRef, RefKeySet, Title};
-@use crate::server::{FullEpisode, OtherContribs};
+@use crate::server::{CoverSet, FullEpisode, OtherContribs};
 @use super::{artmisc, epmisc, page};
 
-@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &[(IssueRef, Option<i16>)], all_covers: &[(IssueRef, Option<i16>)], episodes: &[(Title, FullEpisode)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], other: &OtherContribs)
+@(creator: &Creator, about: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], covers: &CoverSet, episodes: &[(Title, FullEpisode)], articles_by: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], other: &OtherContribs)
 @:page(&creator.name, {
   <p>Här listas vad <strong>@creator.name</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@creator.name&amp;go=go"
@@ -26,13 +26,13 @@
   @if !covers.is_empty() {
   <section>
     <h2>Omslagsbilder</h2>
-    @if !all_covers.is_empty() {
-    <p>@creator.name har skapat minst @all_covers.len() omslag till
+    @if covers.is_many() {
+    <p>@creator.name har skapat minst @covers.len() omslag till
     Fantomentidningen. Här visas några av de bästa, en så komplett
     lista som indexet förmår följer nedan.</p>
     }
     <div class="covers">
-      @for (issue, best) in covers {
+      @for (issue, best) in &covers.best {
       <div class="cover@if let Some(best) = best { best@best}">
 	<p>@issue</p>
 	<img src="@issue.cover_url()">
@@ -40,9 +40,9 @@
       </div>
       }
     </div>
-    @if !all_covers.is_empty() {
+    @if covers.is_many() {
     <ul class="allcovers">
-      @for (issue, best) in all_covers {
+      @for (issue, best) in &covers.all {
       <li>@issue@if let Some(best) = best {, nr @best i bästa omslag}.</li>
       }
     </ul>

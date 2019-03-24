@@ -7,6 +7,7 @@ pub mod search;
 mod titles;
 
 use self::covers::{cover_image, redirect_cover};
+pub use self::creators::CoverSet;
 pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
 use self::refs::{get_all_fa, one_fa};
