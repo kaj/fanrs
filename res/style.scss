@@ -77,14 +77,14 @@ section {
     border-radius: .5em;
     border: solid .5px black;
     margin: 1em 0;
-    padding: .2em .2em 0 0;
+    padding: .2em;
     background: rgba(#eee, 0.6);
 
-    section, .article, table, .covers .cover {
+    section, .article, .covers .cover {
         background: white;
         border: solid .5px rgba(black, 0.5);
         border-radius: .3em;
-        margin: 0 0 .2em .2em;
+        margin: .1em;
         padding: .1em .2em .1em .4em;
         h3, p {
             margin: 0 0 .2em 0;
@@ -103,16 +103,23 @@ section {
     }
     table {
         border-collapse: collapse;
-        margin: .2em;
+        margin: 0;
         width: -moz-available;
-        tr:nth-child(2n+1) {
-            background: #fbfbfb;
+        width: -webkit-fill-available;
+        width: fill-available;
+        tbody {
+            background: white;
+            tr:nth-child(2n+1) {
+                background: #fbfbfb;
+            }
+            tr:hover {
+                background: #eee;
+            }
         }
-        tr:hover {
-            background: #eee;
+        td {
+            border: solid .4px rgba(black, 0.3);
         }
         th, td {
-            border: solid .4px rgba(black, 0.3);
             padding: .1em .5em;
             text-align: left;
             &:nth-child(2) {
@@ -150,47 +157,70 @@ section.searchresults.tags {
 }
 
 .issue {
-    display: flex;
     > header {
-        flex-basis: 10em;
-        flex-shrink: 0;
         img {
-            width: 10em;
+            width: 10rem;
             height: auto;
         }
-        p {
+        .info {
             font-size: 90%;
         }
+        p.pp {
+           font-size: 90%;
+           display: flex;
+           flex-flow: row wrap;
+           gap: 1ex;
+           justify-content: space-between;
+        }
+
+        @media (min-width: 18em) and (max-width: 34.98em) {
+            .info {
+                display: flex;
+                flex-flow: row;
+                gap: 1ex;
+            }
+        }
     }
-    .content {
+
+    @media (min-width: 35em) {
         display: flex;
-        flex-flow: row wrap;
-        flex-grow: 1;
-        section {
-            flex-basis: 28em;
-            flex-grow: 2;
-            &.episode.main {
-                flex-basis: 42em;
-                flex-grow: 5;
-            }
-            &.episode.noteaser {
-                flex-basis: 20em;
-                flex-grow: 1.5;
-            }
-            &.article {
-                flex-basis: 15em;
-                flex-grow: 1;
-                background: rgba(white, 0.7);
+        > header {
+            flex-basis: 10em;
+            flex-shrink: 0;
+            margin-right: .2em;
+        }
+        .content {
+            display: flex;
+            flex-flow: row wrap;
+            flex-grow: 1;
+            margin: -.1rem;
+            section {
+                flex-basis: 28em;
+                flex-grow: 2;
+                &.episode.main {
+                    flex-basis: 42em;
+                    flex-grow: 5;
+                }
+                &.episode.noteaser {
+                    flex-basis: 20em;
+                    flex-grow: 1.5;
+                }
+                &.article {
+                    flex-basis: 15em;
+                    flex-grow: 1;
+                    background: rgba(white, 0.7);
+                }
             }
         }
     }
 }
+
 .searchresults {
     display: flex;
     flex-flow: row wrap;
 
     h2 {
-	flex-basis: 100%;
+        flex-basis: 100%;
     }
     section {
         flex-basis: 20em;
@@ -207,7 +237,7 @@ section.searchresults.tags {
 
 section.front {
     header {
-        margin: 0 .3em;
+        margin: 0;
         display: flex;
         flex-flow: row wrap;
         align-items: baseline;
@@ -237,10 +267,6 @@ section.creators h2::before {
     margin-right: 1ex;
     vertical-align: text-top;
     width: 1em;
-}
-
-section #search {
-    margin: .4rem .5rem;
 }
 
 #search {
@@ -363,7 +389,7 @@ div.wrapfour {
     align-items: start;
     display: flex;
     flex-flow: row wrap;
-    margin: 0 -.6vw;
+    margin: .5em -.6vw -.5em;
     section {
         flex-basis: 20em;
         flex-grow: 1;

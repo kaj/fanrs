@@ -10,12 +10,18 @@
   <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>
-      <img src="/c/f@issue.year-@issue.number&#46;jpg" alt="">
-      @if let Some((last_c, creators)) = cover_by.split_last()
-      {<p class="cover">Omslag av @for c in creators {@c, }@last_c.</p>}
-      @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
-      @if let Some(ref pages) = issue.pages {<p class="pages">@pages sidor</p>}
-      @if let Some(ref price) = issue.price {<p class="price">Pris @price</p>}
+      <div class="info">
+	<img src="/c/f@issue.year-@issue.number&#46;jpg" alt="">
+	<div class="innerinfo">
+	  @if let Some((last_c, creators)) = cover_by.split_last()
+	  {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
+	  @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
+	  @if issue.pages.is_some() || issue.price.is_some() {<p class="pp">
+	    @if let Some(ref pages) = issue.pages {<span>@pages sidor</span>}
+	    @if let Some(ref price) = issue.price {<span>Pris @price</span>}
+	  </p>}
+	</div>
+      </div>
     </header>
     <div class="content">
       @for PublishedInfo{content, seqno, classnames} in contents {
