@@ -30,16 +30,16 @@ body {
             background-image: url(static_name("fa_lindahl_9915_png"));
             background-position: 100% 100%;
             background-repeat: no-repeat;
-            background-size: 23vw auto;
-            min-height: calc(#{"15vw - 2ex"});
-            padding-right: 22vw;
+            background-size: calc(#{"15vw + 8vmin + 4rem"}) auto;
+            min-height: calc(#{"0.63 * (15vw + 8vmin + 4rem) - 2ex"});
+            padding-right: calc(#{"15vw + 8vmin + 4rem"});
             position: relative;
             &:after {
                 content: "Vinjettbild: Hans Lindahl, ur Guldmakaren, Fa 15, 1999.";
                 display: block;
                 font: 60%/1 sans-serif;
                 position: absolute;
-                right: 20.2vw;
+                right: calc(#{"0.9 * (15vw + 8vmin + 4rem)"});
                 bottom: 1px;
             }
         }
