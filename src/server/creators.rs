@@ -1,5 +1,5 @@
-use super::{custom, custom_or_404, goh, redirect, sortable_issue};
-use super::{FullEpisode, PartsPublished, PgFilter, PooledPg};
+use super::{custom, custom_or_404, goh, redirect};
+use super::{FullEpisode, OtherContribs, PgFilter, PooledPg};
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
 };
@@ -17,10 +17,9 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte};
-use diesel::dsl::{all, any, min, sql};
+use diesel::dsl::{any, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
-use std::collections::BTreeMap;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::{self, Filter, Rejection, Reply};
@@ -186,47 +185,7 @@ fn one_creator(
         })
         .collect::<Vec<_>>();
 
-    let oe_columns = (t::titles::all_columns(), e::id, e::episode);
-    let other_episodes = e::episodes
-        .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
-        .inner_join(t::titles)
-        .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
-        .select(oe_columns)
-        .inner_join(
-            ep::episode_parts
-                .inner_join(p::publications.inner_join(i::issues)),
-        )
-        .order(min(sortable_issue()))
-        .group_by(oe_columns)
-        .load::<(Title, i32, Option<String>)>(&db)
-        .map_err(custom)?;
-
-    let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
-    for (title, episode_id, episode) in other_episodes {
-        let published =
-            PartsPublished::for_episode_id(episode_id, &db).unwrap();
-        oe.entry(title).or_default().push((episode, published));
-    }
-
-    let o_roles = eb::episodes_by
-        .inner_join(ca::creator_aliases)
-        .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
-        .select(eb::role)
-        .distinct()
-        .load::<String>(&db)
-        .map_err(custom)?
-        .into_iter()
-        .map(|r| match r.as_ref() {
-            "color" => "färgläggare",
-            "redax" => "redaktion",
-            "xlat" => "översättare",
-            "textning" => "textsättare",
-            _ => "något annat",
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+    let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;
 
     Response::builder().html(|o| {
         templates::creator(
@@ -237,8 +196,7 @@ fn one_creator(
             &all_covers,
             &main_episodes,
             &articles_by,
-            &o_roles,
-            &oe,
+            &others,
         )
     })
 }

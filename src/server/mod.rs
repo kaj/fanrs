@@ -8,7 +8,7 @@ mod titles;
 
 use self::covers::{cover_image, redirect_cover};
 pub use self::paginator::Paginator;
-pub use self::publist::PartsPublished;
+pub use self::publist::{OtherContribs, PartsPublished};
 use self::refs::{get_all_fa, one_fa};
 use self::search::{search, search_autocomplete};
 
