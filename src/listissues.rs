@@ -1,5 +1,6 @@
 use crate::models::Nr;
 use crate::schema::issues::dsl as i;
+use crate::schema::publications::dsl as p;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use failure::Error;
@@ -9,6 +10,9 @@ pub fn list_issues(db: &PgConnection) -> Result<(), Error> {
     let mut all = BTreeMap::<i16, Vec<Nr>>::new();
     for (year, number) in i::issues
         .select((i::year, (i::number, i::number_str)))
+        .inner_join(p::publications)
+        .filter(p::seqno.is_not_null())
+        .group_by((i::year, (i::number, i::number_str)))
         .order((i::year, i::number))
         .load(db)?
     {
