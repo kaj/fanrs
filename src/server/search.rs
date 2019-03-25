@@ -212,7 +212,7 @@ impl SearchQuery {
                 a::title
                     .ilike(word)
                     .or(a::subtitle.ilike(word))
-                    .or(a::note.like(word)),
+                    .or(a::note.ilike(word)),
             );
         }
 
