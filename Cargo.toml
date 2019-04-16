@@ -21,7 +21,7 @@ mime = "0.3"
 reqwest = "0.9.9"
 serde = "1.0.88"
 serde_derive = "1.0.88"
-scraper = "0.9.1"
+scraper = "0.10.0"
 slug = "0.1.4"
 structopt = { version = "0.2.14", features = ["wrap_help"] }
 time = "0.1.42"
