@@ -69,7 +69,9 @@ impl WikiClient {
                 .text()?,
             &self.sel1,
         )?;
-        if url2.contains("Scullmark.gif") {
+        // Scullmark is sometimes used for no cover scanned yet.
+        // The Mini_sweden may be the next image when there is no cover image.
+        if url2.contains("Scullmark.gif") || url2.contains("Mini_sweden") {
             return Err(format_err!("Cover missing"));
         }
         let imgurl = select_href(&self.get(&url2)?.text()?, &self.sel2)?;
