@@ -15,6 +15,7 @@ use crate::templates;
 use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
+use serde::Deserialize;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::reject::not_found;

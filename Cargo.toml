@@ -19,8 +19,7 @@ failure = "0.1.5"
 io-result-optional = "0.1.2"
 mime = "0.3"
 reqwest = "0.9.9"
-serde = "1.0.88"
-serde_derive = "1.0.88"
+serde = { version = "1.0.88", features = ["derive"] }
 scraper = "0.10.0"
 slug = "0.1.4"
 structopt = { version = "0.2.14", features = ["wrap_help"] }

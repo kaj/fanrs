@@ -22,7 +22,7 @@ use diesel::prelude::*;
 use diesel::sql_types::{SmallInt, Text};
 use diesel::PgTextExpressionMethods;
 use failure::Error;
-use serde_derive::Serialize;
+use serde::{Deserialize, Serialize};
 use warp::http::Response;
 use warp::reply::json;
 use warp::{self, reject::custom, Rejection, Reply};
