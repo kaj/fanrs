@@ -23,7 +23,16 @@ pub fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
         for i in Element::parse(file)?.children {
             match i.name.as_ref() {
                 "info" => (), // ignore
-                "issue" => register_issue(year, &i, db)?,
+                "issue" => register_issue(year, &i, db).map_err(|e| {
+                    format_err!(
+                        "In issue {}: {}",
+                        i.attributes
+                            .get("nr")
+                            .map(|n| n.as_ref())
+                            .unwrap_or("?"),
+                        e
+                    )
+                })?,
                 other => Err(format_err!(
                     "Unexpected element {:?} in year {}",
                     other,
@@ -189,7 +198,11 @@ fn register_serie(
                         .execute(db)?;
                 }
             }
-            "ref" => episode.set_refs(&parse_refs(&e.children)?, db)?,
+            "ref" => {
+                episode.set_refs(&parse_refs(&e.children)?, db).map_err(
+                    |err| format_err!("{} while handling {:?}", err, e),
+                )?
+            }
             "prevpub" => match e.children.get(0).map(|e| e.name.as_ref()) {
                 Some("fa") => {
                     let nr = get_text(e, "fa").unwrap().parse()?;
