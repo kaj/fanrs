@@ -169,6 +169,7 @@ pub fn oldslug(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
             return redirect(&format!("/{}", year));
         }
     }
+    let target = slug.replace("weekdays-", "").replace("sundays-", "");
 
     let n = t::titles
         .filter(t::slug.eq(&target))
