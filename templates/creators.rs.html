@@ -12,9 +12,9 @@
     <tbody>
       @for (creator, n, first, last) in creators {
       <tr>
-	<td>@creator</td><td>@n</td>
-	@if let Some(i) = first {<td data-sort="@i.sortno()">@i</td>} else {<td/>}
-	@if let Some(i) = last {<td data-sort="@i.sortno()">@i</td>} else {<td/>}
+        <td>@creator</td><td>@n</td>
+        @if let Some(i) = first {<td data-sort="@i.sortno()">@i</td>} else {<td>}
+        @if let Some(i) = last {<td data-sort="@i.sortno()">@i</td>} else {<td>}
       </tr>
       }
     </tbody>
