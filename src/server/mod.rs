@@ -367,7 +367,6 @@ fn custom_or_404(e: diesel::result::Error) -> Rejection {
 
 fn redirect(url: &str) -> Result<Response<Vec<u8>>, Rejection> {
     use warp::http::header::LOCATION;
-    use warp::http::status::StatusCode;
     let msg = format!("Try {:?}", url);
     Response::builder()
         .status(StatusCode::PERMANENT_REDIRECT)
@@ -395,7 +394,6 @@ fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
 }
 
 fn sortable_issue() -> SqlLiteral<SmallInt> {
-    use diesel::dsl::sql;
     sql("(year-1950)*64 + number")
 }
 
