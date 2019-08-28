@@ -76,13 +76,18 @@ impl Creator {
 }
 
 impl ToHtml for Creator {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         write!(out, "<a href='/who/{}'>{}</a>", self.slug, self.name)
     }
 }
 
 impl CloudItem for Creator {
-    fn write_item(&self, out: &mut Write, n: i64, w: u8) -> io::Result<()> {
+    fn write_item(
+        &self,
+        out: &mut dyn Write,
+        n: i64,
+        w: u8,
+    ) -> io::Result<()> {
         write!(
             out,
             "<a href='/who/{}' class='w{}' data-n='{}'>",

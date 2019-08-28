@@ -137,7 +137,7 @@ pub struct OrigEpisode<'a> {
 }
 
 impl<'a> ToHtml for OrigEpisode<'a> {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         write!(
             out,
             "{} originalets titel: <i lang='{}'>",
@@ -170,7 +170,7 @@ impl OrigDates {
 }
 
 impl ToHtml for OrigDates {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         match (self.from, self.to) {
             (Some(from), Some(to)) if from != to => write!(
                 out,

@@ -25,7 +25,12 @@ pub use self::refkeyset::RefKeySet;
 pub use self::title::Title;
 
 pub trait CloudItem: Ord {
-    fn write_item(&self, out: &mut Write, n: i64, w: u8) -> io::Result<()>;
+    fn write_item(
+        &self,
+        out: &mut dyn Write,
+        n: i64,
+        w: u8,
+    ) -> io::Result<()>;
 }
 
 pub struct Cloud<T: CloudItem> {
@@ -46,7 +51,7 @@ impl<T: CloudItem> Cloud<T> {
 }
 
 impl<T: CloudItem> ToHtml for Cloud<T> {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if let Some((last, titles)) = self.data.split_last() {
             for (item, n, w) in titles {
                 item.write_item(out, *n, *w)?;

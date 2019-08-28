@@ -30,8 +30,8 @@ impl Paginator {
 }
 
 impl ToHtml for Paginator {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
-        fn one(out: &mut Write, p: usize, pp: usize) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
+        fn one(out: &mut dyn Write, p: usize, pp: usize) -> io::Result<()> {
             if p == pp {
                 write!(out, "<b>{}</b>", p)?;
             } else {

@@ -54,7 +54,7 @@ impl CreatorSet {
 }
 
 impl ToHtml for CreatorSet {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if !self.0.is_empty() {
             write!(out, "<p class='info creators'>")?;
             let roles = [

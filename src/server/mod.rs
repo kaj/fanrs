@@ -410,9 +410,9 @@ impl YearLinks {
 }
 
 impl ToHtml for YearLinks {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         let shown = self.shown;
-        let one = |out: &mut Write, y: u16| -> io::Result<()> {
+        let one = |out: &mut dyn Write, y: u16| -> io::Result<()> {
             if y == shown {
                 write!(out, "<b>{}</b>", y)?;
             } else {

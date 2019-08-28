@@ -77,7 +77,12 @@ impl Ord for Title {
 }
 
 impl CloudItem for Title {
-    fn write_item(&self, out: &mut Write, n: i64, w: u8) -> io::Result<()> {
+    fn write_item(
+        &self,
+        out: &mut dyn Write,
+        n: i64,
+        w: u8,
+    ) -> io::Result<()> {
         write!(
             out,
             "<a href='/titles/{}' class='w{}' data-n='{}'>",

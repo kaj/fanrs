@@ -83,7 +83,7 @@ impl Part {
 }
 
 impl ToHtml for Part {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if !(self.no.is_some() || self.name.is_some()) {
             return Ok(());
         }
@@ -105,7 +105,7 @@ impl ToHtml for Part {
 pub struct PartInIssue(pub IssueRef, pub Part);
 
 impl ToHtml for PartInIssue {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         self.0.to_html(out)?;
         if self.1.is_some() {
             write!(out, " (")?;

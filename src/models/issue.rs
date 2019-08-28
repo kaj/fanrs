@@ -170,7 +170,7 @@ impl PartialOrd for IssueRef {
 }
 
 impl ToHtml for IssueRef {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         write!(
             out,
             "<a href='/{y}#i{n}'>Fa {ns}/{y}</a>",

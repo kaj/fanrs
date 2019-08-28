@@ -235,7 +235,7 @@ impl Queryable<(SmallInt, Text, Text), Pg> for RefKey {
 }
 
 impl ToHtml for RefKey {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         out.write_all(b"<a href=\"")?;
         self.url().to_html(out)?;
         write!(
@@ -261,7 +261,12 @@ impl PartialOrd for RefKey {
 }
 
 impl CloudItem for RefKey {
-    fn write_item(&self, out: &mut Write, n: i64, w: u8) -> io::Result<()> {
+    fn write_item(
+        &self,
+        out: &mut dyn Write,
+        n: i64,
+        w: u8,
+    ) -> io::Result<()> {
         write!(
             out,
             "<a href='{}' class='w{}' data-n='{}'>",

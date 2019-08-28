@@ -77,7 +77,7 @@ impl PartsPublished {
 pub struct SmallPartsPublished<'a>(&'a PartsPublished);
 
 impl ToHtml for PartsPublished {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if let Some((last, pubs)) = self.issues.split_last() {
             out.write_all(b"<p class='info pub'>")?;
             if self.others {
@@ -97,7 +97,7 @@ impl ToHtml for PartsPublished {
 }
 
 impl<'a> ToHtml for SmallPartsPublished<'a> {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if let Some((last, pubs)) = self.0.issues.split_last() {
             out.write_all(b"<small class='pub'>")?;
             for p in pubs {

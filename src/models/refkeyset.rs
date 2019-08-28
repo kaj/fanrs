@@ -48,7 +48,7 @@ impl RefKeySet {
 }
 
 impl ToHtml for RefKeySet {
-    fn to_html(&self, out: &mut Write) -> io::Result<()> {
+    fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if let Some((last_ref, refs)) = self.0.split_last() {
             out.write_all(b"<p class='info refs'>Referenser: ")?;
             for r in refs {
