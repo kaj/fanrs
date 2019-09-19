@@ -23,11 +23,7 @@ use structopt::StructOpt;
 use time;
 
 #[derive(StructOpt)]
-#[structopt(
-    name = "fanrs",
-    about = "Manage and serve index of the Phantom comic books.",
-    rename_all = "kebab-case"
-)]
+#[structopt(about, author)]
 struct Fanrs {
     /// How to connect to the postgres database.
     #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
@@ -38,7 +34,6 @@ struct Fanrs {
 }
 
 #[derive(StructOpt)]
-#[structopt(rename_all = "kebab-case")]
 enum Command {
     /// Read data from xml content files.
     ReadFiles {

@@ -2,7 +2,7 @@
 name = "fanrs"
 version = "0.3.5-PRE"
 authors = ["Rasmus Kaj <kaj@kth.se>"]
-description = "Rust version of fantomenindex.krats.se"
+description = "Manage and serve index of the Phantom comic books, fantomenindex.krats.se"
 edition = "2018"
 
 build = "src/build.rs"
@@ -22,7 +22,7 @@ reqwest = "0.9.9"
 serde = { version = "1.0.88", features = ["derive"] }
 scraper = "0.10.0"
 slug = "0.1.4"
-structopt = { version = "0.2.14", features = ["wrap_help"] }
+structopt = { version = "0.3.2", features = ["wrap_help"] }
 time = "0.1.42"
 warp = "0.1.9"
 xmltree = "0.8.0"
