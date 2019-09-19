@@ -93,7 +93,7 @@ impl CloudItem for Title {
     }
 }
 
-static DAYSTRIPS: [&'static str; 7] = [
+static DAYSTRIPS: [&str; 7] = [
     "blixt-gordon",
     "fantomen",
     "johnny-hazard",
@@ -103,7 +103,7 @@ static DAYSTRIPS: [&'static str; 7] = [
     "rick-o-shay",
 ];
 
-static SUNDAYS: [&'static str; 5] = [
+static SUNDAYS: [&str; 5] = [
     "fantomen",
     "johnny-hazard",
     "ludvig",

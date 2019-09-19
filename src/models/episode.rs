@@ -208,10 +208,10 @@ impl<'a> fmt::Display for SvDate<'a> {
     }
 }
 
-static LONG_WEEKDAYS: [&'static str; 7] = [
+static LONG_WEEKDAYS: [&str; 7] = [
     "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag",
 ];
-static LONG_MONTHS: [&'static str; 12] = [
+static LONG_MONTHS: [&str; 12] = [
     "januari",
     "februari",
     "mars",
