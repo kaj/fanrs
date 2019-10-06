@@ -20,7 +20,7 @@ io-result-optional = "0.1.2"
 mime = "0.3"
 reqwest = "0.9.9"
 serde = { version = "1.0.88", features = ["derive"] }
-scraper = "0.10.0"
+scraper = "0.11.0"
 slug = "0.1.4"
 structopt = { version = "0.3.2", features = ["wrap_help"] }
 time = "0.1.42"
