@@ -13,6 +13,8 @@ mod server;
 use crate::checkstrips::check_strips;
 use crate::fetchcovers::fetch_covers;
 use crate::listissues::list_issues;
+use chrono::offset::Local;
+use chrono::Datelike;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
@@ -20,7 +22,6 @@ use failure::format_err;
 use std::path::PathBuf;
 use std::process::exit;
 use structopt::StructOpt;
-use time;
 
 #[derive(StructOpt)]
 #[structopt(about, author)]
@@ -97,7 +98,7 @@ fn run() -> Result<(), failure::Error> {
             let db = opt.get_db()?;
             readfiles::read_persondata(&basedir, &db)?;
             if *all {
-                let current_year = 1900 + time::now().tm_year as i16;
+                let current_year = Local::now().year() as i16;
                 for year in 1950..=current_year {
                     readfiles::load_year(&basedir, year, &db)?;
                 }
