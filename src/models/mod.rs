@@ -9,6 +9,7 @@ mod episode;
 mod issue;
 mod other_mag;
 mod part;
+mod price;
 mod refkey;
 mod refkeyset;
 mod title;

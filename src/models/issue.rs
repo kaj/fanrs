@@ -1,5 +1,5 @@
+use super::price::Price;
 use crate::templates::ToHtml;
-use bigdecimal::BigDecimal;
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -16,7 +16,7 @@ pub struct Issue {
     pub number: i16,
     pub number_str: String,
     pub pages: Option<i16>,
-    pub price: Option<BigDecimal>,
+    pub price: Option<Price>,
     pub cover_best: Option<i16>,
 }
 
@@ -31,7 +31,7 @@ impl Issue {
         year: i16,
         number: Nr,
         pages: Option<i16>,
-        price: Option<BigDecimal>,
+        price: Option<Price>,
         cover_best: Option<i16>,
         db: &PgConnection,
     ) -> Result<Issue, Error> {

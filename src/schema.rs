@@ -109,7 +109,7 @@ table! {
         number -> Int2,
         number_str -> Varchar,
         pages -> Nullable<Int2>,
-        price -> Nullable<Numeric>,
+        price -> Nullable<Int4>,
         cover_best -> Nullable<Int2>,
     }
 }

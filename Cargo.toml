@@ -11,9 +11,8 @@ build = "src/build.rs"
 ructe = { version = "0.7.2", features = ["sass", "mime03", "warp"] }
 
 [dependencies]
-bigdecimal = "0.0.14"
 chrono = "0.4.6"
-diesel = { version = "1.4.0", features = ["chrono", "numeric", "r2d2", "postgres"] }
+diesel = { version = "1.4.0", features = ["chrono", "r2d2", "postgres"] }
 dotenv = "0.14.1"
 failure = "0.1.5"
 io-result-optional = "0.1.2"
