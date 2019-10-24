@@ -202,7 +202,7 @@ impl Nr {
 
 impl fmt::Display for Nr {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
-        write!(out, "{}", self.nr_str)
+        self.nr_str.fmt(out)
     }
 }
 

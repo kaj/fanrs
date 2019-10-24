@@ -3,6 +3,7 @@
 extern crate diesel;
 
 mod checkstrips;
+mod count_pages;
 mod fetchcovers;
 mod listissues;
 mod models;
@@ -65,6 +66,9 @@ enum Command {
     /// daystrips or sunday pages, this routine checks that those
     /// assumptions are correct with the database values.
     CheckStrips,
+
+    /// Calculate number of pages from a yearbook toc.
+    CountPages(count_pages::CountPages)
 }
 
 impl Fanrs {
@@ -119,6 +123,7 @@ fn run() -> Result<(), failure::Error> {
         Command::RunServer => server::run(&opt.db_url),
         Command::FetchCovers => fetch_covers(&opt.get_db()?),
         Command::CheckStrips => check_strips(&opt.get_db()?),
+        Command::CountPages(args) => Ok(args.run()),
     }
 }
 
