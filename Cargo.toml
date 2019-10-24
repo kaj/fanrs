@@ -13,7 +13,7 @@ ructe = { version = "0.7.2", features = ["sass", "mime03", "warp"] }
 [dependencies]
 chrono = "0.4.6"
 diesel = { version = "1.4.0", features = ["chrono", "r2d2", "postgres"] }
-dotenv = "0.14.1"
+dotenv = "0.15.0"
 failure = "0.1.5"
 io-result-optional = "0.1.2"
 mime = "0.3"
