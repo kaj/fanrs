@@ -68,7 +68,7 @@ enum Command {
     CheckStrips,
 
     /// Calculate number of pages from a yearbook toc.
-    CountPages(count_pages::CountPages)
+    CountPages(count_pages::CountPages),
 }
 
 impl Fanrs {

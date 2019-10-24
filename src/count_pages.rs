@@ -1,5 +1,5 @@
-use structopt::StructOpt;
 use crate::models::Nr;
+use structopt::StructOpt;
 
 #[derive(StructOpt)]
 pub struct CountPages {
