@@ -88,7 +88,7 @@ fn run() -> Result<(), failure::Error> {
 
     match opt.cmd {
         Command::ReadFiles(ref args) => args.run(&opt.get_db()?),
-        Command::ListIssues => list_issues(&opt.get_db()?),
+        Command::ListIssues => Ok(list_issues(&opt.get_db()?)?),
         Command::RunServer => server::run(&opt.db_url),
         Command::FetchCovers => fetch_covers(&opt.get_db()?),
         Command::CheckStrips => check_strips(&opt.get_db()?),

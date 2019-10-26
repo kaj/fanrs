@@ -3,7 +3,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use failure::Error;
+use diesel::result::Error;
 use std::collections::BTreeMap;
 
 pub fn list_issues(db: &PgConnection) -> Result<(), Error> {
