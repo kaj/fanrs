@@ -14,13 +14,10 @@ mod server;
 use crate::checkstrips::check_strips;
 use crate::fetchcovers::fetch_covers;
 use crate::listissues::list_issues;
-use chrono::offset::Local;
-use chrono::Datelike;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use failure::format_err;
-use std::path::PathBuf;
 use std::process::exit;
 use structopt::StructOpt;
 
@@ -38,19 +35,8 @@ struct Fanrs {
 #[derive(StructOpt)]
 enum Command {
     /// Read data from xml content files.
-    ReadFiles {
-        /// The directory containing the data files.
-        #[structopt(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
-        basedir: PathBuf,
+    ReadFiles(readfiles::Args),
 
-        /// Read data for all years, from 1950 to current.
-        #[structopt(long, short)]
-        all: bool,
-
-        /// Year(s) to read data for.
-        #[structopt(name = "year")]
-        years: Vec<u32>,
-    },
     /// List known comic book issues (in compact format).
     ListIssues,
 
@@ -94,31 +80,7 @@ fn run() -> Result<(), failure::Error> {
     let opt = Fanrs::from_args();
 
     match opt.cmd {
-        Command::ReadFiles {
-            ref basedir,
-            ref all,
-            ref years,
-        } => {
-            let db = opt.get_db()?;
-            readfiles::read_persondata(&basedir, &db)?;
-            if *all {
-                let current_year = Local::now().year() as i16;
-                for year in 1950..=current_year {
-                    readfiles::load_year(&basedir, year, &db)?;
-                }
-            } else {
-                if years.is_empty() {
-                    return Err(format_err!(
-                        "No year(s) to read files for given."
-                    ));
-                }
-                for year in years {
-                    readfiles::load_year(&basedir, *year as i16, &db)?;
-                }
-            }
-            readfiles::delete_unpublished(&db)?;
-            Ok(())
-        }
+        Command::ReadFiles(ref args) => args.run(&opt.get_db()?),
         Command::ListIssues => list_issues(&opt.get_db()?),
         Command::RunServer => server::run(&opt.db_url),
         Command::FetchCovers => fetch_covers(&opt.get_db()?),

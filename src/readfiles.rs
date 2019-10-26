@@ -1,22 +1,62 @@
 use crate::models::{
     Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
 };
-use chrono::NaiveDate;
+use chrono::offset::Local;
+use chrono::{Datelike, NaiveDate};
 use diesel::prelude::*;
 use failure::{format_err, Error};
 use io_result_optional::IoResultOptional;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 use xmltree::Element;
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
+#[derive(StructOpt)]
+pub struct Args {
+    /// The directory containing the data files.
+    #[structopt(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
+    basedir: PathBuf,
+
+    /// Read data for all years, from 1950 to current.
+    #[structopt(long, short)]
+    all: bool,
+
+    /// Year(s) to read data for.
+    #[structopt(name = "year")]
+    years: Vec<u32>,
+}
+
+impl Args {
+    pub fn run(&self, db: &PgConnection) -> Result<()> {
+        read_persondata(&self.basedir, &db)?;
+        if self.all {
+            let current_year = Local::now().year() as i16;
+            for year in 1950..=current_year {
+                load_year(&self.basedir, year, &db)?;
+            }
+        } else {
+            if self.years.is_empty() {
+                return Err(format_err!(
+                    "No year(s) to read files for given."
+                ));
+            }
+            for year in &self.years {
+                load_year(&self.basedir, *year as i16, &db)?;
+            }
+        }
+        delete_unpublished(&db)?;
+        Ok(())
+    }
+}
+
+fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     do_load_year(base, year, db)
         .map_err(|e| format_err!("Error reading data for {}: {}", year, e))
 }
 
-pub fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
+fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     if let Some(file) =
         File::open(base.join(format!("{}.data", year))).optional()?
     {
@@ -357,7 +397,7 @@ fn get_creators(by: &Element, db: &PgConnection) -> Result<Vec<Creator>> {
     }
 }
 
-pub fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
+fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
     use crate::schema::creator_aliases::dsl as ca;
     use crate::schema::creators::dsl as c;
     use slug::slugify;
@@ -421,7 +461,7 @@ pub fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
     Ok(())
 }
 
-pub fn delete_unpublished(db: &PgConnection) -> Result<()> {
+fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::dsl as a;
     use crate::schema::articles_by::dsl as ab;
