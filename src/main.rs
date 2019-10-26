@@ -66,6 +66,14 @@ impl Fanrs {
 }
 
 fn main() {
+    match dotenv() {
+        Ok(_) => (),
+        Err(ref err) if err.not_found() => (),
+        Err(err) => {
+            eprintln!("Failed to read env: {}", err);
+            exit(1);
+        }
+    }
     match run() {
         Ok(()) => (),
         Err(error) => {
@@ -76,7 +84,6 @@ fn main() {
 }
 
 fn run() -> Result<(), failure::Error> {
-    opt_dotenv()?;
     let opt = Fanrs::from_args();
 
     match opt.cmd {
@@ -86,15 +93,6 @@ fn run() -> Result<(), failure::Error> {
         Command::FetchCovers => fetch_covers(&opt.get_db()?),
         Command::CheckStrips => check_strips(&opt.get_db()?),
         Command::CountPages(args) => Ok(args.run()),
-    }
-}
-
-/// Normal dotenv, but if the file .env is not found, that is not an error.
-fn opt_dotenv() -> Result<(), dotenv::Error> {
-    match dotenv() {
-        Ok(_) => Ok(()),
-        Err(ref err) if err.not_found() => Ok(()),
-        Err(err) => Err(err),
     }
 }
 
