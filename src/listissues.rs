@@ -18,8 +18,22 @@ pub fn list_issues(db: &PgConnection) -> Result<(), Error> {
     {
         all.entry(year).or_default().push(number);
     }
+
+    println!(
+        "# Indexerade tidningar ({:?} stycken)",
+        all.iter()
+            .map(|(_, issues)| issues.len())
+            .fold(0, |n, sum| sum + n),
+    );
+    println!();
+
+    let mut decade = 0;
     for (year, numbers) in &all {
-        print!("{}: ", year);
+        if year / 10 != decade {
+            decade = year / 10;
+            println!("{}0", decade);
+        }
+        print!("- {}: ", year);
         let mut iter = numbers.iter().peekable();
         while let Some(n) = iter.next() {
             let mut end = n;
