@@ -8,11 +8,10 @@ edition = "2018"
 build = "src/build.rs"
 
 [build-dependencies]
-ructe = { version = "0.7.2", features = ["sass", "mime03", "warp"] }
+ructe = { version = "0.8.0", features = ["sass", "mime03", "warp"] }
 
 [dependencies]
 chrono = "0.4.6"
-diesel = { version = "1.4.0", features = ["chrono", "r2d2", "postgres"] }
 dotenv = "0.15.0"
 failure = "0.1.5"
 io-result-optional = "0.1.2"
@@ -24,3 +23,8 @@ slug = "0.1.4"
 structopt = { version = "0.3.2", features = ["wrap_help"] }
 warp = "0.1.9"
 xmltree = "0.8.0"
+
+[dependencies.diesel]
+version = "1.4.0"
+default-features = false # get rid of 32-column-tables support
+features = ["chrono", "r2d2", "postgres"]
