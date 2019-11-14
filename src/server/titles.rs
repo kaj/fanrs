@@ -99,17 +99,17 @@ fn one_title(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db).unwrap();
-            let creators = CreatorSet::for_article(&article, &db).unwrap();
+            let refs = RefKeySet::for_article(&article, &db)?;
+            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
-                .load::<IssueRef>(&db)
-                .unwrap();
-            (article, refs, creators, published)
+                .load::<IssueRef>(&db)?;
+            Ok((article, refs, creators, published))
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, failure::Error>>()
+        .map_err(custom)?;
 
     let episodes = e::episodes
         .filter(e::title.eq(title.id))

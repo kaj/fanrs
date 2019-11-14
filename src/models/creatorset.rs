@@ -1,7 +1,7 @@
 use super::{Article, Creator, Episode};
 use crate::templates::ToHtml;
 use diesel::prelude::*;
-use failure::Error;
+use diesel::result::Error;
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 

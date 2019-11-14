@@ -113,17 +113,17 @@ fn one_creator(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db).unwrap();
-            let creators = CreatorSet::for_article(&article, &db).unwrap();
+            let refs = RefKeySet::for_article(&article, &db)?;
+            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
-                .load::<IssueRef>(&db)
-                .unwrap();
-            (article, refs, creators, published)
+                .load::<IssueRef>(&db)?;
+            Ok((article, refs, creators, published))
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, diesel::result::Error>>()
+        .map_err(custom)?;
 
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
     let main_episodes = e::episodes
@@ -156,17 +156,17 @@ fn one_creator(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db).unwrap();
-            let creators = CreatorSet::for_article(&article, &db).unwrap();
+            let refs = RefKeySet::for_article(&article, &db)?;
+            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
-                .load::<IssueRef>(&db)
-                .unwrap();
-            (article, refs, creators, published)
+                .load::<IssueRef>(&db)?;
+            Ok((article, refs, creators, published))
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, diesel::result::Error>>()
+        .map_err(custom)?;
 
     let covers = CoverSet::by(&creator, &db).map_err(custom)?;
     let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;

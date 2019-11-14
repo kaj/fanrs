@@ -26,14 +26,14 @@ impl PartsPublished {
     pub fn for_episode(
         episode: &Episode,
         db: &PgConnection,
-    ) -> Result<PartsPublished, Error> {
+    ) -> Result<PartsPublished, diesel::result::Error> {
         PartsPublished::for_episode_id(episode.id, db)
     }
 
     pub fn for_episode_id(
         episode: i32,
         db: &PgConnection,
-    ) -> Result<PartsPublished, Error> {
+    ) -> Result<PartsPublished, diesel::result::Error> {
         Ok(PartsPublished {
             issues: i::issues
                 .inner_join(p::publications.inner_join(ep::episode_parts))
@@ -138,8 +138,7 @@ impl OtherContribs {
 
         let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (title, episode_id, episode) in other_episodes {
-            let published =
-                PartsPublished::for_episode_id(episode_id, db).unwrap();
+            let published = PartsPublished::for_episode_id(episode_id, db)?;
             oe.entry(title).or_default().push((episode, published));
         }
 

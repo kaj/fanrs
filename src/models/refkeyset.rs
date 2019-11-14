@@ -1,7 +1,7 @@
 use super::{Article, Episode, IdRefKey, RefKey};
 use crate::templates::ToHtml;
 use diesel::prelude::*;
-use failure::Error;
+use diesel::result::Error;
 use std::io::{self, Write};
 
 #[derive(Debug)]
