@@ -1,43 +1,90 @@
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
+use crate::DbOpt;
 use diesel::dsl::now;
+use diesel::pg::upsert::excluded;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use failure::{format_err, Error};
 use reqwest::{Client, Response};
 use scraper::{Html, Selector};
+use structopt::StructOpt;
 
-pub fn fetch_covers(db: &PgConnection) -> Result<(), Error> {
-    let mut client = WikiClient::new();
-    for (id, year, number_str) in i::issues
-        .left_join(c::covers)
-        .filter(c::image.is_null())
-        .select((i::id, i::year, i::number_str))
-        .order((i::year.desc(), i::number.desc()))
-        .load::<(i32, i16, String)>(db)?
-    {
-        match client.fetchcover(year, &number_str) {
-            Ok(imgdata) => {
-                diesel::insert_into(c::covers)
-                    .values((
-                        c::issue.eq(id),
-                        c::image.eq(&imgdata),
-                        c::fetch_time.eq(now),
-                    ))
-                    .execute(db)?;
-                eprintln!(
-                    "Got {} bytes of image data for {}/{}",
-                    imgdata.len(),
-                    number_str,
-                    year,
-                );
+#[derive(StructOpt)]
+pub struct Args {
+    #[structopt(flatten)]
+    db: DbOpt,
+
+    /// No operation, only check which covers would be fetched.
+    #[structopt(long)]
+    no_op: bool,
+
+    /// Update some of the oldest fetched covers, as there may be
+    /// updated scans on the phantom wiki.
+    #[structopt(long)]
+    update_old: bool,
+}
+
+impl Args {
+    pub fn run(&self) -> Result<(), Error> {
+        let db = self.db.get_db()?;
+        let mut client = WikiClient::new();
+        let query = i::issues
+            .select((i::id, i::year, i::number_str))
+            .left_join(c::covers);
+        let query = if self.update_old {
+            query.order(c::fetch_time.asc()).limit(10).into_boxed()
+        } else {
+            query
+                .filter(c::image.is_null())
+                .order((i::year.desc(), i::number.desc()))
+                .into_boxed()
+        };
+        for (id, year, number_str) in query.load::<(i32, i16, String)>(&db)? {
+            if self.no_op {
+                println!("Would load cover {:>2}/{}.", number_str, year);
+            } else {
+                load_cover(&mut client, &db, id, year, &number_str)?;
             }
-            Err(err) => {
-                eprintln!(
-                    "Failed to fetch cover for {}/{}: {}",
-                    number_str, year, err,
-                );
-            }
+        }
+        Ok(())
+    }
+}
+
+fn load_cover(
+    client: &mut WikiClient,
+    db: &PgConnection,
+    id: i32,
+    year: i16,
+    number_str: &str,
+) -> Result<(), Error> {
+    match client.fetchcover(year, number_str) {
+        Ok(imgdata) => {
+            diesel::insert_into(c::covers)
+                .values((
+                    c::issue.eq(id),
+                    c::image.eq(&imgdata),
+                    c::fetch_time.eq(now),
+                ))
+                .on_conflict(c::issue)
+                .do_update()
+                .set((
+                    c::image.eq(excluded(c::image)),
+                    c::fetch_time.eq(excluded(c::fetch_time)),
+                ))
+                .execute(db)?;
+            eprintln!(
+                "Got {} bytes of image data for {}/{}",
+                imgdata.len(),
+                number_str,
+                year,
+            );
+        }
+        Err(err) => {
+            eprintln!(
+                "Failed to fetch cover for {}/{}: {}",
+                number_str, year, err,
+            );
         }
     }
     Ok(())

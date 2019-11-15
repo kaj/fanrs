@@ -1,6 +1,7 @@
 use crate::models::{
     Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
 };
+use crate::DbOpt;
 use chrono::offset::Local;
 use chrono::{Datelike, NaiveDate};
 use diesel::prelude::*;
@@ -15,6 +16,9 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(StructOpt)]
 pub struct Args {
+    #[structopt(flatten)]
+    db: DbOpt,
+
     /// The directory containing the data files.
     #[structopt(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
     basedir: PathBuf,
@@ -29,7 +33,8 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn run(&self, db: &PgConnection) -> Result<()> {
+    pub fn run(&self) -> Result<()> {
+        let db = self.db.get_db()?;
         read_persondata(&self.basedir, &db)?;
         if self.all {
             let current_year = Local::now().year() as i16;

@@ -12,53 +12,62 @@ mod schema;
 mod server;
 
 use crate::checkstrips::check_strips;
-use crate::fetchcovers::fetch_covers;
 use crate::listissues::list_issues;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
-use failure::format_err;
+use failure::{format_err, Error};
 use std::process::exit;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(about, author)]
-struct Fanrs {
-    /// How to connect to the postgres database.
-    #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
-    db_url: String,
-
-    #[structopt(subcommand)]
-    cmd: Command,
-}
-
-#[derive(StructOpt)]
-enum Command {
+enum Fanrs {
     /// Read data from xml content files.
     ReadFiles(readfiles::Args),
 
     /// List known comic book issues (in compact format).
-    ListIssues,
+    ListIssues(DbOpt),
 
     /// Run the web server.
-    RunServer,
+    RunServer(DbOpt),
 
     /// Fetch missing cover images from phantomwiki.
-    FetchCovers,
+    FetchCovers(fetchcovers::Args),
 
     /// Check assumptions about which titles has daystrips and/or sunday pages.
     ///
     /// The code contains hardcoded lists of which comics has
     /// daystrips or sunday pages, this routine checks that those
     /// assumptions are correct with the database values.
-    CheckStrips,
+    CheckStrips(DbOpt),
 
     /// Calculate number of pages from a yearbook toc.
     CountPages(count_pages::CountPages),
 }
 
 impl Fanrs {
-    fn get_db(&self) -> Result<PgConnection, failure::Error> {
+    fn run(&self) -> Result<(), Error> {
+        match self {
+            Fanrs::ReadFiles(args) => args.run(),
+            Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
+            Fanrs::RunServer(db) => server::run(&db.db_url),
+            Fanrs::FetchCovers(args) => args.run(),
+            Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
+            Fanrs::CountPages(args) => Ok(args.run()),
+        }
+    }
+}
+
+#[derive(StructOpt)]
+struct DbOpt {
+    /// How to connect to the postgres database.
+    #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
+    db_url: String,
+}
+
+impl DbOpt {
+    fn get_db(&self) -> Result<PgConnection, Error> {
         PgConnection::establish(&self.db_url).map_err(|e| {
             format_err!("Failed to establish postgres connection: {}", e)
         })
@@ -74,25 +83,12 @@ fn main() {
             exit(1);
         }
     }
-    match run() {
+    match Fanrs::from_args().run() {
         Ok(()) => (),
         Err(error) => {
             eprintln!("Error: {}", error);
             exit(1);
         }
-    }
-}
-
-fn run() -> Result<(), failure::Error> {
-    let opt = Fanrs::from_args();
-
-    match opt.cmd {
-        Command::ReadFiles(ref args) => args.run(&opt.get_db()?),
-        Command::ListIssues => Ok(list_issues(&opt.get_db()?)?),
-        Command::RunServer => server::run(&opt.db_url),
-        Command::FetchCovers => fetch_covers(&opt.get_db()?),
-        Command::CheckStrips => check_strips(&opt.get_db()?),
-        Command::CountPages(args) => Ok(args.run()),
     }
 }
 
