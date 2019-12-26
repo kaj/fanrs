@@ -54,7 +54,7 @@ impl Fanrs {
             Fanrs::RunServer(db) => server::run(&db.db_url),
             Fanrs::FetchCovers(args) => args.run(),
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
-            Fanrs::CountPages(args) => Ok(args.run()),
+            Fanrs::CountPages(args) => args.run(),
         }
     }
 }
