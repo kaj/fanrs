@@ -14,8 +14,7 @@ impl CountPages {
     pub fn run(&self) -> Result<(), Error> {
         let mut issue = self.issue.clone();
         let mut page = self.pages.iter();
-        let mut prev = page.next()
-            .ok_or(format_err!("Too few arguments"))?;
+        let mut prev = page.next().ok_or(format_err!("Too few arguments"))?;
         while let Some(page) = page.next() {
             if page <= prev {
                 return Err(format_err!("Page numbers must increase"));
