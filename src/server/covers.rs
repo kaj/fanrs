@@ -1,12 +1,13 @@
-use super::{custom, custom_or_404, redirect, PooledPg};
+use super::{custom, redirect, PooledPg};
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
+use crate::templates::statics::xcover_jpg;
 use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use mime::IMAGE_JPEG;
 use std::str::FromStr;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
-use warp::http::Response;
+use warp::http::{Response, StatusCode};
 use warp::reject::not_found;
 use warp::{Rejection, Reply};
 
@@ -21,12 +22,21 @@ pub fn cover_image(
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
         .first::<Vec<u8>>(&db)
-        .map_err(custom_or_404)?;
-    let medium_expires = Utc::now() + Duration::days(90);
-    Ok(Response::builder()
-        .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
-        .header(EXPIRES, medium_expires.to_rfc2822())
-        .body(data))
+        .optional()
+        .map_err(custom)?;
+
+    if let Some(data) = data {
+        let medium_expires = Utc::now() + Duration::days(90);
+        Ok(Response::builder()
+            .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
+            .header(EXPIRES, medium_expires.to_rfc2822())
+            .body(data))
+    } else {
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(CONTENT_TYPE, xcover_jpg.mime.as_ref())
+            .body(xcover_jpg.content.to_vec()))
+    }
 }
 
 pub struct CoverRef {
