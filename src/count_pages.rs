@@ -4,9 +4,9 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 pub struct CountPages {
-    /// Issue followed by page number where it and following issues
-    /// are starting.
+    /// The issue starting at the first given page number.
     issue: Nr,
+    /// Page numbers where new issues start.
     pages: Vec<u16>,
 }
 
