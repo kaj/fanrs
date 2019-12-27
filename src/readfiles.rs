@@ -77,11 +77,13 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
                         e
                     )
                 })?,
-                other => Err(format_err!(
-                    "Unexpected element {:?} in year {}",
-                    other,
-                    year,
-                ))?,
+                other => {
+                    return Err(format_err!(
+                        "Unexpected element {:?} in year {}",
+                        other,
+                        year,
+                    ))
+                }
             }
         }
     } else {
@@ -127,11 +129,13 @@ fn register_issue(year: i16, i: &Element, db: &PgConnection) -> Result<()> {
             "text" => register_article(&issue, seqno, &c, db)?,
             "serie" => register_serie(&issue, seqno, &c, db)?,
             "skick" => (), // ignore
-            _ => Err(format_err!(
-                "Unexpected element {:?} in issue {}",
-                c,
-                issue,
-            ))?,
+            _ => {
+                return Err(format_err!(
+                    "Unexpected element {:?} in issue {}",
+                    c,
+                    issue,
+                ))
+            }
         }
     }
     Ok(())
@@ -172,7 +176,7 @@ fn register_article(
                 }
             }
             "ref" => article.set_refs(&parse_refs(&e.children)?, db)?,
-            _other => Err(format_err!("Unknown {:?} in text", e))?,
+            _other => return Err(format_err!("Unknown {:?} in text", e)),
         }
     }
     Ok(())
@@ -296,7 +300,7 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 }
-                _other => Err(format_err!("Unknown prevpub {:?}", e))?,
+                _other => return Err(format_err!("Unknown prevpub {:?}", e)),
             },
             "daystrip" => {
                 if let Some(from) = get_text(e, "from") {
@@ -323,10 +327,10 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 } else {
-                    Err(format_err!("Unknown daystrip {:?}", e))?;
+                    return Err(format_err!("Unknown daystrip {:?}", e));
                 }
             }
-            _other => Err(format_err!("Unknown {:?} in serie", e))?,
+            _other => return Err(format_err!("Unknown {:?} in serie", e)),
         }
     }
     Ok(())
