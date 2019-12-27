@@ -47,7 +47,7 @@ enum Fanrs {
 }
 
 impl Fanrs {
-    fn run(&self) -> Result<(), Error> {
+    fn run(self) -> Result<(), Error> {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),

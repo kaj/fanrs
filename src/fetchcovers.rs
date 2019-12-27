@@ -26,7 +26,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn run(&self) -> Result<(), Error> {
+    pub fn run(self) -> Result<(), Error> {
         let db = self.db.get_db()?;
         let mut client = WikiClient::new();
         let query = i::issues

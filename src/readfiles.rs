@@ -2,8 +2,7 @@ use crate::models::{
     Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
 };
 use crate::DbOpt;
-use chrono::offset::Local;
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate};
 use diesel::prelude::*;
 use failure::{format_err, Error};
 use io_result_optional::IoResultOptional;
@@ -33,7 +32,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn run(&self) -> Result<()> {
+    pub fn run(self) -> Result<()> {
         let db = self.db.get_db()?;
         read_persondata(&self.basedir, &db)?;
         if self.all {
@@ -47,8 +46,8 @@ impl Args {
                     "No year(s) to read files for given."
                 ));
             }
-            for year in &self.years {
-                load_year(&self.basedir, *year as i16, &db)?;
+            for year in self.years {
+                load_year(&self.basedir, year as i16, &db)?;
             }
         }
         delete_unpublished(&db)?;

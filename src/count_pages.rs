@@ -11,8 +11,8 @@ pub struct CountPages {
 }
 
 impl CountPages {
-    pub fn run(&self) -> Result<(), Error> {
-        let mut issue = self.issue.clone();
+    pub fn run(self) -> Result<(), Error> {
+        let mut issue = self.issue;
         for pages in self.pages.windows(2) {
             // Irrefutable, because pages are 2-windows of a slice.
             if let [start, end] = pages {
