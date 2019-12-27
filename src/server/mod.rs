@@ -190,6 +190,7 @@ pub struct PublishedInfo {
     pub classnames: &'static str,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum PublishedContent {
     Text {
         article: Article,
