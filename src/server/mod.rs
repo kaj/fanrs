@@ -222,10 +222,7 @@ impl FullEpisode {
         let refs = RefKeySet::for_episode(&episode, db)?;
         let creators = CreatorSet::for_episode(&episode, db)?;
         let published = PartsPublished::for_episode(&episode, db)?;
-        let orig_mag = episode
-            .orig_mag_id
-            .map(|id| OtherMag::get_by_id(id, db))
-            .transpose()?;
+        let orig_mag = episode.load_orig_mag(db)?;
         Ok(FullEpisode {
             episode,
             refs,
@@ -244,10 +241,7 @@ impl FullEpisode {
         let creators = CreatorSet::for_episode(&episode, db)?;
         let published =
             PartsPublished::for_episode_except(&episode, issue, db)?;
-        let orig_mag = episode
-            .orig_mag_id
-            .map(|id| OtherMag::get_by_id(id, db))
-            .transpose()?;
+        let orig_mag = episode.load_orig_mag(db)?;
         Ok(FullEpisode {
             episode,
             refs,

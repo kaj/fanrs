@@ -1,4 +1,4 @@
-use super::{RefKey, Title};
+use super::{OtherMag, RefKey, Title};
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
 use diesel;
@@ -18,12 +18,12 @@ pub struct Episode {
     pub copyright: Option<String>,
     orig_lang: Option<String>,
     orig_episode: Option<String>,
-    pub orig_date: Option<NaiveDate>,
-    pub orig_to_date: Option<NaiveDate>,
-    pub sun: bool,
-    pub orig_mag_id: Option<i32>,
-    pub strip_from: Option<i32>,
-    pub strip_to: Option<i32>,
+    orig_date: Option<NaiveDate>,
+    orig_to_date: Option<NaiveDate>,
+    sun: bool,
+    orig_mag_id: Option<i32>,
+    strip_from: Option<i32>,
+    strip_to: Option<i32>,
 }
 
 impl Episode {
@@ -128,6 +128,27 @@ impl Episode {
             to: self.orig_to_date,
             sun: self.sun,
         }
+    }
+    pub fn strip_nrs(&self) -> Option<(i32, i32)> {
+        match (self.strip_from, self.strip_to) {
+            (Some(from), Some(to)) => Some((from, to)),
+            (None, None) => None,
+            (from, to) => {
+                eprintln!(
+                    "WARNING: One-ended strips {:?} - {:?} in ep #{}",
+                    from, to, self.id,
+                );
+                None
+            }
+        }
+    }
+    pub fn load_orig_mag(
+        &self,
+        db: &PgConnection,
+    ) -> Result<Option<OtherMag>, Error> {
+        self.orig_mag_id
+            .map(|id| OtherMag::get_by_id(id, db))
+            .transpose()
     }
 }
 
