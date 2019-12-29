@@ -1,15 +1,15 @@
-@use crate::models::{Article, CreatorSet, IssueRef, RefKey, RefKeySet, Title};
-@use crate::server::FullEpisode;
+@use crate::models::{IssueRef, RefKey, Title};
+@use crate::server::{FullArticle, FullEpisode};
 @use super::{artmisc, epmisc, page};
 
-@(refkey: &RefKey, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
+@(refkey: &RefKey, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
 @:page(&refkey.name(), {}, {
   @if !articles.is_empty() {
   <section class="articles">
     <h2>Artiklar</h2>
-    @for (article, refs, creators, pubs) in articles {
+    @for (article, pubs) in articles {
     <div class="article">
-      @:artmisc(article, refs, creators)
+      @:artmisc(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>

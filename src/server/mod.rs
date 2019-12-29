@@ -192,11 +192,7 @@ pub struct PublishedInfo {
 
 #[allow(clippy::large_enum_variant)]
 pub enum PublishedContent {
-    Text {
-        article: Article,
-        refs: RefKeySet,
-        creators: CreatorSet,
-    },
+    Text(FullArticle),
     EpisodePart {
         title: Title,
         episode: FullEpisode,
@@ -248,6 +244,27 @@ impl FullEpisode {
             creators,
             published,
             orig_mag,
+        })
+    }
+}
+
+pub struct FullArticle {
+    pub article: Article,
+    pub refs: RefKeySet,
+    pub creators: CreatorSet,
+}
+
+impl FullArticle {
+    fn load(
+        article: Article,
+        db: &PgConnection,
+    ) -> Result<FullArticle, diesel::result::Error> {
+        let refs = RefKeySet::for_article(&article, &db)?;
+        let creators = CreatorSet::for_article(&article, &db)?;
+        Ok(FullArticle {
+            article,
+            refs,
+            creators,
         })
     }
 }
@@ -323,14 +340,10 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
                         })
                     }
                     (None, Some(a), seqno, None, _label) => {
-                        let refs = RefKeySet::for_article(&a, &db)?;
-                        let creators = CreatorSet::for_article(&a, &db)?;
                         Ok(PublishedInfo {
-                            content: PublishedContent::Text {
-                                article: a,
-                                refs,
-                                creators,
-                            },
+                            content: PublishedContent::Text(
+                                FullArticle::load(a, &db)?,
+                            ),
                             seqno,
                             classnames: "article",
                         })

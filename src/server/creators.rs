@@ -1,7 +1,7 @@
 use super::{custom, custom_or_404, goh, redirect};
-use super::{FullEpisode, OtherContribs, PgFilter, PooledPg};
+use super::{FullArticle, FullEpisode, OtherContribs, PgFilter, PooledPg};
 use crate::models::{
-    Article, Creator, CreatorSet, Episode, IssueRef, RefKey, RefKeySet, Title,
+    Article, Creator, CreatorSet, Episode, IssueRef, RefKey, Title,
 };
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
@@ -113,14 +113,12 @@ fn one_creator(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db)?;
-            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
                 .load::<IssueRef>(&db)?;
-            Ok((article, refs, creators, published))
+            Ok((FullArticle::load(article, &db)?, published))
         })
         .collect::<Result<Vec<_>, diesel::result::Error>>()
         .map_err(custom)?;
@@ -156,14 +154,12 @@ fn one_creator(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db)?;
-            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
                 .load::<IssueRef>(&db)?;
-            Ok((article, refs, creators, published))
+            Ok((FullArticle::load(article, &db)?, published))
         })
         .collect::<Result<Vec<_>, diesel::result::Error>>()
         .map_err(custom)?;

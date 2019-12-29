@@ -1,8 +1,8 @@
-@use crate::models::{Article, CreatorSet, RefKeySet};
+@use crate::server::FullArticle;
 
-@(article: &Article, refs: &RefKeySet, creators: &CreatorSet)
+@(article: &FullArticle)
 
-<h3>@article.title@if let Some(ref s) = article.subtitle {: @s}</h3>
-@refs
-@creators
-@if let Some(ref note) = article.note { <p class="info note">@note</p> }
+<h3>@article.article.title@if let Some(ref s) = article.article.subtitle {: @s}</h3>
+@article.refs
+@article.creators
+@if let Some(ref note) = article.article.note { <p class="info note">@note</p> }

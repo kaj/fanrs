@@ -32,9 +32,7 @@
 	@:epmisc(&episode)
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
-	@if let Text{article, refs, creators} = content {
-	@:artmisc(article, refs, creators)
-	}
+	@if let Text(article) = content {@:artmisc(article)}
       </section>
       }
     </div>

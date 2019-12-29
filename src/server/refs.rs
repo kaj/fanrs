@@ -1,8 +1,7 @@
-use super::{goh, redirect, FullEpisode, PgFilter, PooledPg, RenderRucte};
-use crate::models::{
-    Article, CreatorSet, Episode, IdRefKey, IssueRef, RefKey, RefKeySet,
-    Title,
+use super::{
+    goh, redirect, FullArticle, FullEpisode, PgFilter, PooledPg, RenderRucte,
 };
+use crate::models::{Article, Episode, IdRefKey, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
 use crate::schema::episode_parts::dsl as ep;
@@ -149,14 +148,12 @@ fn one_ref_impl(
         .map_err(custom)?
         .into_iter()
         .map(|article| {
-            let refs = RefKeySet::for_article(&article, &db)?;
-            let creators = CreatorSet::for_article(&article, &db)?;
             let published = i::issues
                 .inner_join(p::publications)
                 .select((i::year, (i::number, i::number_str)))
                 .filter(p::article_id.eq(article.id))
                 .load::<IssueRef>(&db)?;
-            Ok((article, refs, creators, published))
+            Ok((FullArticle::load(article, &db)?, published))
         })
         .collect::<Result<Vec<_>, Error>>()
         .map_err(custom)?;

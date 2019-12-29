@@ -1,11 +1,9 @@
-use super::{FullEpisode, PooledPg, RenderRucte};
+use super::{FullArticle, FullEpisode, PooledPg, RenderRucte};
 use crate::models::{
-    Article, Creator, CreatorSet, Episode, IdRefKey, IssueRef, RefKey,
-    RefKeySet, Title,
+    Article, Creator, Episode, IdRefKey, IssueRef, RefKey, Title,
 };
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
-//use crate::schema::articles_by::dsl as ab;
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
 use crate::schema::episode_parts::dsl as ep;
@@ -363,9 +361,7 @@ pub enum Hit {
         fe: FullEpisode,
     },
     Article {
-        article: Article,
-        refs: RefKeySet,
-        creators: CreatorSet,
+        article: FullArticle,
         published: Vec<IssueRef>,
     },
 }
@@ -381,17 +377,13 @@ impl Hit {
     }
 
     fn article(article: Article, db: &PgConnection) -> Result<Hit, Error> {
-        let refs = RefKeySet::for_article(&article, db)?;
-        let creators = CreatorSet::for_article(&article, db)?;
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
             .load::<IssueRef>(db)?;
         Ok(Hit::Article {
-            article,
-            refs,
-            creators,
+            article: FullArticle::load(article, db)?,
             published,
         })
     }

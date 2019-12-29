@@ -1,8 +1,8 @@
-@use crate::models::{Article, CreatorSet, IssueRef, RefKeySet, Title};
-@use crate::server::{Paginator, FullEpisode};
+@use crate::models::{IssueRef, Title};
+@use crate::server::{Paginator, FullArticle, FullEpisode};
 @use super::{artmisc, epmisc, page};
 
-@(title: &Title, pages: Option<&Paginator>, articles: &[(Article, RefKeySet, CreatorSet, Vec<IssueRef>)], episodes: &[FullEpisode])
+@(title: &Title, pages: Option<&Paginator>, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[FullEpisode])
 @:page(&title.title, {
   <p>Här listas de gånger serien <strong>@title.title</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
@@ -29,9 +29,9 @@
   @if !articles.is_empty() {
   <section class="articles">
     <h2>Artiklar</h2>
-    @for (article, refs, creators, pubs) in articles {
+    @for (article, pubs) in articles {
     <div class="article">
-      @:artmisc(article, refs, creators)
+      @:artmisc(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
