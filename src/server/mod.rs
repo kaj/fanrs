@@ -26,7 +26,7 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, RenderRucte, ToHtml};
+use crate::templates::{self, Html, RenderRucte, ToHtml};
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
 use diesel::expression::SqlLiteral;
@@ -36,7 +36,9 @@ use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
 use failure::Error;
+use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
+use regex::Regex;
 use std::io::{self, Write};
 use warp::filters::BoxedFilter;
 use warp::http::status::StatusCode;
@@ -246,6 +248,10 @@ impl FullEpisode {
             orig_mag,
         })
     }
+
+    pub fn note(&self) -> Option<Html<String>> {
+        self.episode.note.as_ref().map(|s| text_to_fa_html(s))
+    }
 }
 
 pub struct FullArticle {
@@ -267,6 +273,55 @@ impl FullArticle {
             creators,
         })
     }
+
+    pub fn note(&self) -> Option<Html<String>> {
+        self.article.note.as_ref().map(|s| text_to_fa_html(s))
+    }
+}
+
+fn text_to_fa_html(text: &str) -> Html<String> {
+    lazy_static! {
+        static ref RE: Regex =
+            Regex::new(r"\b[Ff]a (?P<ii>(?P<i>[1-9]\d?)(-[1-9]\d?)?)[ /](?P<y>(19|20)\d{2})\b")
+            .unwrap();
+    }
+    let html = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let html = RE.replace_all(&html, "<a href='/$y#i$i'>Fa $ii/$y</a>");
+    Html(html.to_string())
+}
+
+#[test]
+fn text_to_fa_html_a() {
+    assert_eq!(
+        text_to_fa_html("Hello world of the Phantom").0,
+        "Hello world of the Phantom",
+    )
+}
+
+#[test]
+fn text_to_fa_html_b() {
+    assert_eq!(
+        text_to_fa_html("Hello <Kit & Julie>").0,
+        "Hello &lt;Kit &amp; Julie&gt;",
+    )
+}
+
+#[test]
+fn text_to_fa_html_c() {
+    assert_eq!(
+        text_to_fa_html("See Fa 7 1980.").0,
+        "See <a href='/1980#i7'>Fa 7/1980</a>.",
+    )
+}
+#[test]
+fn text_to_fa_html_d() {
+    assert_eq!(
+        text_to_fa_html("See Fa 25-26/2019.").0,
+        "See <a href='/2019#i25'>Fa 25-26/2019</a>.",
+    )
 }
 
 #[allow(clippy::needless_pass_by_value)]

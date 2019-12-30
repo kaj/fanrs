@@ -5,4 +5,4 @@
 <h3>@article.article.title@if let Some(ref s) = article.article.subtitle {: @s}</h3>
 @article.refs
 @article.creators
-@if let Some(ref note) = article.article.note { <p class="info note">@note</p> }
+@if let Some(ref note) = article.note() { <p class="info note">@note</p> }
