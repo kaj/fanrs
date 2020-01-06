@@ -2,17 +2,20 @@
 @use super::page;
 @use super::statics::sortable_js;
 
-@(creators: &[(Creator, i64, Option<IssueRef>, Option<IssueRef>)])
+@(creators: &[(Creator, i64, i64, Option<IssueRef>, Option<IssueRef>)])
 @:page("Serieskapare i Fantomentidningen", {}, {
 <section>
   <table class="sortable">
     <thead>
-      <tr><th class=" dir-d ">Namn</th><th><span class="ifwide">Antal</span> episoder</th><th>Först</th><th>Senast</th></tr>
+      <tr><th class=" dir-d ">Namn</th>
+	<th><span class="ifwide">Antal</span> episoder</th>
+	<th><span class="ifwide">Antal</span> omslag</th>
+	<th>Först</th><th>Senast</th></tr>
     </thead>
     <tbody>
-      @for (creator, n, first, last) in creators {
+      @for (creator, n_ep, n_cov, first, last) in creators {
       <tr>
-        <td>@creator</td><td>@n</td>
+        <td>@creator</td><td>@n_ep</td><td>@n_cov</td>
         @if let Some(i) = first {<td data-sort="@i.sortno()">@i</td>} else {<td>}
         @if let Some(i) = last {<td data-sort="@i.sortno()">@i</td>} else {<td>}
       </tr>

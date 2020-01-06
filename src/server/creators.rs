@@ -35,18 +35,28 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
     let all = c::creators
         .left_join(
-            ca::creator_aliases.left_join(
-                eb::episodes_by.left_join(
-                    e::episodes.left_join(
-                        ep::episode_parts
-                            .left_join(p::publications.left_join(i::issues)),
+            ca::creator_aliases
+                .left_join(
+                    eb::episodes_by.left_join(
+                        e::episodes.left_join(
+                            ep::episode_parts
+                                .left_join(p::publications), // .left_join(i::issues)),
+                        ),
                     ),
-                ),
-            ),
+                )
+                .left_join(cb::covers_by)
+                .left_join(
+                    i::issues
+                        .on(
+                            i::id.eq(p::issue).or(
+                            i::id.eq(cb::issue_id))
+                        )
+                )
         )
         .select((
             c::creators::all_columns(),
             sql("count(distinct episodes.id)"),
+            sql("count(distinct covers_by.id)"),
             sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q))
                 .nullable(),
             sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q))
@@ -54,13 +64,14 @@ fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
         ))
         .group_by(c::creators::all_columns())
         .order(c::name)
-        .load::<(Creator, i64, Option<i16>, Option<i16>)>(&db)
+        .load::<(Creator, i64, i64, Option<i16>, Option<i16>)>(&db)
         .map_err(custom)?
         .into_iter()
-        .map(|(creator, c, first, last)| {
+        .map(|(creator, n_ep, n_cov, first, last)| {
             (
                 creator,
-                c,
+                n_ep,
+                n_cov,
                 first.map(IssueRef::from_magic),
                 last.map(IssueRef::from_magic),
             )
