@@ -56,7 +56,10 @@ impl Article {
             .optional()?
         {
             if old_seqno != Some(seqno) {
-                eprintln!("TODO: Should update seqno for {}", id);
+                eprintln!(
+                    "TODO: Should update seqno for article #{} ({:?} != {})",
+                    id, old_seqno, seqno
+                );
             }
             Ok(())
         } else {

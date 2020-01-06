@@ -52,7 +52,12 @@ impl Part {
             .optional()?
         {
             if seqno.is_some() && old_seqno != seqno {
-                unimplemented!("Should update seqno for {}", id);
+                unimplemented!(
+                    "Should update seqno for publication #{} ({:?} != {:?})",
+                    id,
+                    seqno,
+                    old_seqno
+                );
             }
             if label != "" && old_label != label {
                 diesel::update(p::publications)
