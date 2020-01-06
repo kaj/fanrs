@@ -126,6 +126,11 @@ section {
                 text-align: right;
             }
         }
+	@media (width < 55em) {
+	    .ifwide {
+		display: none;
+	    }
+	}
     }
 }
 

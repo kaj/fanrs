@@ -8,9 +8,9 @@ document.addEventListener( 'click', function ( e ) {
 
     var down_class = 'dir-d';
     var up_class = 'dir-u';
-    var element = e.target;
+    var element = e.target.closest('th');
 
-    if ( element.nodeName == 'TH' ) {
+    if (element) {
 
         var table = element.offsetParent;
 
