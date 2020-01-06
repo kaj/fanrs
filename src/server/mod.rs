@@ -281,15 +281,18 @@ impl FullArticle {
 
 fn text_to_fa_html(text: &str) -> Html<String> {
     lazy_static! {
-        static ref RE: Regex =
+        static ref FA: Regex =
             Regex::new(r"\b[Ff]a (?P<ii>(?P<i>[1-9]\d?)(-[1-9]\d?)?)[ /](?P<y>(19|20)\d{2})\b")
             .unwrap();
+        static ref URL: Regex =
+            Regex::new(r"\b(?P<p>https?)://(?P<l>[a-z0-9?%./=&;-]+)").unwrap();
     }
     let html = text
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
-    let html = RE.replace_all(&html, "<a href='/$y#i$i'>Fa $ii/$y</a>");
+    let html = FA.replace_all(&html, "<a href='/$y#i$i'>Fa $ii/$y</a>");
+    let html = URL.replace_all(&html, "<a href='$p://$l'>$l</a>");
     Html(html.to_string())
 }
 
@@ -321,6 +324,14 @@ fn text_to_fa_html_d() {
     assert_eq!(
         text_to_fa_html("See Fa 25-26/2019.").0,
         "See <a href='/2019#i25'>Fa 25-26/2019</a>.",
+    )
+}
+
+#[test]
+fn text_to_fa_html_e() {
+    assert_eq!(
+        text_to_fa_html("See https://rasmus.krats.se .").0,
+        "See <a href='https://rasmus.krats.se'>rasmus.krats.se</a> .",
     )
 }
 
