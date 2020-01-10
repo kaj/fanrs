@@ -36,22 +36,16 @@ fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
     let all = c::creators
         .left_join(
             ca::creator_aliases
-                .left_join(
-                    eb::episodes_by.left_join(
-                        e::episodes.left_join(
-                            ep::episode_parts
-                                .left_join(p::publications), // .left_join(i::issues)),
-                        ),
+                .left_join(eb::episodes_by.left_join(
+                    e::episodes.left_join(
+                        ep::episode_parts.left_join(p::publications),
                     ),
-                )
+                ))
                 .left_join(cb::covers_by)
                 .left_join(
                     i::issues
-                        .on(
-                            i::id.eq(p::issue).or(
-                            i::id.eq(cb::issue_id))
-                        )
-                )
+                        .on(i::id.eq(p::issue).or(i::id.eq(cb::issue_id))),
+                ),
         )
         .select((
             c::creators::all_columns(),
