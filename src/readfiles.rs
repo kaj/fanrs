@@ -69,7 +69,7 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
         for elem in child_elems(Document::parse(&data)?.root_element()) {
             match elem.tag_name().name() {
                 "info" => (), // ignore
-                "issue" => register_issue(year, &elem, db).map_err(|e| {
+                "issue" => register_issue(year, elem, db).map_err(|e| {
                     format_err!(
                         "In issue {}: {}",
                         elem.attribute("nr").unwrap_or("?"),
@@ -85,7 +85,7 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     Ok(())
 }
 
-fn register_issue(year: i16, i: &Node, db: &PgConnection) -> Result<()> {
+fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
     let nr = i
         .attribute("nr")
         .ok_or_else(|| format_err!("nr missing"))
@@ -95,13 +95,13 @@ fn register_issue(year: i16, i: &Node, db: &PgConnection) -> Result<()> {
         nr,
         i.attribute("pages").and_then(|s| s.parse().ok()),
         i.attribute("price").and_then(|s| s.parse().ok()),
-        get_child(*i, "omslag").and_then(get_best_plac),
+        get_child(i, "omslag").and_then(get_best_plac),
         db,
     )?;
     println!("Found issue {}", issue);
     issue.clear(db)?;
 
-    for (seqno, c) in child_elems(*i).enumerate() {
+    for (seqno, c) in child_elems(i).enumerate() {
         match c.tag_name().name() {
             "omslag" => {
                 if let Some(by) = get_child(c, "by") {
@@ -297,12 +297,11 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 } else if let Some(from) = get_text(e, "fromnr") {
+                    let to = get_req_text(e, "tonr")?;
                     diesel::update(e::episodes)
                         .set((
                             e::strip_from.eq(from.parse::<i32>()?),
-                            e::strip_to
-                                .eq(get_req_text(e, "tonr")?
-                                    .parse::<i32>()?),
+                            e::strip_to.eq(to.parse::<i32>()?),
                         ))
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
@@ -322,24 +321,13 @@ fn parse_refs(parent: Node) -> Result<Vec<RefKey>> {
 
 fn parse_ref(e: Node) -> Result<RefKey> {
     match e.tag_name().name() {
-        "fa" => e
-            .attribute("no")
-            .map(RefKey::fa)
-            .ok_or_else(|| format_err!("Fa witout no: {:?}", e)),
-        "key" => e
-            .text()
-            .map(RefKey::key)
-            .ok_or_else(|| format_err!("Key without text: {:?}", e)),
-        "who" => e
-            .text()
-            .map(RefKey::who)
-            .ok_or_else(|| format_err!("Who without name: {:?}", e)),
-        "serie" => e
-            .text()
-            .map(RefKey::title)
-            .ok_or_else(|| format_err!("Serie without title: {:?}", e)),
-        _ => Err(format_err!("Unknown reference: {:?}", e)),
+        "fa" => e.attribute("no").map(RefKey::fa).ok_or("Fa without no"),
+        "key" => e.text().map(RefKey::key).ok_or("Key without text"),
+        "who" => e.text().map(RefKey::who).ok_or("Who without name"),
+        "serie" => e.text().map(RefKey::title).ok_or("Serie without title"),
+        _ => Err("Unknown reference"),
     }
+    .map_err(|err| format_err!("{} in {:?}", err, e))
 }
 
 #[test]
