@@ -1,4 +1,4 @@
-use super::{FullArticle, FullEpisode, PooledPg, RenderRucte};
+use super::{custom, FullArticle, FullEpisode, PooledPg};
 use crate::models::{
     Article, Creator, Episode, IdRefKey, IssueRef, RefKey, Title,
 };
@@ -14,7 +14,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates;
+use crate::templates::{self, RenderRucte};
 use diesel::dsl::{any, max, sql};
 use diesel::prelude::*;
 use diesel::sql_types::{SmallInt, Text};
@@ -23,10 +23,10 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 use warp::http::Response;
 use warp::reply::json;
-use warp::{self, reject::custom, Rejection, Reply};
+use warp::{self, Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn search(
+pub async fn search(
     db: PooledPg,
     query: Vec<(String, String)>,
 ) -> Result<impl Reply, Rejection> {
@@ -38,7 +38,7 @@ pub fn search(
     })
 }
 
-pub fn search_autocomplete(
+pub async fn search_autocomplete(
     db: PooledPg,
     query: AcQuery,
 ) -> Result<impl Reply, Rejection> {

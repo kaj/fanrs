@@ -41,15 +41,12 @@ use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
 use warp::filters::BoxedFilter;
+use warp::http::header::{CONTENT_TYPE, EXPIRES};
+use warp::http::response::Builder;
 use warp::http::status::StatusCode;
-use warp::http::Response;
 use warp::path::Tail;
-use warp::{
-    self,
-    http::header::{CONTENT_TYPE, EXPIRES},
-    reject::{custom, not_found},
-    Filter, Rejection, Reply,
-};
+use warp::reply::Response;
+use warp::{self, reject::not_found, Filter, Rejection, Reply};
 
 type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
 type PgPool = Pool<ConnectionManager<PgConnection>>;
@@ -57,18 +54,18 @@ type PgFilter = BoxedFilter<(PooledPg,)>;
 
 /// Get or head - a filter matching GET and HEAD requests only.
 fn goh() -> BoxedFilter<()> {
-    use warp::{get2 as get, head};
+    use warp::{get, head};
     get().or(head()).unify().boxed()
 }
 
-pub fn run(db_url: &str) -> Result<(), Error> {
+pub async fn run(db_url: &str) -> Result<(), Error> {
     let pool = pg_pool(db_url);
     let s = warp::any()
-        .and_then(move || match pool.get() {
-            Ok(conn) => Ok(conn),
+        .map(move || match pool.get() {
+            Ok(conn) => conn,
             Err(e) => {
-                eprintln!("Failed to get a db connection: {}", e);
-                Err(custom(e))
+                panic!("Failed to get a db connection: {}", e);
+                //Err(custom(e))
             }
         })
         .boxed();
@@ -123,7 +120,7 @@ pub fn run(db_url: &str) -> Result<(), Error> {
             .and(end())
             .and_then(titles::oldslug))
         .recover(customize_error);
-    warp::serve(routes).run(([127, 0, 0, 1], 1536));
+    warp::serve(routes).run(([127, 0, 0, 1], 1536)).await;
     Ok(())
 }
 
@@ -131,11 +128,11 @@ pub fn run(db_url: &str) -> Result<(), Error> {
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
 #[allow(clippy::needless_pass_by_value)]
-fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
+async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     use crate::templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
-        Ok(Response::builder()
+        Ok(Builder::new()
             .header(CONTENT_TYPE, data.mime.as_ref())
             .header(EXPIRES, far_expires.to_rfc2822())
             .body(data.content))
@@ -145,8 +142,8 @@ fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
     }
 }
 
-fn robots_txt() -> Result<impl Reply, Rejection> {
-    Ok(Response::builder()
+async fn robots_txt() -> Result<impl Reply, Rejection> {
+    Ok(Builder::new()
         .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
         .body("User-agent: *\nDisallow: /search\nDisallow: /ac\n"))
 }
@@ -157,7 +154,7 @@ fn pg_pool(database_url: &str) -> PgPool {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
+async fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     let n = p::publications
         .select(sql("count(distinct issue)"))
         .filter(not(p::seqno.is_null()))
@@ -178,7 +175,7 @@ fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
     let refkeys = RefKey::cloud(num, &db).map_err(custom)?;
     let creators = Creator::cloud(num, &db).map_err(custom)?;
 
-    Response::builder().html(|o| {
+    Builder::new().html(|o| {
         templates::frontpage(
             o, n, &all_fa, &years, &titles, &refkeys, &creators,
         )
@@ -336,7 +333,7 @@ fn text_to_fa_html_e() {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
+async fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
     let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
@@ -429,7 +426,7 @@ fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
         .first::<(i16, i16)>(&db)
         .map_err(custom)?;
     let years = YearLinks::new(years.0 as u16, year, years.1 as u16);
-    Response::builder().html(|o| templates::year(o, year, &years, &issues))
+    Builder::new().html(|o| templates::year(o, year, &years, &issues))
 }
 
 fn custom_or_404(e: diesel::result::Error) -> Rejection {
@@ -439,31 +436,29 @@ fn custom_or_404(e: diesel::result::Error) -> Rejection {
     }
 }
 
-fn redirect(url: &str) -> Result<Response<Vec<u8>>, Rejection> {
+fn redirect(url: &str) -> Result<Response, Rejection> {
     use warp::http::header::LOCATION;
     let msg = format!("Try {:?}", url);
-    Response::builder()
+    Builder::new()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
-        .body(msg.into_bytes())
+        .body(msg.into())
         .map_err(custom)
 }
 
-fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
-    match err.status() {
-        StatusCode::NOT_FOUND => {
-            eprintln!("Got a 404: {:?}", err);
-            // We have a custom 404 page!
-            Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
-        }
-        code => {
-            eprintln!("Got a {}: {:?}", code.as_u16(), err);
-            Response::builder()
-                .status(code)
-                .html(|o| templates::error(o, code))
-        }
+async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
+    if err.is_not_found() {
+        eprintln!("Got a 404: {:?}", err);
+        // We have a custom 404 page!
+        Builder::new()
+            .status(StatusCode::NOT_FOUND)
+            .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
+    } else {
+        let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
+        eprintln!("Internal server error: {:?}", err);
+        Builder::new()
+            .status(code)
+            .html(|o| templates::error(o, code))
     }
 }
 
@@ -519,4 +514,14 @@ impl ToHtml for YearLinks {
         }
         Ok(())
     }
+}
+
+use warp::reject::Reject;
+#[derive(Debug)]
+struct ISE;
+impl Reject for ISE {}
+
+fn custom<E: std::fmt::Display>(e: E) -> Rejection {
+    eprintln!("Internal server error: {}", e);
+    warp::reject::custom(ISE)
 }

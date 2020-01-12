@@ -12,7 +12,7 @@ use warp::reject::not_found;
 use warp::{Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn cover_image(
+pub async fn cover_image(
     db: PooledPg,
     issue: CoverRef,
 ) -> Result<impl Reply, Rejection> {
@@ -60,7 +60,7 @@ impl FromStr for CoverRef {
     }
 }
 
-pub fn redirect_cover(
+pub async fn redirect_cover(
     db: PooledPg,
     year: CYear,
     issue: SIssue,

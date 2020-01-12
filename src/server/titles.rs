@@ -17,9 +17,9 @@ use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
 use serde::Deserialize;
 use warp::filters::BoxedFilter;
-use warp::http::Response;
+use warp::http::response::Builder;
 use warp::reject::not_found;
-use warp::{self, Filter, Rejection, Reply};
+use warp::{self, reply::Response, Filter, Rejection, Reply};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::filters::query::query;
@@ -36,7 +36,7 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn list_titles(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
+async fn list_titles(db: PooledPg) -> Result<Response, Rejection> {
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -61,7 +61,7 @@ fn list_titles(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
             ))
         })
         .collect::<Result<Vec<_>, Rejection>>()?;
-    Response::builder().html(|o| templates::titles(o, &all))
+    Builder::new().html(|o| templates::titles(o, &all))
 }
 
 #[derive(Deserialize)]
@@ -70,11 +70,11 @@ pub struct PageParam {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn one_title(
+async fn one_title(
     db: PooledPg,
     slug: String,
     page: PageParam,
-) -> Result<Response<Vec<u8>>, Rejection> {
+) -> Result<Response, Rejection> {
     let (slug, strip) = if slug.starts_with("weekdays-") {
         (&slug["weekdays-".len()..], Some(false))
     } else if slug.starts_with("sundays-") {
@@ -138,12 +138,15 @@ fn one_title(
         .collect::<Result<Vec<_>, _>>()
         .map_err(custom)?;
 
-    Response::builder().html(|o| {
+    Builder::new().html(|o| {
         templates::title(o, &title, pages.as_ref(), &articles, &episodes)
     })
 }
 
-pub fn oldslug(db: PooledPg, slug: String) -> Result<impl Reply, Rejection> {
+pub async fn oldslug(
+    db: PooledPg,
+    slug: String,
+) -> Result<impl Reply, Rejection> {
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;
