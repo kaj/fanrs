@@ -453,7 +453,11 @@ async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
             .status(StatusCode::NOT_FOUND)
             .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
     } else {
-        log::error!("Internal server error: {:?}", err);
+        if let Some(ise) = err.find::<ISE>() {
+            log::error!("Internal server error: {}", ise.0);
+        } else {
+            log::error!("Internal server error: {:?}", err);
+        }
         let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
         Builder::new()
             .status(code)
@@ -517,10 +521,9 @@ impl ToHtml for YearLinks {
 
 use warp::reject::Reject;
 #[derive(Debug)]
-struct ISE;
+struct ISE(String);
 impl Reject for ISE {}
 
-fn custom<E: std::fmt::Display>(e: E) -> Rejection {
-    log::error!("Internal server error: {}", e);
-    warp::reject::custom(ISE)
+fn custom<E: std::fmt::Display + std::fmt::Debug>(e: E) -> Rejection {
+    warp::reject::custom(ISE(format!("{}\nDetails: ({:#?})", e, e)))
 }
