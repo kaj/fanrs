@@ -8,7 +8,7 @@ edition = "2018"
 build = "src/build.rs"
 
 [build-dependencies]
-ructe = { version = "0.9.0", features = ["sass", "mime03", "warp"] }
+ructe = { version = "0.9.0", features = ["sass", "warp02"] }
 
 [dependencies]
 chrono = "0.4.6"
@@ -18,12 +18,13 @@ io-result-optional = "0.1.2"
 lazy_static = "1.4.0"
 mime = "0.3"
 regex = "1.3.1"
-reqwest = "0.9.9"
+reqwest = "0.10.1"
 serde = { version = "1.0.88", features = ["derive"] }
 scraper = "0.11.0"
 slug = "0.1.4"
 structopt = { version = "0.3.2", features = ["wrap_help"] }
-warp = "0.1.9"
+tokio = { version = "0.2", features = ["macros"] }
+warp = "0.2.0"
 roxmltree = "0.9.0"
 
 [dependencies.diesel]

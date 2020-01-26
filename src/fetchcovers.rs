@@ -26,7 +26,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<(), Error> {
         let db = self.db.get_db()?;
         let mut client = WikiClient::new();
         let query = i::issues
@@ -44,26 +44,26 @@ impl Args {
             if self.no_op {
                 println!("Would load cover {:>2}/{}.", number_str, year);
             } else {
-                load_cover(&mut client, &db, id, year, &number_str)?;
+                load_cover(&mut client, &db, id, year, &number_str).await?;
             }
         }
         Ok(())
     }
 }
 
-fn load_cover(
+async fn load_cover(
     client: &mut WikiClient,
     db: &PgConnection,
     id: i32,
     year: i16,
     number_str: &str,
 ) -> Result<(), Error> {
-    match client.fetchcover(year, number_str) {
+    match client.fetchcover(year, number_str).await {
         Ok(imgdata) => {
             diesel::insert_into(c::covers)
                 .values((
                     c::issue.eq(id),
-                    c::image.eq(&imgdata),
+                    c::image.eq(imgdata.as_ref()),
                     c::fetch_time.eq(now),
                 ))
                 .on_conflict(c::issue)
@@ -75,7 +75,7 @@ fn load_cover(
                 .execute(db)?;
             eprintln!(
                 "Got {} bytes of image data for {}/{}",
-                imgdata.len(),
+                imgdata.as_ref().len(),
                 number_str,
                 year,
             );
@@ -105,15 +105,17 @@ impl WikiClient {
         }
     }
 
-    fn fetchcover(
+    async fn fetchcover(
         &mut self,
         year: i16,
         number_str: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<impl AsRef<[u8]>, Error> {
         let url2 = select_href(
             &self
-                .get(&format!("/Fantomen_{}/{}", number_str, year))?
-                .text()?,
+                .get(&format!("/Fantomen_{}/{}", number_str, year))
+                .await?
+                .text()
+                .await?,
             &self.sel1,
         )?;
         // Scullmark is sometimes used for no cover scanned yet.
@@ -121,15 +123,14 @@ impl WikiClient {
         if url2.contains("Scullmark.gif") || url2.contains("Mini_sweden") {
             return Err(format_err!("Cover missing"));
         }
-        let imgurl = select_href(&self.get(&url2)?.text()?, &self.sel2)?;
-        let mut buf = Vec::new();
-        self.get(&imgurl)?.copy_to(&mut buf)?;
-        Ok(buf)
+        let imgurl =
+            select_href(&self.get(&url2).await?.text().await?, &self.sel2)?;
+        Ok(self.get(&imgurl).await?.bytes().await?)
     }
 
-    fn get(&mut self, url: &str) -> Result<Response, Error> {
+    async fn get(&mut self, url: &str) -> Result<Response, Error> {
         let url1 = format!("http://www.phantomwiki.org{}", url);
-        let resp = self.client.get(&url1).send()?;
+        let resp = self.client.get(&url1).send().await?;
         if resp.status().is_success() {
             Ok(resp)
         } else {

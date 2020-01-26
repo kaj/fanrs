@@ -47,12 +47,12 @@ enum Fanrs {
 }
 
 impl Fanrs {
-    fn run(self) -> Result<(), Error> {
+    async fn run(self) -> Result<(), Error> {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
-            Fanrs::RunServer(db) => server::run(&db.db_url),
-            Fanrs::FetchCovers(args) => args.run(),
+            Fanrs::RunServer(db) => server::run(&db.db_url).await,
+            Fanrs::FetchCovers(args) => args.run().await,
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
             Fanrs::CountPages(args) => args.run(),
         }
@@ -74,7 +74,8 @@ impl DbOpt {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     match dotenv() {
         Ok(_) => (),
         Err(ref err) if err.not_found() => (),
@@ -83,7 +84,7 @@ fn main() {
             exit(1);
         }
     }
-    match Fanrs::from_args().run() {
+    match Fanrs::from_args().run().await {
         Ok(()) => (),
         Err(error) => {
             eprintln!("Error: {}", error);

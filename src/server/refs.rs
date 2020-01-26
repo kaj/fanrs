@@ -1,5 +1,5 @@
 use super::{
-    goh, redirect, FullArticle, FullEpisode, PgFilter, PooledPg, RenderRucte,
+    custom, goh, redirect, FullArticle, FullEpisode, PgFilter, PooledPg,
 };
 use crate::models::{Article, Episode, IdRefKey, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -11,7 +11,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates;
+use crate::templates::{self, RenderRucte};
 use diesel::dsl::{count_star, min, sql};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -20,10 +20,10 @@ use diesel::QueryDsl;
 use failure::Error;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
-use warp::reject::{custom, not_found};
+use warp::reject::not_found;
 use warp::{self, Filter, Rejection};
 
-type ByteResponse = Response<Vec<u8>>;
+type ByteResponse = warp::reply::Response;
 
 pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
     use warp::path::{end, param};
@@ -43,7 +43,7 @@ pub fn get_all_fa(db: &PgConnection) -> Result<Vec<RefKey>, Error> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn list_refs(db: PooledPg) -> Result<ByteResponse, Rejection> {
+async fn list_refs(db: PooledPg) -> Result<ByteResponse, Rejection> {
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
         .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
@@ -74,16 +74,22 @@ fn list_refs(db: PooledPg) -> Result<ByteResponse, Rejection> {
     Response::builder().html(|o| templates::refkeys(o, &all))
 }
 
-pub fn one_fa(db: PooledPg, slug: String) -> Result<ByteResponse, Rejection> {
-    one_ref_impl(db, slug, RefKey::FA_ID)
+pub async fn one_fa(
+    db: PooledPg,
+    slug: String,
+) -> Result<ByteResponse, Rejection> {
+    one_ref_impl(db, slug, RefKey::FA_ID).await
 }
 
-fn one_ref(db: PooledPg, slug: String) -> Result<ByteResponse, Rejection> {
-    one_ref_impl(db, slug, RefKey::KEY_ID)
+async fn one_ref(
+    db: PooledPg,
+    slug: String,
+) -> Result<ByteResponse, Rejection> {
+    one_ref_impl(db, slug, RefKey::KEY_ID).await
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn one_ref_impl(
+async fn one_ref_impl(
     db: PooledPg,
     slug: String,
     kind: i16,

@@ -21,7 +21,8 @@ use diesel::dsl::{any, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
 use warp::filters::BoxedFilter;
-use warp::http::Response;
+use warp::http::response::Builder;
+use warp::reply::Response;
 use warp::{self, Filter, Rejection, Reply};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
@@ -32,7 +33,7 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
+async fn list_creators(db: PooledPg) -> Result<Response, Rejection> {
     let all = c::creators
         .left_join(
             ca::creator_aliases
@@ -71,14 +72,14 @@ fn list_creators(db: PooledPg) -> Result<Response<Vec<u8>>, Rejection> {
             )
         })
         .collect::<Vec<_>>();
-    Response::builder().html(|o| templates::creators(o, &all))
+    Builder::new().html(|o| templates::creators(o, &all))
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn one_creator(
+async fn one_creator(
     db: PooledPg,
     slug: String,
-) -> Result<Response<Vec<u8>>, Rejection> {
+) -> Result<Response, Rejection> {
     let creator = c::creators
         .filter(c::slug.eq(&slug))
         .first::<Creator>(&db)
@@ -172,7 +173,7 @@ fn one_creator(
     let covers = CoverSet::by(&creator, &db).map_err(custom)?;
     let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;
 
-    Response::builder().html(|o| {
+    Builder::new().html(|o| {
         templates::creator(
             o,
             &creator,
