@@ -84,6 +84,7 @@ async fn main() {
             exit(1);
         }
     }
+    env_logger::init();
     match Fanrs::from_args().run().await {
         Ok(()) => (),
         Err(error) => {

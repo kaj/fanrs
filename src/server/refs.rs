@@ -125,7 +125,7 @@ async fn one_ref_impl(
         let target =
             slug.to_lowercase().replace("_", "-").replace(".html", "");
         if target != slug {
-            eprintln!("Trying refkey redirect {:?} -> {:?}", slug, target);
+            log::debug!("Trying refkey redirect {:?} -> {:?}", slug, target);
             let n = r::refkeys
                 .filter(r::kind.eq(&kind))
                 .filter(r::slug.eq(&target))

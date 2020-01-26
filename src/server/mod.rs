@@ -137,7 +137,7 @@ async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
             .header(EXPIRES, far_expires.to_rfc2822())
             .body(data.content))
     } else {
-        println!("Static file {:?} not found", name);
+        log::info!("Static file {:?} not found", name);
         Err(not_found())
     }
 }
@@ -448,14 +448,13 @@ fn redirect(url: &str) -> Result<Response, Rejection> {
 
 async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
     if err.is_not_found() {
-        eprintln!("Got a 404: {:?}", err);
-        // We have a custom 404 page!
+        log::debug!("Got a 404: {:?}", err);
         Builder::new()
             .status(StatusCode::NOT_FOUND)
             .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
     } else {
+        log::error!("Internal server error: {:?}", err);
         let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
-        eprintln!("Internal server error: {:?}", err);
         Builder::new()
             .status(code)
             .html(|o| templates::error(o, code))
@@ -522,6 +521,6 @@ struct ISE;
 impl Reject for ISE {}
 
 fn custom<E: std::fmt::Display>(e: E) -> Rejection {
-    eprintln!("Internal server error: {}", e);
+    log::error!("Internal server error: {}", e);
     warp::reject::custom(ISE)
 }

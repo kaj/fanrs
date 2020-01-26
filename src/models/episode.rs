@@ -134,9 +134,11 @@ impl Episode {
             (Some(from), Some(to)) => Some((from, to)),
             (None, None) => None,
             (from, to) => {
-                eprintln!(
-                    "WARNING: One-ended strips {:?} - {:?} in ep #{}",
-                    from, to, self.id,
+                log::warn!(
+                    "One-ended strips {:?} - {:?} in ep #{}",
+                    from,
+                    to,
+                    self.id,
                 );
                 None
             }

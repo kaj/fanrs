@@ -92,9 +92,9 @@ async fn one_creator(
             .replace('_', "%")
             .replace('-', "%")
             .replace(".html", "");
-        eprintln!("Looking for creator fallback {:?} -> {:?}", slug, target);
+        log::info!("Looking for creator fallback {:?} -> {:?}", slug, target);
         if target == "anderas%eriksson" || target == "andreas%erikssson" {
-            return redirect("/who/andreas_eriksson");
+            return redirect("/who/andreas-eriksson");
         }
         let found = ca::creator_aliases
             .inner_join(c::creators)
@@ -103,7 +103,7 @@ async fn one_creator(
             .select(c::slug)
             .first::<String>(&db)
             .map_err(custom_or_404)?;
-        eprintln!("Found replacement: {:?}", found);
+        log::debug!("Found replacement: {:?}", found);
         return redirect(&format!("/who/{}", found));
     };
 

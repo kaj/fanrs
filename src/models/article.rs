@@ -56,9 +56,11 @@ impl Article {
             .optional()?
         {
             if old_seqno != Some(seqno) {
-                eprintln!(
+                log::warn!(
                     "TODO: Should update seqno for article #{} ({:?} != {})",
-                    id, old_seqno, seqno
+                    id,
+                    old_seqno,
+                    seqno
                 );
             }
             Ok(())
