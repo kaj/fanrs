@@ -1,6 +1,6 @@
 use super::{
-    custom, custom_or_404, goh, redirect, sortable_issue, FullArticle,
-    FullEpisode, Paginator, PgFilter, PooledPg, RenderRucte,
+    custom, custom_or_404, goh, redirect, FullArticle, FullEpisode,
+    Paginator, PgFilter, PooledPg, RenderRucte,
 };
 use crate::models::{Article, Episode, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -44,8 +44,8 @@ async fn list_titles(db: PooledPg) -> Result<Response, Rejection> {
         .select((
             t::titles::all_columns(),
             sql("count(*)"),
-            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q)),
-            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q)),
+            sql::<SmallInt>("min(magic)"),
+            sql::<SmallInt>("max(magic)"),
         ))
         .group_by(t::titles::all_columns())
         .order(t::title)
@@ -93,7 +93,7 @@ async fn one_title(
         .filter(r::kind.eq(RefKey::TITLE_ID))
         .filter(r::slug.eq(&title.slug))
         .inner_join(p::publications.inner_join(i::issues))
-        .order(min(sortable_issue()))
+        .order(min(i::magic))
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?
@@ -123,9 +123,7 @@ async fn one_title(
             .filter(e::orig_sundays.eq(sun))
             .filter(e::orig_date.is_not_null())
             .order(e::orig_date),
-        None => {
-            episodes.order(min(sql::<SmallInt>("(year-1950)*64 + number")))
-        }
+        None => episodes.order(min(i::magic)),
     };
     let episodes = episodes.load::<Episode>(&db).map_err(custom)?;
 

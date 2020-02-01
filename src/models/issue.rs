@@ -18,6 +18,7 @@ pub struct Issue {
     pub pages: Option<i16>,
     pub price: Option<Price>,
     pub cover_best: Option<i16>,
+    pub magic: i16,
 }
 
 #[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
@@ -60,6 +61,8 @@ impl Issue {
             }
             Ok(t)
         } else {
+            let magic = ((year - 1950) * 64 + number.number) * 2
+                + if number.nr_str.contains('-') { 1 } else { 0 };
             Ok(diesel::insert_into(dsl::issues)
                 .values((
                     dsl::year.eq(year),
@@ -68,6 +71,7 @@ impl Issue {
                     dsl::pages.eq(pages),
                     dsl::price.eq(price),
                     dsl::cover_best.eq(cover_best),
+                    dsl::magic.eq(magic),
                 ))
                 .get_result(db)?)
         }
@@ -112,9 +116,6 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 impl IssueRef {
-    pub const MAGIC_Q: &'static str =
-        "cast(((year-1950)*64+number)*2 + sign(cast(position('-' in number_str) as smallint)) as smallint)";
-
     pub fn from_magic(n: i16) -> IssueRef {
         let double = (n % 2) > 0;
         let n = n / 2;

@@ -17,9 +17,8 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte};
-use diesel::dsl::{any, min, sql};
+use diesel::dsl::{any, min};
 use diesel::prelude::*;
-use diesel::sql_types::SmallInt;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reply::Response;
@@ -34,45 +33,46 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 
 #[allow(clippy::needless_pass_by_value)]
 async fn list_creators(db: PooledPg) -> Result<Response, Rejection> {
-    let all = c::creators
-        .left_join(
-            ca::creator_aliases
-                .left_join(eb::episodes_by.left_join(
-                    e::episodes.left_join(
-                        ep::episode_parts.left_join(p::publications),
-                    ),
-                ))
-                .left_join(cb::covers_by)
-                .left_join(
-                    i::issues
-                        .on(i::id.eq(p::issue).or(i::id.eq(cb::issue_id))),
-                ),
-        )
+    use creator_contributions::dsl as cc;
+    let all = cc::creator_contributions
         .select((
-            c::creators::all_columns(),
-            sql("count(distinct episodes.id)"),
-            sql("count(distinct covers_by.id)"),
-            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q))
-                .nullable(),
-            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q))
-                .nullable(),
+            (cc::id, cc::name, cc::slug),
+            cc::n_episodes,
+            cc::n_covers,
+            cc::n_articles,
+            cc::first_issue,
+            cc::latest_issue,
         ))
-        .group_by(c::creators::all_columns())
-        .order(c::name)
-        .load::<(Creator, i64, i64, Option<i16>, Option<i16>)>(&db)
+        .load::<(Creator, i64, i64, i64, Option<i16>, Option<i16>)>(&db)
         .map_err(custom)?
         .into_iter()
-        .map(|(creator, n_ep, n_cov, first, last)| {
+        .map(|(creator, n_ep, n_cov, n_articles, first, last)| {
             (
                 creator,
                 n_ep,
                 n_cov,
+                n_articles,
                 first.map(IssueRef::from_magic),
                 last.map(IssueRef::from_magic),
             )
         })
         .collect::<Vec<_>>();
     Builder::new().html(|o| templates::creators(o, &all))
+}
+
+table! {
+    /// This is a materialzied view, and apparently not included in
+    /// diesel schema generation.
+    creator_contributions (id) {
+        id -> Int4,
+        name -> Varchar,
+        slug -> Varchar,
+        n_episodes -> Int8,
+        n_covers -> Int8,
+        n_articles -> Int8,
+        first_issue -> Nullable<Int2>,
+        latest_issue -> Nullable<Int2>,
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -113,7 +113,7 @@ async fn one_creator(
         .filter(r::kind.eq(RefKey::WHO_ID))
         .filter(r::slug.eq(&creator.slug))
         .inner_join(p::publications.inner_join(i::issues))
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(i::magic))
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?
@@ -140,7 +140,7 @@ async fn one_creator(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),
         )
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(i::magic))
         .group_by(e_t_columns)
         .load::<(Title, Episode)>(&db)
         .map_err(custom)?
@@ -154,7 +154,7 @@ async fn one_creator(
         .inner_join(ab::articles_by.inner_join(ca::creator_aliases))
         .filter(ca::creator_id.eq(creator.id))
         .inner_join(p::publications.inner_join(i::issues))
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(i::magic))
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?

@@ -29,7 +29,6 @@ use crate::schema::titles::dsl as t;
 use crate::templates::{self, Html, RenderRucte, ToHtml};
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
-use diesel::expression::SqlLiteral;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
@@ -463,10 +462,6 @@ async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
             .status(code)
             .html(|o| templates::error(o, code))
     }
-}
-
-fn sortable_issue() -> SqlLiteral<SmallInt> {
-    sql("(year-1950)*64 + number")
 }
 
 pub struct YearLinks {

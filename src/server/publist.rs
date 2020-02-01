@@ -1,4 +1,3 @@
-use super::sortable_issue;
 use crate::models::{
     Creator, CreatorSet, Episode, Issue, IssueRef, PartInIssue, Title,
 };
@@ -132,7 +131,7 @@ impl OtherContribs {
                 ep::episode_parts
                     .inner_join(p::publications.inner_join(i::issues)),
             )
-            .order(min(sortable_issue()))
+            .order(min(i::magic))
             .group_by(oe_columns)
             .load::<(Title, i32, Option<String>)>(db)?;
 

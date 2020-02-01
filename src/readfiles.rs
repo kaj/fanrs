@@ -4,12 +4,14 @@ use crate::models::{
 use crate::DbOpt;
 use chrono::{Datelike, Local, NaiveDate};
 use diesel::prelude::*;
+use diesel::sql_query;
 use failure::{format_err, Error};
 use io_result_optional::IoResultOptional;
 use roxmltree::{Document, Node};
 use slug::slugify;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use structopt::StructOpt;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -53,6 +55,10 @@ impl Args {
             }
         }
         delete_unpublished(&db)?;
+        let start = Instant::now();
+        sql_query("refresh materialized view creator_contributions;")
+            .execute(&db)?;
+        println!("Updated creators view in {:?}", start.elapsed());
         Ok(())
     }
 }

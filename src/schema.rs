@@ -111,6 +111,7 @@ table! {
         pages -> Nullable<Int2>,
         price -> Nullable<Int4>,
         cover_best -> Nullable<Int2>,
+        magic -> Int2,
     }
 }
 

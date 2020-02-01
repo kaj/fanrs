@@ -17,7 +17,7 @@ use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte};
 use diesel::dsl::{any, max, sql};
 use diesel::prelude::*;
-use diesel::sql_types::{SmallInt, Text};
+use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
 use failure::Error;
 use serde::{Deserialize, Serialize};
@@ -329,7 +329,7 @@ impl SearchQuery {
         };
 
         let mut episodes = episodes
-            .order(max(sql::<SmallInt>("(year-1950)*64 + number")).desc())
+            .order(max(i::magic).desc())
             .group_by((t::titles::all_columns(), e::episodes::all_columns()))
             .limit(max_hits)
             .load::<(Title, Episode)>(db)?
@@ -338,7 +338,7 @@ impl SearchQuery {
             .collect::<Result<Vec<_>, _>>()?;
 
         let articles = articles
-            .order(max(sql::<SmallInt>("(year-1950)*64 + number")).desc())
+            .order(max(i::magic).desc())
             .group_by(a::articles::all_columns())
             .limit(max_hits)
             .load(db)?

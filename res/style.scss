@@ -126,6 +126,13 @@ section {
                 text-align: right;
             }
         }
+	&.creators {
+            th, td {
+		&:nth-child(3), &:nth-child(4) {
+                    text-align: right;
+		}
+            }
+	}
 	@media (width < 55em) {
 	    .ifwide {
 		display: none;

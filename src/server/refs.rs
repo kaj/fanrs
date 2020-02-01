@@ -52,10 +52,8 @@ async fn list_refs(db: PooledPg) -> Result<ByteResponse, Rejection> {
         .select((
             r::refkeys::all_columns(),
             sql("count(*)"),
-            sql::<SmallInt>(&format!("min({})", IssueRef::MAGIC_Q))
-                .nullable(),
-            sql::<SmallInt>(&format!("max({})", IssueRef::MAGIC_Q))
-                .nullable(),
+            sql::<SmallInt>("min(magic)").nullable(),
+            sql::<SmallInt>("max(magic)").nullable(),
         ))
         .group_by(r::refkeys::all_columns())
         .order(r::title)
@@ -148,7 +146,7 @@ async fn one_ref_impl(
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(ar::refkey_id.eq(refkey.id))
         .inner_join(p::publications.inner_join(i::issues))
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(i::magic))
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)
         .map_err(custom)?
@@ -173,7 +171,7 @@ async fn one_ref_impl(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),
         )
-        .order(min(sql::<SmallInt>("(year-1950)*64 + number")))
+        .order(min(i::magic))
         .group_by((t::titles::all_columns(), e::episodes::all_columns()))
         .load::<(Title, Episode)>(&db)
         .map_err(custom)?
