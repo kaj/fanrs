@@ -2,9 +2,11 @@ use super::{Episode, Issue, IssueRef};
 use crate::schema::episode_parts::dsl as ep;
 use crate::schema::publications::dsl as p;
 use crate::templates::ToHtml;
+use diesel::dsl::count_star;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use log::warn;
 use std::io::{self, Write};
 
 #[derive(Debug, Queryable)]
@@ -25,6 +27,23 @@ impl Part {
         label: &str,
         db: &PgConnection,
     ) -> Result<(), Error> {
+        let mut existing = p::publications
+            .select(count_star())
+            .left_join(ep::episode_parts)
+            .filter(ep::episode.eq(episode.id))
+            .filter(p::issue.eq(issue.id))
+            .into_boxed();
+        if part_no.is_some() || part_name.is_some() {
+            existing = existing
+                .filter(ep::part_no.is_not_distinct_from(part_no))
+                .filter(ep::part_name.is_not_distinct_from(part_name));
+        }
+        match existing.first::<i64>(db)? {
+            0 => (),
+            1 => return Ok(()),
+            n => warn!("{} of {:?} in {}", n, episode, issue),
+        }
+
         let part_id = if let Some(part_id) = ep::episode_parts
             .select(ep::id)
             .filter(ep::episode.eq(episode.id))
