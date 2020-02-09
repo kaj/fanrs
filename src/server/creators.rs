@@ -1,5 +1,6 @@
 use super::{custom, custom_or_404, goh, redirect};
 use super::{FullArticle, FullEpisode, OtherContribs, PgFilter, PooledPg};
+use crate::models::creator_contributions::CreatorContributions;
 use crate::models::{
     Article, Creator, CreatorSet, Episode, IssueRef, RefKey, Title,
 };
@@ -33,7 +34,7 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 
 #[allow(clippy::needless_pass_by_value)]
 async fn list_creators(db: PooledPg) -> Result<Response, Rejection> {
-    use creator_contributions::dsl as cc;
+    use crate::models::creator_contributions::creator_contributions::dsl as cc;
     let all = cc::creator_contributions
         .select((
             (cc::id, cc::name, cc::slug),
@@ -43,36 +44,9 @@ async fn list_creators(db: PooledPg) -> Result<Response, Rejection> {
             cc::first_issue,
             cc::latest_issue,
         ))
-        .load::<(Creator, i64, i64, i64, Option<i16>, Option<i16>)>(&db)
-        .map_err(custom)?
-        .into_iter()
-        .map(|(creator, n_ep, n_cov, n_articles, first, last)| {
-            (
-                creator,
-                n_ep,
-                n_cov,
-                n_articles,
-                first.map(IssueRef::from_magic),
-                last.map(IssueRef::from_magic),
-            )
-        })
-        .collect::<Vec<_>>();
+        .load::<CreatorContributions>(&db)
+        .map_err(custom)?;
     Builder::new().html(|o| templates::creators(o, &all))
-}
-
-table! {
-    /// This is a materialzied view, and apparently not included in
-    /// diesel schema generation.
-    creator_contributions (id) {
-        id -> Int4,
-        name -> Varchar,
-        slug -> Varchar,
-        n_episodes -> Int8,
-        n_covers -> Int8,
-        n_articles -> Int8,
-        first_issue -> Nullable<Int2>,
-        latest_issue -> Nullable<Int2>,
-    }
 }
 
 #[allow(clippy::needless_pass_by_value)]

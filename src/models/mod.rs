@@ -4,6 +4,7 @@ use std::io::{self, Write};
 
 mod article;
 mod creator;
+pub mod creator_contributions;
 mod creatorset;
 mod episode;
 mod issue;

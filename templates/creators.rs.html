@@ -1,8 +1,8 @@
-@use crate::models::{IssueRef, Creator};
+@use crate::models::creator_contributions::CreatorContributions;
 @use super::page;
 @use super::statics::sortable_js;
 
-@(creators: &[(Creator, i64, i64, i64, Option<IssueRef>, Option<IssueRef>)])
+@(creators: &[CreatorContributions])
 @:page("Serieskapare i Fantomentidningen", {}, {
 <section>
   <table class="sortable creators">
@@ -14,11 +14,12 @@
 	<th>Först</th><th>Senast</th></tr>
     </thead>
     <tbody>
-      @for (creator, n_ep, n_cov, n_articles, first, last) in creators {
+      @for c in creators {
       <tr>
-        <td>@creator</td><td>@n_ep</td><td>@n_cov</td><td>@n_articles</td>
-        @if let Some(i) = first {<td data-sort="@i.sortno()">@i</td>} else {<td>}
-        @if let Some(i) = last {<td data-sort="@i.sortno()">@i</td>} else {<td>}
+        <td>@c.creator</td>
+        <td>@c.n_episodes</td><td>@c.n_covers</td><td>@c.n_articles</td>
+        @if let Some(i) = &c.first_issue {<td data-sort="@i.sortno()">@i</td>} else {<td>}
+        @if let Some(i) = &c.latest_issue {<td data-sort="@i.sortno()">@i</td>} else {<td>}
       </tr>
       }
     </tbody>

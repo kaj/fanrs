@@ -1,8 +1,9 @@
 use super::price::Price;
 use crate::templates::ToHtml;
 use diesel;
-use diesel::pg::PgConnection;
+use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
+use diesel::sql_types::{SmallInt, Text};
 use failure::Error;
 use std::cmp::Ordering;
 use std::fmt;
@@ -21,7 +22,7 @@ pub struct Issue {
     pub magic: i16,
 }
 
-#[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
+#[derive(Clone, Debug, Ord, PartialEq, Eq)]
 pub struct IssueRef {
     pub year: i16,
     pub number: Nr,
@@ -141,6 +142,26 @@ impl IssueRef {
     /// Site-relative url to the cover image of this issue.
     pub fn cover_url(&self) -> String {
         format!("/c/f{}-{}.jpg", self.year, self.number.number)
+    }
+}
+
+impl Queryable<SmallInt, Pg> for IssueRef {
+    type Row = i16;
+    fn build(row: Self::Row) -> IssueRef {
+        IssueRef::from_magic(row)
+    }
+}
+
+impl Queryable<(SmallInt, (SmallInt, Text)), Pg> for IssueRef {
+    type Row = (i16, (i16, String));
+    fn build(row: Self::Row) -> IssueRef {
+        IssueRef {
+            year: row.0,
+            number: Nr {
+                number: (row.1).0,
+                nr_str: (row.1).1,
+            },
+        }
     }
 }
 
