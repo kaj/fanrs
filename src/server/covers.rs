@@ -1,4 +1,4 @@
-use super::{custom, redirect, PooledPg};
+use super::{custom, redirect, PgPool};
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::templates::statics::xcover_jpg;
@@ -6,6 +6,7 @@ use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use mime::IMAGE_JPEG;
 use std::str::FromStr;
+use tokio_diesel::{AsyncRunQueryDsl, OptionalExtension};
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::{Response, StatusCode};
 use warp::reject::not_found;
@@ -13,7 +14,7 @@ use warp::{Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn cover_image(
-    db: PooledPg,
+    db: PgPool,
     issue: CoverRef,
 ) -> Result<impl Reply, Rejection> {
     let data = i::issues
@@ -21,7 +22,8 @@ pub async fn cover_image(
         .select(c::image)
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
-        .first::<Vec<u8>>(&db)
+        .first_async::<Vec<u8>>(&db)
+        .await
         .optional()
         .map_err(custom)?;
 
@@ -61,15 +63,16 @@ impl FromStr for CoverRef {
 }
 
 pub async fn redirect_cover(
-    db: PooledPg,
+    db: PgPool,
     year: CYear,
     issue: SIssue,
 ) -> Result<impl Reply, Rejection> {
     let exists = i::issues
-        .filter(i::year.eq(&year.0))
-        .filter(i::number.eq(&issue.0))
+        .filter(i::year.eq(year.0))
+        .filter(i::number.eq(issue.0))
         .count()
-        .get_result::<i64>(&db)
+        .get_result_async::<i64>(&db)
+        .await
         .map_err(custom)?;
     if exists > 0 {
         redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))

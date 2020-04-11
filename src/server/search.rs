@@ -1,4 +1,4 @@
-use super::{custom, FullArticle, FullEpisode, PooledPg};
+use super::{custom, FullArticle, FullEpisode, PgPool};
 use crate::models::{
     Article, Creator, Episode, IdRefKey, IssueRef, RefKey, Title,
 };
@@ -21,34 +21,38 @@ use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
 use failure::Error;
 use serde::{Deserialize, Serialize};
+use tokio_diesel::{AsyncConnection, AsyncRunQueryDsl};
 use warp::http::Response;
 use warp::reply::json;
 use warp::{self, Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn search(
-    db: PooledPg,
+    db: PgPool,
     query: Vec<(String, String)>,
 ) -> Result<impl Reply, Rejection> {
-    let query = SearchQuery::load(query, &db).map_err(custom)?;
-    let (titles, creators, refkeys, episodes) =
-        query.do_search(&db).map_err(custom)?;
+    let query = SearchQuery::load(query, &db).await.map_err(custom)?;
+    let (query, titles, creators, refkeys, episodes) = db
+        .run(|c| query.do_search(c).map(|(t, c, r, e)| (query, t, c, r, e)))
+        .await
+        .map_err(custom)?;
     Response::builder().html(|o| {
         templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
     })
 }
 
 pub async fn search_autocomplete(
-    db: PooledPg,
+    db: PgPool,
     query: AcQuery,
 ) -> Result<impl Reply, Rejection> {
     let q = format!("%{}%", query.q);
     let mut titles = t::titles
         .select((t::title, t::slug))
-        .filter(t::title.ilike(&q))
+        .filter(t::title.ilike(q.clone()))
         .order_by(t::title)
         .limit(8)
-        .load::<(String, String)>(&db)
+        .load_async::<(String, String)>(&db)
+        .await
         .map_err(custom)?
         .into_iter()
         .map(|(t, s)| Completion::title(t, s))
@@ -57,11 +61,12 @@ pub async fn search_autocomplete(
         &mut ca::creator_aliases
             .inner_join(c::creators)
             .select((sql::<Text>("min(creator_aliases.name)"), c::slug))
-            .filter(ca::name.ilike(&q))
+            .filter(ca::name.ilike(q.clone()))
             .group_by(c::slug)
             .order(sql::<Text>("min(creator_aliases.name)"))
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load::<(String, String)>(&db)
+            .load_async::<(String, String)>(&db)
+            .await
             .map_err(custom)?
             .into_iter()
             .map(|(t, s)| Completion::creator(t, s))
@@ -70,11 +75,12 @@ pub async fn search_autocomplete(
     titles.append(
         &mut r::refkeys
             .select((r::kind, r::title, r::slug))
-            .filter(r::title.ilike(&q))
+            .filter(r::title.ilike(q))
             .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
             .order(r::title)
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load::<(i16, String, String)>(&db)
+            .load_async::<(i16, String, String)>(&db)
+            .await
             .map_err(custom)?
             .into_iter()
             .map(|(k, t, s)| Completion::refkey(k, t, s))
@@ -128,18 +134,20 @@ impl SearchQuery {
             k: vec![],
         }
     }
-    fn load(
+    async fn load(
         query: Vec<(String, String)>,
-        db: &PooledPg,
+        db: &PgPool,
     ) -> Result<Self, Error> {
         let mut result = SearchQuery::empty();
         for (key, val) in query {
             match key.as_ref() {
                 "q" => result.q = val,
-                "t" => result.t.push(Title::from_slug(&val, db)?),
-                "p" => result.p.push(Creator::from_slug(&val, db)?),
-                "k" => result.k.push(IdRefKey::key_from_slug(&val, db)?),
-                "f" => result.k.push(IdRefKey::fa_from_slug(&val, db)?),
+                "t" => result.t.push(Title::from_slug(val, db).await?),
+                "p" => {
+                    result.p.push(Creator::from_slug_async(val, db).await?)
+                }
+                "k" => result.k.push(IdRefKey::key_from_slug(val, db).await?),
+                "f" => result.k.push(IdRefKey::fa_from_slug(val, db).await?),
                 _ => (), // ignore unknown query parameters
             }
         }
@@ -153,9 +161,11 @@ impl SearchQuery {
     }
     fn do_search(
         &self,
-        db: &PooledPg,
-    ) -> Result<(Vec<Title>, Vec<Creator>, Vec<RefKey>, Vec<Hit>), Error>
-    {
+        db: &PgConnection,
+    ) -> Result<
+        (Vec<Title>, Vec<Creator>, Vec<RefKey>, Vec<Hit>),
+        diesel::result::Error,
+    > {
         let max_hits = 25;
         if self.is_empty() {
             return Ok((vec![], vec![], vec![], vec![]));
@@ -344,7 +354,7 @@ impl SearchQuery {
             .load(db)?
             .into_iter()
             .map(|article| Hit::article(article, db))
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect::<Result<Vec<_>, diesel::result::Error>>()?;
 
         episodes.extend(articles.into_iter());
         episodes.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
@@ -371,12 +381,15 @@ impl Hit {
         title: Title,
         episode: Episode,
         db: &PgConnection,
-    ) -> Result<Hit, Error> {
+    ) -> Result<Hit, diesel::result::Error> {
         FullEpisode::load_details(episode, db)
             .map(|fe| Hit::Episode { title, fe })
     }
 
-    fn article(article: Article, db: &PgConnection) -> Result<Hit, Error> {
+    fn article(
+        article: Article,
+        db: &PgConnection,
+    ) -> Result<Hit, diesel::result::Error> {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))

@@ -1,4 +1,5 @@
 use super::{OtherMag, RefKey, Title};
+use crate::server::PgPool;
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
 use diesel;
@@ -7,6 +8,7 @@ use diesel::prelude::*;
 use diesel::result::Error;
 use std::fmt;
 use std::io::{self, Write};
+use tokio_diesel::AsyncError;
 
 #[derive(Debug, Queryable)]
 pub struct Episode {
@@ -151,6 +153,15 @@ impl Episode {
         self.orig_mag_id
             .map(|id| OtherMag::get_by_id(id, db))
             .transpose()
+    }
+    pub async fn load_orig_mag_async(
+        &self,
+        db: &PgPool,
+    ) -> Result<Option<OtherMag>, AsyncError> {
+        match self.orig_mag_id {
+            Some(id) => Ok(Some(OtherMag::get_by_id_async(id, db).await?)),
+            None => Ok(None),
+        }
     }
 }
 

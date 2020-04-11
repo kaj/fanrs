@@ -31,7 +31,7 @@ use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
 use failure::Error;
@@ -39,6 +39,7 @@ use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
+use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::response::Builder;
@@ -47,9 +48,8 @@ use warp::path::Tail;
 use warp::reply::Response;
 use warp::{self, reject::not_found, Filter, Rejection, Reply};
 
-type PooledPg = PooledConnection<ConnectionManager<PgConnection>>;
-type PgPool = Pool<ConnectionManager<PgConnection>>;
-type PgFilter = BoxedFilter<(PooledPg,)>;
+pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+type PgFilter = BoxedFilter<(PgPool,)>;
 
 /// Get or head - a filter matching GET and HEAD requests only.
 fn goh() -> BoxedFilter<()> {
@@ -59,15 +59,7 @@ fn goh() -> BoxedFilter<()> {
 
 pub async fn run(db_url: &str) -> Result<(), Error> {
     let pool = pg_pool(db_url);
-    let s = warp::any()
-        .map(move || match pool.get() {
-            Ok(conn) => conn,
-            Err(e) => {
-                panic!("Failed to get a db connection: {}", e);
-                //Err(custom(e))
-            }
-        })
-        .boxed();
+    let s = warp::any().map(move || pool.clone()).boxed();
     let s = move || s.clone();
     use warp::filters::query::query;
     use warp::{path, path::end, path::param, path::tail};
@@ -149,30 +141,34 @@ async fn robots_txt() -> Result<impl Reply, Rejection> {
 
 fn pg_pool(database_url: &str) -> PgPool {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
-    Pool::new(manager).expect("Postgres connection pool could not be created")
+    Pool::builder()
+        .test_on_check_out(false)
+        .build(manager)
+        .expect("Postgres connection pool could not be created")
 }
 
-#[allow(clippy::needless_pass_by_value)]
-async fn frontpage(db: PooledPg) -> Result<impl Reply, Rejection> {
+async fn frontpage(db: PgPool) -> Result<impl Reply, Rejection> {
     let n = p::publications
         .select(sql("count(distinct issue)"))
         .filter(not(p::seqno.is_null()))
-        .first(&db)
+        .first_async(&db)
+        .await
         .map_err(custom)?;
 
     let years = i::issues
         .select(i::year)
         .distinct()
         .order(i::year)
-        .load(&db)
+        .load_async(&db)
+        .await
         .map_err(custom)?;
 
-    let all_fa = get_all_fa(&db).map_err(custom)?;
+    let all_fa = get_all_fa(&db).await.map_err(custom)?;
 
     let num = 50;
-    let titles = Title::cloud(num, &db).map_err(custom)?;
-    let refkeys = RefKey::cloud(num, &db).map_err(custom)?;
-    let creators = Creator::cloud(num, &db).map_err(custom)?;
+    let titles = Title::cloud(num, &db).await.map_err(custom)?;
+    let refkeys = RefKey::cloud(num, &db).await.map_err(custom)?;
+    let creators = Creator::cloud(num, &db).await.map_err(custom)?;
 
     Builder::new().html(|o| {
         templates::frontpage(
@@ -212,7 +208,7 @@ impl FullEpisode {
     fn load_details(
         episode: Episode,
         db: &PgConnection,
-    ) -> Result<FullEpisode, Error> {
+    ) -> Result<FullEpisode, diesel::result::Error> {
         let refs = RefKeySet::for_episode(&episode, db)?;
         let creators = CreatorSet::for_episode(&episode, db)?;
         let published = PartsPublished::for_episode(&episode, db)?;
@@ -225,17 +221,34 @@ impl FullEpisode {
             orig_mag,
         })
     }
+    async fn load_details_async(
+        episode: Episode,
+        db: &PgPool,
+    ) -> Result<FullEpisode, AsyncError> {
+        let refs = RefKeySet::for_episode_async(&episode, db).await?;
+        let creators = CreatorSet::for_episode_async(&episode, db).await?;
+        let published =
+            PartsPublished::for_episode_async(&episode, db).await?;
+        let orig_mag = episode.load_orig_mag_async(db).await?;
+        Ok(FullEpisode {
+            episode,
+            refs,
+            creators,
+            published,
+            orig_mag,
+        })
+    }
 
-    fn in_issue(
+    async fn in_issue(
         episode: Episode,
         issue: &Issue,
-        db: &PgConnection,
+        db: &PgPool,
     ) -> Result<FullEpisode, Error> {
-        let refs = RefKeySet::for_episode(&episode, db)?;
-        let creators = CreatorSet::for_episode(&episode, db)?;
+        let refs = RefKeySet::for_episode_async(&episode, db).await?;
+        let creators = CreatorSet::for_episode_async(&episode, db).await?;
         let published =
-            PartsPublished::for_episode_except(&episode, issue, db)?;
-        let orig_mag = episode.load_orig_mag(db)?;
+            PartsPublished::for_episode_except(&episode, issue, db).await?;
+        let orig_mag = episode.load_orig_mag_async(db).await?;
         Ok(FullEpisode {
             episode,
             refs,
@@ -263,6 +276,18 @@ impl FullArticle {
     ) -> Result<FullArticle, diesel::result::Error> {
         let refs = RefKeySet::for_article(&article, &db)?;
         let creators = CreatorSet::for_article(&article, &db)?;
+        Ok(FullArticle {
+            article,
+            refs,
+            creators,
+        })
+    }
+    async fn load_async(
+        article: Article,
+        db: &PgPool,
+    ) -> Result<FullArticle, AsyncError> {
+        let refs = RefKeySet::for_article_async(&article, &db).await?;
+        let creators = CreatorSet::for_article_async(&article, &db).await?;
         Ok(FullArticle {
             article,
             refs,
@@ -331,106 +356,114 @@ fn text_to_fa_html_e() {
     )
 }
 
-#[allow(clippy::needless_pass_by_value)]
-async fn list_year(db: PooledPg, year: u16) -> Result<impl Reply, Rejection> {
-    let issues = i::issues
+async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
+    let issues_raw: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load(&db)
-        .map_err(custom)?
-        .into_iter()
-        .map(|issue: Issue| {
-            let c_columns = (c::id, ca::name, c::slug);
-            let cover_by = c::creators
-                .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-                .select(c_columns)
-                .filter(cb::issue_id.eq(issue.id))
-                .load(&db)?;
-
-            let mut have_main = false;
-            let content = p::publications
-                .left_outer_join(
-                    ep::episode_parts
-                        .inner_join(e::episodes.inner_join(t::titles)),
-                )
-                .left_outer_join(a::articles)
-                .select((
-                    (
-                        t::titles::all_columns(),
-                        e::episodes::all_columns(),
-                        (ep::id, ep::part_no, ep::part_name),
-                    )
-                        .nullable(),
-                    a::articles::all_columns().nullable(),
-                    p::seqno,
-                    p::best_plac,
-                    p::label,
-                ))
-                .filter(p::issue.eq(issue.id))
-                .order(p::seqno)
-                .load::<(
-                    Option<(Title, Episode, Part)>,
-                    Option<Article>,
-                    Option<i16>,
-                    Option<i16>,
-                    String,
-                )>(&db)?
-                .into_iter()
-                .map(|row| match row {
-                    (Some((t, mut e, part)), None, seqno, b, label) => {
-                        let classnames =
-                            if e.teaser.is_none() || !part.is_first() {
-                                e.teaser = None;
-                                "episode noteaser"
-                            } else if t.title == "Fantomen" && !have_main {
-                                have_main = true;
-                                "episode main"
-                            } else {
-                                "episode"
-                            };
-                        let content = PublishedContent::EpisodePart {
-                            title: t,
-                            episode: FullEpisode::in_issue(e, &issue, &db)?,
-                            part,
-                            best_plac: b,
-                            label,
-                        };
-                        Ok(PublishedInfo {
-                            content,
-                            seqno,
-                            classnames,
-                        })
-                    }
-                    (None, Some(a), seqno, None, _label) => {
-                        Ok(PublishedInfo {
-                            content: PublishedContent::Text(
-                                FullArticle::load(a, &db)?,
-                            ),
-                            seqno,
-                            classnames: "article",
-                        })
-                    }
-                    row => panic!("Strange row: {:?}", row),
-                })
-                .collect::<Result<_, Error>>()?;
-            Ok((issue, cover_by, content))
-        })
-        .collect::<Result<Vec<(Issue, Vec<_>, Vec<_>)>, Error>>()
+        .load_async(&db)
+        .await
         .map_err(custom)?;
-    if issues.is_empty() {
+    if issues_raw.is_empty() {
         return Err(not_found());
+    }
+    let mut issues = Vec::with_capacity(issues_raw.len());
+    for issue in issues_raw.into_iter() {
+        let c_columns = (c::id, ca::name, c::slug);
+        let cover_by = c::creators
+            .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
+            .select(c_columns)
+            .filter(cb::issue_id.eq(issue.id))
+            .load_async(&db)
+            .await
+            .map_err(custom)?;
+
+        let mut have_main = false;
+        let content_raw = p::publications
+            .left_outer_join(
+                ep::episode_parts
+                    .inner_join(e::episodes.inner_join(t::titles)),
+            )
+            .left_outer_join(a::articles)
+            .select((
+                (
+                    t::titles::all_columns(),
+                    e::episodes::all_columns(),
+                    (ep::id, ep::part_no, ep::part_name),
+                )
+                    .nullable(),
+                a::articles::all_columns().nullable(),
+                p::seqno,
+                p::best_plac,
+                p::label,
+            ))
+            .filter(p::issue.eq(issue.id))
+            .order(p::seqno)
+            .load_async::<(
+                Option<(Title, Episode, Part)>,
+                Option<Article>,
+                Option<i16>,
+                Option<i16>,
+                String,
+            )>(&db)
+            .await
+            .map_err(custom)?;
+        let mut contents = Vec::with_capacity(content_raw.len());
+        for row in content_raw.into_iter() {
+            match row {
+                (Some((t, mut e, part)), None, seqno, b, label) => {
+                    let classnames = if e.teaser.is_none() || !part.is_first()
+                    {
+                        e.teaser = None;
+                        "episode noteaser"
+                    } else if t.title == "Fantomen" && !have_main {
+                        have_main = true;
+                        "episode main"
+                    } else {
+                        "episode"
+                    };
+                    let content = PublishedContent::EpisodePart {
+                        title: t,
+                        episode: FullEpisode::in_issue(e, &issue, &db)
+                            .await
+                            .map_err(custom)?,
+                        part,
+                        best_plac: b,
+                        label,
+                    };
+                    contents.push(PublishedInfo {
+                        content,
+                        seqno,
+                        classnames,
+                    });
+                }
+                (None, Some(a), seqno, None, _label) => {
+                    contents.push(PublishedInfo {
+                        content: PublishedContent::Text(
+                            FullArticle::load_async(a, &db)
+                                .await
+                                .map_err(custom)?,
+                        ),
+                        seqno,
+                        classnames: "article",
+                    });
+                }
+                row => panic!("Strange row: {:?}", row),
+            }
+        }
+        issues.push((issue, cover_by, contents));
     }
     let years = i::issues
         .select((sql::<SmallInt>("min(year)"), sql::<SmallInt>("max(year)")))
-        .first::<(i16, i16)>(&db)
+        .first_async::<(i16, i16)>(&db)
+        .await
         .map_err(custom)?;
     let years = YearLinks::new(years.0 as u16, year, years.1 as u16);
     Builder::new().html(|o| templates::year(o, year, &years, &issues))
 }
 
-fn custom_or_404(e: diesel::result::Error) -> Rejection {
+fn custom_or_404(e: AsyncError) -> Rejection {
     match e {
-        diesel::result::Error::NotFound => not_found(),
+        AsyncError::Error(diesel::result::Error::NotFound) => not_found(),
         e => custom(e),
     }
 }

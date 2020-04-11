@@ -1,12 +1,14 @@
 use super::{Cloud, CloudItem};
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
+use crate::server::PgPool;
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use diesel::result::Error;
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
+use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 /// In most cases, this struct will hold the id and name from
 /// creator_aliases together with the slug from creators.
@@ -55,10 +57,22 @@ impl Creator {
             .first(db)
     }
 
-    pub fn cloud(
+    /// The id and name here is for the actual creator.
+    pub async fn from_slug_async(
+        slug: String,
+        db: &PgPool,
+    ) -> Result<Creator, AsyncError> {
+        c::creators
+            .select((c::id, c::name, c::slug))
+            .filter(c::slug.eq(slug))
+            .first_async(db)
+            .await
+    }
+
+    pub async fn cloud(
         num: i64,
-        db: &PgConnection,
-    ) -> Result<Cloud<Creator>, Error> {
+        db: &PgPool,
+    ) -> Result<Cloud<Creator>, AsyncError> {
         use crate::models::creator_contributions::creator_contributions::dsl as cc;
         let creators = cc::creator_contributions
             .select((
@@ -67,7 +81,8 @@ impl Creator {
             ))
             .order_by((cc::n_episodes + cc::n_covers + cc::n_articles).desc())
             .limit(num)
-            .load(db)?;
+            .load_async(db)
+            .await?;
         Ok(Cloud::from_ordered(creators))
     }
 }

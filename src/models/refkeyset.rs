@@ -1,8 +1,10 @@
 use super::{Article, Episode, IdRefKey, RefKey};
+use crate::server::PgPool;
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use diesel::result::Error;
 use std::io::{self, Write};
+use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 #[derive(Debug)]
 pub struct RefKeySet(Vec<RefKey>);
@@ -26,6 +28,25 @@ impl RefKeySet {
                 .collect(),
         ))
     }
+    pub async fn for_article_async(
+        article: &Article,
+        db: &PgPool,
+    ) -> Result<RefKeySet, AsyncError> {
+        use crate::schema::article_refkeys::dsl as ar;
+        use crate::schema::refkeys::{all_columns, dsl as r};
+        Ok(RefKeySet(
+            r::refkeys
+                .inner_join(ar::article_refkeys)
+                .select(all_columns)
+                .filter(ar::article_id.eq(article.id))
+                .order((r::title, r::slug))
+                .load_async::<IdRefKey>(db)
+                .await?
+                .into_iter()
+                .map(|ir| ir.refkey)
+                .collect(),
+        ))
+    }
 
     pub fn for_episode(
         episode: &Episode,
@@ -40,6 +61,25 @@ impl RefKeySet {
                 .filter(er::episode_id.eq(episode.id))
                 .order((r::title, r::slug))
                 .load::<IdRefKey>(db)?
+                .into_iter()
+                .map(|ir| ir.refkey)
+                .collect(),
+        ))
+    }
+    pub async fn for_episode_async(
+        episode: &Episode,
+        db: &PgPool,
+    ) -> Result<RefKeySet, AsyncError> {
+        use crate::schema::episode_refkeys::dsl as er;
+        use crate::schema::refkeys::{all_columns, dsl as r};
+        Ok(RefKeySet(
+            r::refkeys
+                .inner_join(er::episode_refkeys)
+                .select(all_columns)
+                .filter(er::episode_id.eq(episode.id))
+                .order((r::title, r::slug))
+                .load_async::<IdRefKey>(db)
+                .await?
                 .into_iter()
                 .map(|ir| ir.refkey)
                 .collect(),

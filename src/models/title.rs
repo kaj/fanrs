@@ -2,6 +2,7 @@ use super::{Cloud, CloudItem};
 use crate::schema::episode_parts::dsl as ep;
 use crate::schema::episodes::dsl as e;
 use crate::schema::titles::dsl as t;
+use crate::server::PgPool;
 use crate::templates::ToHtml;
 use diesel;
 use diesel::pg::PgConnection;
@@ -10,6 +11,7 @@ use diesel::result::Error;
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
+use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 /// A title of a comic.
 ///
@@ -39,8 +41,11 @@ impl Title {
         }
     }
 
-    pub fn from_slug(slug: &str, db: &PgConnection) -> Result<Title, Error> {
-        t::titles.filter(t::slug.eq(slug)).first(db)
+    pub async fn from_slug(
+        slug: String,
+        db: &PgPool,
+    ) -> Result<Title, AsyncError> {
+        t::titles.filter(t::slug.eq(slug)).first_async(db).await
     }
 
     pub fn has_daystrip(&self) -> bool {
@@ -50,7 +55,10 @@ impl Title {
     pub fn has_sundays(&self) -> bool {
         SUNDAYS.binary_search(&self.slug.as_ref()).is_ok()
     }
-    pub fn cloud(num: i64, db: &PgConnection) -> Result<Cloud<Title>, Error> {
+    pub async fn cloud(
+        num: i64,
+        db: &PgPool,
+    ) -> Result<Cloud<Title>, AsyncError> {
         use diesel::dsl::sql;
         let c = sql("count(*)");
         let titles = t::titles
@@ -59,7 +67,8 @@ impl Title {
             .group_by(t::titles::all_columns())
             .order(c.desc())
             .limit(num)
-            .load(db)?;
+            .load_async(db)
+            .await?;
         Ok(Cloud::from_ordered(titles))
     }
 }
