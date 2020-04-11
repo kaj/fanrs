@@ -79,7 +79,10 @@ impl Creator {
                 (cc::id, cc::name, cc::slug),
                 cc::n_episodes + cc::n_covers + cc::n_articles,
             ))
-            .order_by((cc::n_episodes + cc::n_covers + cc::n_articles).desc())
+            .order_by(
+                (cc::n_episodes * 3 + cc::n_covers * 2 + cc::n_articles)
+                    .desc(),
+            )
             .limit(num)
             .load_async(db)
             .await?;
