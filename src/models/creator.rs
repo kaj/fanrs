@@ -1,12 +1,9 @@
-use super::{Cloud, CloudItem, CreatorSet};
+use super::{Cloud, CloudItem};
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
-use crate::schema::episodes_by::dsl as eb;
 use crate::templates::ToHtml;
-use diesel::dsl::{any, sql};
 use diesel::prelude::*;
 use diesel::result::Error;
-use diesel::sql_types::BigInt;
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
@@ -62,13 +59,13 @@ impl Creator {
         num: i64,
         db: &PgConnection,
     ) -> Result<Cloud<Creator>, Error> {
-        let c_ep = sql::<BigInt>("count(distinct episode_id)");
-        let creators = c::creators
-            .left_join(ca::creator_aliases.left_join(eb::episodes_by))
-            .filter(eb::role.eq(any(CreatorSet::MAIN_ROLES)))
-            .select((c::creators::all_columns(), c_ep.clone()))
-            .group_by(c::creators::all_columns())
-            .order(c_ep.desc())
+        use crate::models::creator_contributions::creator_contributions::dsl as cc;
+        let creators = cc::creator_contributions
+            .select((
+                (cc::id, cc::name, cc::slug),
+                cc::n_episodes + cc::n_covers + cc::n_articles,
+            ))
+            .order_by((cc::n_episodes + cc::n_covers + cc::n_articles).desc())
             .limit(num)
             .load(db)?;
         Ok(Cloud::from_ordered(creators))
