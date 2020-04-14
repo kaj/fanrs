@@ -19,9 +19,8 @@ use diesel::dsl::{any, max, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
-use failure::Error;
 use serde::{Deserialize, Serialize};
-use tokio_diesel::{AsyncConnection, AsyncRunQueryDsl};
+use tokio_diesel::{AsyncConnection, AsyncError, AsyncRunQueryDsl};
 use warp::http::Response;
 use warp::reply::json;
 use warp::{self, Rejection, Reply};
@@ -137,7 +136,7 @@ impl SearchQuery {
     async fn load(
         query: Vec<(String, String)>,
         db: &PgPool,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, AsyncError> {
         let mut result = SearchQuery::empty();
         for (key, val) in query {
             match key.as_ref() {

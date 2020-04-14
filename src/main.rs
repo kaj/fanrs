@@ -51,7 +51,7 @@ impl Fanrs {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
-            Fanrs::RunServer(db) => server::run(&db.db_url).await,
+            Fanrs::RunServer(db) => Ok(server::run(&db.db_url).await?),
             Fanrs::FetchCovers(args) => args.run().await,
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
             Fanrs::CountPages(args) => args.run(),

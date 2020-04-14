@@ -32,9 +32,9 @@ use diesel::dsl::{not, sql};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::result::Error;
 use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
-use failure::Error;
 use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
 use regex::Regex;
@@ -243,7 +243,7 @@ impl FullEpisode {
         episode: Episode,
         issue: &Issue,
         db: &PgPool,
-    ) -> Result<FullEpisode, Error> {
+    ) -> Result<FullEpisode, AsyncError> {
         let refs = RefKeySet::for_episode_async(&episode, db).await?;
         let creators = CreatorSet::for_episode_async(&episode, db).await?;
         let published =

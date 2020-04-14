@@ -16,8 +16,7 @@ use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::{Integer, SmallInt};
 use diesel::QueryDsl;
-use failure::Error;
-use tokio_diesel::{AsyncRunQueryDsl, OptionalExtension};
+use tokio_diesel::{AsyncError, AsyncRunQueryDsl, OptionalExtension};
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::reject::not_found;
@@ -32,7 +31,7 @@ pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
     list.or(one).unify().boxed()
 }
 
-pub async fn get_all_fa(db: &PgPool) -> Result<Vec<RefKey>, Error> {
+pub async fn get_all_fa(db: &PgPool) -> Result<Vec<RefKey>, AsyncError> {
     Ok(r::refkeys
         .filter(r::kind.eq(RefKey::FA_ID))
         .order((sql::<Integer>("cast(substr(slug, 1, 2) as int)"), r::slug))
