@@ -3,12 +3,19 @@
 
 @(episode: &FullEpisode)
 @if let Some(ref teaser) = episode.episode.teaser {<p class="teaser">@teaser</p>}
-@if let Some(orig) = episode.episode.orig() {<p class="info orig">@orig</p>}
 @episode.refs
 @episode.creators
+@match (episode.episode.orig_dates(), episode.episode.orig()) {
+  (Some(dates), Some(orig)) =>
+    {<p class="info pub">@dates.kind() @orig @dates.</p>}
+  (Some(dates), None) =>
+    {<p class="info orig">@dates.kind() @dates.</p>}
+  (None, Some(orig)) =>
+    {<p class="info orig">@orig.langname() originlet @orig.</p>}
+  (None, None) => {}
+}
 @episode.published
 @if let Some(ref mag) = episode.orig_mag {<p class="info mag">Tidigare publicerad i @mag.</p>}
-@episode.episode.orig_dates()
 @if let Some((from, to)) = episode.episode.strip_nrs() {<p class="info orig">Stripp nr @from - @to.</p>}
 @if let Some(ref note) = episode.note() {<p class="info note">@note</p>}
 @if let Some(ref copyright) = episode.episode.copyright {<p class="info copyright">Copyright @copyright</p>}

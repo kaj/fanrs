@@ -124,11 +124,14 @@ impl Episode {
             None
         }
     }
-    pub fn orig_dates(&self) -> OrigDates {
-        OrigDates {
-            from: self.orig_date,
-            to: self.orig_to_date,
-            sun: self.sun,
+    pub fn orig_dates(&self) -> Option<OrigDates> {
+        match self.orig_date {
+            Some(date) => Some(OrigDates {
+                from: date,
+                to: self.orig_to_date,
+                sun: self.sun,
+            }),
+            None => None,
         }
     }
     pub fn strip_nrs(&self) -> Option<(i32, i32)> {
@@ -170,25 +173,26 @@ pub struct OrigEpisode<'a> {
     episode: &'a str,
 }
 
+impl<'a> OrigEpisode<'a> {
+    pub fn langname(&self) -> &'a str {
+        match self.lang {
+            "fr" => "Franska",
+            "en" => "Engelska",
+            l => l,
+        }
+    }
+}
+
 impl<'a> ToHtml for OrigEpisode<'a> {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
-        write!(
-            out,
-            "{} originalets titel: <i lang='{}'>",
-            match self.lang {
-                "fr" => "Franska",
-                "en" => "Engelska",
-                l => l,
-            },
-            self.lang,
-        )?;
+        write!(out, "<q lang='{}'>", self.lang)?;
         self.episode.to_html(out)?;
-        out.write_all(b"</i>")
+        out.write_all(b"</q>")
     }
 }
 
 pub struct OrigDates {
-    from: Option<NaiveDate>,
+    from: NaiveDate,
     to: Option<NaiveDate>,
     sun: bool,
 }
@@ -196,9 +200,18 @@ pub struct OrigDates {
 impl OrigDates {
     pub fn date(date: NaiveDate) -> Self {
         OrigDates {
-            from: Some(date),
+            from: date,
             to: None,
             sun: false,
+        }
+    }
+    pub fn kind(&self) -> &'static str {
+        if self.to.is_none() {
+            "Först publicerad"
+        } else if self.sun {
+            "Söndagssidor"
+        } else {
+            "Dagstrippar"
         }
     }
 }
@@ -206,23 +219,13 @@ impl OrigDates {
 impl ToHtml for OrigDates {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         match (self.from, self.to) {
-            (Some(from), Some(to)) if from != to => write!(
+            (from, Some(to)) if from != to => write!(
                 out,
-                "<p class='info dates'>{} {} - {}.</p>",
-                if self.sun {
-                    "Söndagssidor"
-                } else {
-                    "Dagstrippar"
-                },
+                "{} - {}",
                 SvDate(&from),
                 SvDate(&to),
             ),
-            (Some(date), _) => write!(
-                out,
-                "<p class='info date'>Först publicerad {}.</p>",
-                SvDate(&date),
-            ),
-            (None, _) => Ok(()),
+            (date, _) => write!(out, "{}", SvDate(&date)),
         }
     }
 }
