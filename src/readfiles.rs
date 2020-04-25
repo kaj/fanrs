@@ -6,7 +6,6 @@ use chrono::{Datelike, Local, NaiveDate};
 use diesel::prelude::*;
 use diesel::sql_query;
 use failure::{format_err, Error};
-use io_result_optional::IoResultOptional;
 use roxmltree::{Document, Node};
 use slug::slugify;
 use std::fs::read_to_string;
@@ -69,25 +68,33 @@ fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
 }
 
 fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
-    if let Some(data) =
-        read_to_string(base.join(format!("{}.data", year))).optional()?
-    {
-        for elem in child_elems(Document::parse(&data)?.root_element()) {
-            match elem.tag_name().name() {
-                "info" => (), // ignore
-                "issue" => register_issue(year, elem, db).map_err(|e| {
-                    format_err!(
-                        "In issue {}: {}",
-                        elem.attribute("nr").unwrap_or("?"),
-                        e
-                    )
-                })?,
-                _other => return Err(format_err!("Unexpected {:?}", elem)),
+    match read_to_string(base.join(format!("{}.data", year))) {
+        Ok(data) => {
+            for elem in child_elems(Document::parse(&data)?.root_element()) {
+                match elem.tag_name().name() {
+                    "info" => (), // ignore
+                    "issue" => {
+                        register_issue(year, elem, db).map_err(|e| {
+                            format_err!(
+                                "In issue {}: {}",
+                                elem.attribute("nr").unwrap_or("?"),
+                                e
+                            )
+                        })?
+                    }
+                    _other => {
+                        return Err(format_err!("Unexpected {:?}", elem));
+                    }
+                }
             }
         }
-    } else {
-        eprintln!("No data found for {}", year);
-    };
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("No data found for {}", year);
+        }
+        Err(e) => {
+            return Err(e.into());
+        }
+    }
     Ok(())
 }
 
