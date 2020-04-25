@@ -219,12 +219,9 @@ impl OrigDates {
 impl ToHtml for OrigDates {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         match (self.from, self.to) {
-            (from, Some(to)) if from != to => write!(
-                out,
-                "{} - {}",
-                SvDate(&from),
-                SvDate(&to),
-            ),
+            (from, Some(to)) if from != to => {
+                write!(out, "{} - {}", SvDate(&from), SvDate(&to))
+            }
             (date, _) => write!(out, "{}", SvDate(&date)),
         }
     }
