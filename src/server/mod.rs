@@ -184,6 +184,21 @@ pub struct PublishedInfo {
     pub classnames: &'static str,
 }
 
+impl PublishedInfo {
+    pub fn classnames(&self) -> String {
+        match self.content {
+            PublishedContent::EpisodePart {
+                title: _,
+                episode: _,
+                part: _,
+                best_plac: Some(p),
+                label: _,
+            } if p <= 3 => format!("{} best{}", self.classnames, p),
+            _ => self.classnames.to_string(),
+        }
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
 pub enum PublishedContent {
     Text(FullArticle),
@@ -260,6 +275,14 @@ impl FullEpisode {
 
     pub fn note(&self) -> Option<Html<String>> {
         self.episode.note.as_ref().map(|s| text_to_fa_html(s))
+    }
+    pub fn bestclass(&self) -> &str {
+        match self.published.bestplac() {
+            Some(1) => "best1",
+            Some(2) => "best2",
+            Some(3) => "best3",
+            _ => "",
+        }
     }
 }
 

@@ -42,7 +42,7 @@
     <h2>Episoder och artiklar</h2>
     @for hit in hits {
       @if let Hit::Episode{ title, fe } = hit {
-        <section class="episode">
+        <section class="episode @fe.bestclass()">
           <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
           @:epmisc(&fe)
         </section>

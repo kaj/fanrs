@@ -46,6 +46,7 @@ impl PartsPublished {
                 .select((
                     (i::year, (i::number, i::number_str)),
                     (ep::id, ep::part_no, ep::part_name),
+                    p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode))
                 .order((i::year, i::number))
@@ -63,6 +64,7 @@ impl PartsPublished {
                 .select((
                     (i::year, (i::number, i::number_str)),
                     (ep::id, ep::part_no, ep::part_name),
+                    p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode))
                 .order((i::year, i::number))
@@ -83,6 +85,7 @@ impl PartsPublished {
                 .select((
                     (i::year, (i::number, i::number_str)),
                     (ep::id, ep::part_no, ep::part_name),
+                    p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode.id))
                 .filter(i::id.ne(issue.id))
@@ -97,6 +100,9 @@ impl PartsPublished {
     }
     pub fn last(&self) -> Option<&IssueRef> {
         self.issues.last().map(|p| &p.0)
+    }
+    pub fn bestplac(&self) -> Option<i16> {
+        self.issues.iter().flat_map(|i| i.2).min()
     }
 }
 

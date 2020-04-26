@@ -10,8 +10,8 @@
   <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>
-      <div class="info">
-	<img src="/c/f@issue.year-@issue.number&#46;jpg" alt="">
+      <div class="info cover@if let Some(b) = issue.cover_best { best@b}">
+	<span class="img"><img src="/c/f@issue.year-@issue.number&#46;jpg" alt=""></span>
 	<div class="innerinfo">
 	  @if let Some((last_c, creators)) = cover_by.split_last()
 	  {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
@@ -24,9 +24,9 @@
       </div>
     </header>
     <div class="content">
-      @for PublishedInfo{content, seqno, classnames} in contents {
-      <section class="@classnames" @if let Some(seqno) = seqno {data-seq="@seqno"}>
-	@match content {
+      @for item in contents {
+      <section class="@item.classnames()" @if let Some(seqno) = item.seqno {data-seq="@seqno"}>
+	@match &item.content {
 	EpisodePart{title, episode, part, best_plac, label} => {
 	@if label != "" {<p class="info label">@label:</p> }
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>

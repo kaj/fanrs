@@ -35,7 +35,7 @@
       @for (issue, best) in &covers.best {
       <div class="cover@if let Some(best) = best { best@best}">
 	<p>@issue</p>
-	<img src="@issue.cover_url()">
+	<span class="img"><img src="@issue.cover_url()" alt=""></span>
 	@if let Some(best) = best {<p class="info">Nr @best i bästa omslag.</p>}
       </div>
       }
@@ -53,7 +53,7 @@
   <section>
     <h2>Episoder</h2>
     @for (title, fe) in episodes {
-    <section class="episode">
+    <section class="episode @fe.bestclass()">
       <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
       @:epmisc(&fe)
     </section>

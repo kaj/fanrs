@@ -41,7 +41,7 @@
   <section>
     <h2>Episoder</h2>
     @for fe in episodes {
-    <section class="episode">
+    <section class="episode @fe.bestclass()">
       <h3>@if let Some(ref h) = fe.episode.episode {@h} else {@title.title}</h3>
       @:epmisc(&fe)
     </section>
