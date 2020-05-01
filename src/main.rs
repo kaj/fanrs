@@ -4,6 +4,7 @@ extern crate diesel;
 
 mod checkstrips;
 mod count_pages;
+mod dbopt;
 mod fetchcovers;
 mod listissues;
 mod models;
@@ -13,10 +14,9 @@ mod server;
 
 use crate::checkstrips::check_strips;
 use crate::listissues::list_issues;
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
+use dbopt::DbOpt;
 use dotenv::dotenv;
-use failure::{format_err, Error};
+use failure::Error;
 use std::process::exit;
 use structopt::StructOpt;
 
@@ -30,7 +30,7 @@ enum Fanrs {
     ListIssues(DbOpt),
 
     /// Run the web server.
-    RunServer(DbOpt),
+    RunServer(server::Args),
 
     /// Fetch missing cover images from phantomwiki.
     FetchCovers(fetchcovers::Args),
@@ -51,26 +51,11 @@ impl Fanrs {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
-            Fanrs::RunServer(db) => Ok(server::run(&db.db_url).await?),
+            Fanrs::RunServer(args) => Ok(args.run().await?),
             Fanrs::FetchCovers(args) => args.run().await,
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
             Fanrs::CountPages(args) => args.run(),
         }
-    }
-}
-
-#[derive(StructOpt)]
-struct DbOpt {
-    /// How to connect to the postgres database.
-    #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
-    db_url: String,
-}
-
-impl DbOpt {
-    fn get_db(&self) -> Result<PgConnection, Error> {
-        PgConnection::establish(&self.db_url).map_err(|e| {
-            format_err!("Failed to establish postgres connection: {}", e)
-        })
     }
 }
 

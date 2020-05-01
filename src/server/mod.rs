@@ -27,18 +27,19 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, Html, RenderRucte, ToHtml};
+use crate::DbOpt;
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::Error;
+use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 use diesel::sql_types::SmallInt;
 use diesel::QueryDsl;
 use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
+use structopt::StructOpt;
 use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
@@ -47,6 +48,12 @@ use warp::http::status::StatusCode;
 use warp::path::Tail;
 use warp::reply::Response;
 use warp::{self, reject::not_found, Filter, Rejection, Reply};
+
+#[derive(StructOpt)]
+pub struct Args {
+    #[structopt(flatten)]
+    db: DbOpt,
+}
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 type PgFilter = BoxedFilter<(PgPool,)>;
@@ -57,62 +64,64 @@ fn goh() -> BoxedFilter<()> {
     get().or(head()).unify().boxed()
 }
 
-pub async fn run(db_url: &str) -> Result<(), Error> {
-    let pool = pg_pool(db_url);
-    let s = warp::any().map(move || pool.clone()).boxed();
-    let s = move || s.clone();
-    use warp::filters::query::query;
-    use warp::{path, path::end, path::param, path::tail};
-    let routes = warp::any()
-        .and(goh().and(path("s")).and(tail()).and_then(static_file))
-        .or(goh()
-            .and(path("c"))
-            .and(s())
-            .and(param())
-            .and(end())
-            .and_then(cover_image))
-        .or(goh().and(end()).and(s()).and_then(frontpage))
-        .or(goh()
-            .and(path("search"))
-            .and(end())
-            .and(s())
-            .and(query())
-            .and_then(search))
-        .or(goh()
-            .and(path("ac"))
-            .and(end())
-            .and(s())
-            .and(query())
-            .and_then(search_autocomplete))
-        .or(path("titles").and(titles::routes(s())))
-        .or(goh()
-            .and(path("fa"))
-            .and(s())
-            .and(param())
-            .and(end())
-            .and_then(one_fa))
-        .or(path("what").and(refs::what_routes(s())))
-        .or(path("who").and(creators::routes(s())))
-        .or(goh()
-            .and(path("static"))
-            .and(s())
-            .and(param())
-            .and(param())
-            .and(end())
-            .and_then(redirect_cover))
-        .or(goh()
-            .and(path("robots.txt"))
-            .and(end())
-            .and_then(robots_txt))
-        .or(goh().and(s()).and(param()).and(end()).and_then(list_year))
-        .or(goh()
-            .and(s())
-            .and(param())
-            .and(end())
-            .and_then(titles::oldslug))
-        .recover(customize_error);
-    warp::serve(routes).run(([127, 0, 0, 1], 1536)).await;
-    Ok(())
+impl Args {
+    pub async fn run(&self) -> Result<(), PoolError> {
+        let pool = self.db.get_pool()?;
+        let s = warp::any().map(move || pool.clone()).boxed();
+        let s = move || s.clone();
+        use warp::filters::query::query;
+        use warp::{path, path::end, path::param, path::tail};
+        let routes = warp::any()
+            .and(goh().and(path("s")).and(tail()).and_then(static_file))
+            .or(goh()
+                .and(path("c"))
+                .and(s())
+                .and(param())
+                .and(end())
+                .and_then(cover_image))
+            .or(goh().and(end()).and(s()).and_then(frontpage))
+            .or(goh()
+                .and(path("search"))
+                .and(end())
+                .and(s())
+                .and(query())
+                .and_then(search))
+            .or(goh()
+                .and(path("ac"))
+                .and(end())
+                .and(s())
+                .and(query())
+                .and_then(search_autocomplete))
+            .or(path("titles").and(titles::routes(s())))
+            .or(goh()
+                .and(path("fa"))
+                .and(s())
+                .and(param())
+                .and(end())
+                .and_then(one_fa))
+            .or(path("what").and(refs::what_routes(s())))
+            .or(path("who").and(creators::routes(s())))
+            .or(goh()
+                .and(path("static"))
+                .and(s())
+                .and(param())
+                .and(param())
+                .and(end())
+                .and_then(redirect_cover))
+            .or(goh()
+                .and(path("robots.txt"))
+                .and(end())
+                .and_then(robots_txt))
+            .or(goh().and(s()).and(param()).and(end()).and_then(list_year))
+            .or(goh()
+                .and(s())
+                .and(param())
+                .and(end())
+                .and_then(titles::oldslug))
+            .recover(customize_error);
+        warp::serve(routes).run(([127, 0, 0, 1], 1536)).await;
+        Ok(())
+    }
 }
 
 /// Handler for static files.
@@ -137,14 +146,6 @@ async fn robots_txt() -> Result<impl Reply, Rejection> {
     Ok(Builder::new()
         .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
         .body("User-agent: *\nDisallow: /search\nDisallow: /ac\n"))
-}
-
-fn pg_pool(database_url: &str) -> PgPool {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    Pool::builder()
-        .test_on_check_out(false)
-        .build(manager)
-        .expect("Postgres connection pool could not be created")
 }
 
 async fn frontpage(db: PgPool) -> Result<impl Reply, Rejection> {
