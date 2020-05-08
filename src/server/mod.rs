@@ -189,11 +189,7 @@ impl PublishedInfo {
     pub fn classnames(&self) -> String {
         match self.content {
             PublishedContent::EpisodePart {
-                title: _,
-                episode: _,
-                part: _,
-                best_plac: Some(p),
-                label: _,
+                best_plac: Some(p), ..
             } if p <= 3 => format!("{} best{}", self.classnames, p),
             _ => self.classnames.to_string(),
         }
