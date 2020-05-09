@@ -45,9 +45,9 @@ impl Issue {
             .first::<Issue>(db)
             .optional()?
         {
-            if t.cover_best != cover_best
-                || t.pages != pages
-                || t.price != price
+            if (t.cover_best != cover_best)
+                || (t.pages != pages)
+                || (t.price != price)
             {
                 diesel::update(dsl::issues)
                     .filter(dsl::year.eq(year))
