@@ -84,13 +84,13 @@ async fn one_creator(
     };
 
     let about_raw = a::articles
-        .select(a::articles::all_columns())
+        .select(Article::columns)
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(r::kind.eq(RefKey::WHO_ID))
         .filter(r::slug.eq(creator.slug.clone()))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
-        .group_by(a::articles::all_columns())
+        .group_by(Article::columns)
         .load_async::<Article>(&db)
         .await
         .map_err(custom)?;
@@ -111,7 +111,7 @@ async fn one_creator(
         ));
     }
 
-    let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
+    let e_t_columns = (t::titles::all_columns(), Episode::columns);
     let main_episodes_raw = e::episodes
         .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
         .inner_join(t::titles)
@@ -136,12 +136,12 @@ async fn one_creator(
     }
 
     let articles_by_raw = a::articles
-        .select(a::articles::all_columns())
+        .select(Article::columns)
         .inner_join(ab::articles_by.inner_join(ca::creator_aliases))
         .filter(ca::creator_id.eq(creator.id))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
-        .group_by(a::articles::all_columns())
+        .group_by(Article::columns)
         .load_async::<Article>(&db)
         .await
         .map_err(custom)?;

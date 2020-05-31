@@ -144,12 +144,12 @@ async fn one_ref_impl(
     };
 
     let raw_articles = a::articles
-        .select(a::articles::all_columns())
+        .select(Article::columns)
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(ar::refkey_id.eq(refkey.id))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
-        .group_by(a::articles::all_columns())
+        .group_by(Article::columns)
         .load_async::<Article>(&db)
         .await
         .map_err(custom)?;
@@ -175,7 +175,7 @@ async fn one_ref_impl(
         .left_join(er::episode_refkeys)
         .inner_join(t::titles)
         .filter(er::refkey_id.eq(refkey.id))
-        .select((t::titles::all_columns(), e::episodes::all_columns()))
+        .select((t::titles::all_columns(), Episode::columns))
         .inner_join(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),

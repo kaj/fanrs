@@ -7,11 +7,14 @@ table! {
 }
 
 table! {
+    use diesel::sql_types::*;
+    use diesel_full_text_search::TsVector;
     articles (id) {
         id -> Int4,
         title -> Varchar,
         subtitle -> Nullable<Varchar>,
         note -> Nullable<Text>,
+        ts -> TsVector,
     }
 }
 
@@ -75,6 +78,8 @@ table! {
 }
 
 table! {
+    use diesel::sql_types::*;
+    use diesel_full_text_search::TsVector;
     episodes (id) {
         id -> Int4,
         title -> Int4,
@@ -90,6 +95,7 @@ table! {
         orig_mag -> Nullable<Int4>,
         strip_from -> Nullable<Int4>,
         strip_to -> Nullable<Int4>,
+        ts -> TsVector,
     }
 }
 
