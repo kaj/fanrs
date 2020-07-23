@@ -2,7 +2,6 @@ use super::{OtherMag, RefKey, Title};
 use crate::server::PgPool;
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
-use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;

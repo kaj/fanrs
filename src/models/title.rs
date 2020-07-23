@@ -4,7 +4,6 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::titles::dsl as t;
 use crate::server::PgPool;
 use crate::templates::ToHtml;
-use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;

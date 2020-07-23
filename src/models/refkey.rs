@@ -5,7 +5,6 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::refkeys::dsl as r;
 use crate::server::PgPool;
 use crate::templates::ToHtml;
-use diesel;
 use diesel::dsl::sql;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;

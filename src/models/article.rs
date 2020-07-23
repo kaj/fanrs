@@ -2,7 +2,6 @@ use super::RefKey;
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
 use crate::schema::publications::dsl as p;
-use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;

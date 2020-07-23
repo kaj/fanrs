@@ -81,7 +81,7 @@ impl CreatorSet {
     fn from_data(data: Vec<(String, Creator)>) -> CreatorSet {
         let mut result: BTreeMap<String, Vec<Creator>> = BTreeMap::new();
         for (role, creator) in data {
-            result.entry(role).or_insert_with(|| vec![]).push(creator);
+            result.entry(role).or_insert_with(Vec::new).push(creator);
         }
         CreatorSet(result)
     }

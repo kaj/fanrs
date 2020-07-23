@@ -1,6 +1,5 @@
 use super::price::Price;
 use crate::templates::ToHtml;
-use diesel;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::result::Error;
