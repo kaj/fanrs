@@ -254,13 +254,11 @@ fn register_serie(
                     let year = get_text(e, "year")
                         .ok_or_else(|| format_err!("year missing"))?
                         .parse()?;
-                    let issue =
-                        Issue::get_or_create(year, nr, None, None, None, db)?;
                     Part::publish(
                         &episode,
                         None,
                         None,
-                        &issue,
+                        &Issue::get_or_create_ref(year, nr, db)?,
                         None,
                         get_best_plac(c),
                         &get_text_norm(c, "label").unwrap_or_default(),
