@@ -1,5 +1,6 @@
 mod covers;
 mod creators;
+mod error;
 mod paginator;
 mod publist;
 mod refs;
@@ -13,6 +14,7 @@ pub use self::publist::{OtherContribs, PartsPublished};
 use self::refs::{get_all_fa, one_fa};
 use self::search::{search, search_autocomplete};
 
+use self::error::{OptionalExtension, ServerError};
 use crate::models::{
     Article, Creator, CreatorSet, Episode, Issue, OtherMag, Part, RefKey,
     RefKeySet, Title,
@@ -38,6 +40,7 @@ use diesel::QueryDsl;
 use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
 use regex::Regex;
+use std::convert::Infallible;
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
@@ -47,7 +50,7 @@ use warp::http::response::Builder;
 use warp::http::status::StatusCode;
 use warp::path::Tail;
 use warp::reply::Response;
-use warp::{self, reject::not_found, Filter, Rejection, Reply};
+use warp::{self, Filter, Rejection, Reply};
 
 #[derive(StructOpt)]
 pub struct Args {
@@ -72,33 +75,33 @@ impl Args {
         use warp::filters::query::query;
         use warp::{path, path::end, path::param, path::tail};
         let routes = warp::any()
-            .and(goh().and(path("s")).and(tail()).and_then(static_file))
+            .and(goh().and(path("s")).and(tail()).map_async(static_file))
             .or(goh()
                 .and(path("c"))
                 .and(s())
                 .and(param())
                 .and(end())
-                .and_then(cover_image))
-            .or(goh().and(end()).and(s()).and_then(frontpage))
+                .map_async(cover_image))
+            .or(goh().and(end()).and(s()).map_async(frontpage))
             .or(goh()
                 .and(path("search"))
                 .and(end())
                 .and(s())
                 .and(query())
-                .and_then(search))
+                .map_async(search))
             .or(goh()
                 .and(path("ac"))
                 .and(end())
                 .and(s())
                 .and(query())
-                .and_then(search_autocomplete))
+                .map_async(search_autocomplete))
             .or(path("titles").and(titles::routes(s())))
             .or(goh()
                 .and(path("fa"))
                 .and(s())
                 .and(param())
                 .and(end())
-                .and_then(one_fa))
+                .map_async(one_fa))
             .or(path("what").and(refs::what_routes(s())))
             .or(path("who").and(creators::routes(s())))
             .or(goh()
@@ -107,17 +110,17 @@ impl Args {
                 .and(param())
                 .and(param())
                 .and(end())
-                .and_then(redirect_cover))
+                .map_async(redirect_cover))
             .or(goh()
                 .and(path("robots.txt"))
                 .and(end())
-                .and_then(robots_txt))
-            .or(goh().and(s()).and(param()).and(end()).and_then(list_year))
+                .map_async(robots_txt))
+            .or(goh().and(s()).and(param()).and(end()).map_async(list_year))
             .or(goh()
                 .and(s())
                 .and(param())
                 .and(end())
-                .and_then(titles::oldslug))
+                .map_async(titles::oldslug))
             .recover(customize_error);
         warp::serve(routes).run(([127, 0, 0, 1], 1536)).await;
         Ok(())
@@ -128,7 +131,7 @@ impl Args {
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
 #[allow(clippy::needless_pass_by_value)]
-async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
+async fn static_file(name: Tail) -> Result<impl Reply, ServerError> {
     use crate::templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
@@ -138,44 +141,42 @@ async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
             .body(data.content))
     } else {
         log::info!("Static file {:?} not found", name);
-        Err(not_found())
+        Err(ServerError::not_found())
     }
 }
 
-async fn robots_txt() -> Result<impl Reply, Rejection> {
+async fn robots_txt() -> Result<impl Reply, ServerError> {
     Ok(Builder::new()
         .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
         .body("User-agent: *\nDisallow: /search\nDisallow: /ac\n"))
 }
 
-async fn frontpage(db: PgPool) -> Result<impl Reply, Rejection> {
+async fn frontpage(db: PgPool) -> Result<impl Reply, ServerError> {
     let n = p::publications
         .select(sql("count(distinct issue)"))
         .filter(not(p::seqno.is_null()))
         .first_async(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
 
     let years = i::issues
         .select(i::year)
         .distinct()
         .order(i::year)
         .load_async(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
 
-    let all_fa = get_all_fa(&db).await.map_err(custom)?;
+    let all_fa = get_all_fa(&db).await?;
 
     let num = 50;
-    let titles = Title::cloud(num, &db).await.map_err(custom)?;
-    let refkeys = RefKey::cloud(num, &db).await.map_err(custom)?;
-    let creators = Creator::cloud(num, &db).await.map_err(custom)?;
+    let titles = Title::cloud(num, &db).await?;
+    let refkeys = RefKey::cloud(num, &db).await?;
+    let creators = Creator::cloud(num, &db).await?;
 
-    Builder::new().html(|o| {
+    Ok(Builder::new().html(|o| {
         templates::frontpage(
             o, n, &all_fa, &years, &titles, &refkeys, &creators,
         )
-    })
+    })?)
 }
 
 /// Information about an episode / part or article, as published in an issue.
@@ -376,15 +377,14 @@ fn text_to_fa_html_e() {
     )
 }
 
-async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
+async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, ServerError> {
     let issues_raw: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
         .load_async(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
     if issues_raw.is_empty() {
-        return Err(not_found());
+        return Err(ServerError::not_found());
     }
     let mut issues = Vec::with_capacity(issues_raw.len());
     for issue in issues_raw.into_iter() {
@@ -394,8 +394,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
             .select(c_columns)
             .filter(cb::issue_id.eq(issue.id))
             .load_async(&db)
-            .await
-            .map_err(custom)?;
+            .await?;
 
         let mut have_main = false;
         let content_raw = p::publications
@@ -425,8 +424,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 Option<i16>,
                 String,
             )>(&db)
-            .await
-            .map_err(custom)?;
+            .await?;
         let mut contents = Vec::with_capacity(content_raw.len());
         for row in content_raw.into_iter() {
             match row {
@@ -444,8 +442,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                     let content = PublishedContent::EpisodePart {
                         title: t,
                         episode: FullEpisode::in_issue(e, &issue, &db)
-                            .await
-                            .map_err(custom)?,
+                            .await?,
                         part,
                         best_plac: b,
                         label,
@@ -459,9 +456,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 (None, Some(a), seqno, None, _label) => {
                     contents.push(PublishedInfo {
                         content: PublishedContent::Text(
-                            FullArticle::load_async(a, &db)
-                                .await
-                                .map_err(custom)?,
+                            FullArticle::load_async(a, &db).await?,
                         ),
                         seqno,
                         classnames: "article",
@@ -475,46 +470,23 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
     let years = i::issues
         .select((sql::<SmallInt>("min(year)"), sql::<SmallInt>("max(year)")))
         .first_async::<(i16, i16)>(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
     let years = YearLinks::new(years.0 as u16, year, years.1 as u16);
-    Builder::new().html(|o| templates::year(o, year, &years, &issues))
+    Ok(Builder::new().html(|o| templates::year(o, year, &years, &issues))?)
 }
 
-fn custom_or_404(e: AsyncError) -> Rejection {
-    match e {
-        AsyncError::Error(diesel::result::Error::NotFound) => not_found(),
-        e => custom(e),
-    }
-}
-
-fn redirect(url: &str) -> Result<Response, Rejection> {
+fn redirect(url: &str) -> Response {
     use warp::http::header::LOCATION;
     let msg = format!("Try {:?}", url);
     Builder::new()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
         .body(msg.into())
-        .map_err(custom)
+        .unwrap()
 }
 
-async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
-    if err.is_not_found() {
-        log::debug!("Got a 404: {:?}", err);
-        Builder::new()
-            .status(StatusCode::NOT_FOUND)
-            .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
-    } else {
-        if let Some(ise) = err.find::<ISE>() {
-            log::error!("Internal server error: {}", ise.0);
-        } else {
-            log::error!("Internal server error: {:?}", err);
-        }
-        let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
-        Builder::new()
-            .status(code)
-            .html(|o| templates::error(o, code))
-    }
+async fn customize_error(err: Rejection) -> Result<impl Reply, Infallible> {
+    Ok(ServerError::from(err))
 }
 
 pub struct YearLinks {
@@ -565,13 +537,4 @@ impl ToHtml for YearLinks {
         }
         Ok(())
     }
-}
-
-use warp::reject::Reject;
-#[derive(Debug)]
-struct ISE(String);
-impl Reject for ISE {}
-
-fn custom<E: std::fmt::Display + std::fmt::Debug>(e: E) -> Rejection {
-    warp::reject::custom(ISE(format!("{}\nDetails: ({:#?})", e, e)))
 }

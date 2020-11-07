@@ -1,4 +1,4 @@
-use super::{custom, FullArticle, FullEpisode, PgPool};
+use super::{FullArticle, FullEpisode, PgPool, ServerError};
 use crate::models::{
     Article, Creator, Episode, IdRefKey, IssueRef, RefKey, Title,
 };
@@ -23,27 +23,26 @@ use serde::{Deserialize, Serialize};
 use tokio_diesel::{AsyncConnection, AsyncError, AsyncRunQueryDsl};
 use warp::http::Response;
 use warp::reply::json;
-use warp::{self, Rejection, Reply};
+use warp::{self, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn search(
     db: PgPool,
     query: Vec<(String, String)>,
-) -> Result<impl Reply, Rejection> {
-    let query = SearchQuery::load(query, &db).await.map_err(custom)?;
+) -> Result<impl Reply, ServerError> {
+    let query = SearchQuery::load(query, &db).await?;
     let (query, titles, creators, refkeys, episodes) = db
         .run(|c| query.do_search(c).map(|(t, c, r, e)| (query, t, c, r, e)))
-        .await
-        .map_err(custom)?;
-    Response::builder().html(|o| {
+        .await?;
+    Ok(Response::builder().html(|o| {
         templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
-    })
+    })?)
 }
 
 pub async fn search_autocomplete(
     db: PgPool,
     query: AcQuery,
-) -> Result<impl Reply, Rejection> {
+) -> Result<impl Reply, ServerError> {
     let q = format!("%{}%", query.q);
     let mut titles = t::titles
         .select((t::title, t::slug))
@@ -51,8 +50,7 @@ pub async fn search_autocomplete(
         .order_by(t::title)
         .limit(8)
         .load_async::<(String, String)>(&db)
-        .await
-        .map_err(custom)?
+        .await?
         .into_iter()
         .map(|(t, s)| Completion::title(t, s))
         .collect::<Vec<_>>();
@@ -65,8 +63,7 @@ pub async fn search_autocomplete(
             .order(sql::<Text>("min(creator_aliases.name)"))
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
             .load_async::<(String, String)>(&db)
-            .await
-            .map_err(custom)?
+            .await?
             .into_iter()
             .map(|(t, s)| Completion::creator(t, s))
             .collect(),
@@ -79,8 +76,7 @@ pub async fn search_autocomplete(
             .order(r::title)
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
             .load_async::<(i16, String, String)>(&db)
-            .await
-            .map_err(custom)?
+            .await?
             .into_iter()
             .map(|(k, t, s)| Completion::refkey(k, t, s))
             .collect(),

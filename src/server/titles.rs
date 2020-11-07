@@ -1,6 +1,6 @@
 use super::{
-    custom, custom_or_404, goh, redirect, FullArticle, FullEpisode,
-    Paginator, PgFilter, PgPool, RenderRucte,
+    goh, redirect, FullArticle, FullEpisode, OptionalExtension, Paginator,
+    PgFilter, PgPool, RenderRucte, ServerError,
 };
 use crate::models::{Article, Episode, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -20,24 +20,24 @@ use tokio_diesel::AsyncRunQueryDsl;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reject::not_found;
-use warp::{self, reply::Response, Filter, Rejection, Reply};
+use warp::{self, reply::Response, Filter, Reply};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::filters::query::query;
     use warp::path::{end, param};
     let s = || s.clone();
-    let list = goh().and(end()).and(s()).and_then(list_titles);
+    let list = goh().and(end()).and(s()).map_async(list_titles);
     let one = goh()
         .and(s())
         .and(param())
         .and(end())
         .and(query())
-        .and_then(one_title);
+        .map_async(one_title);
     list.or(one).unify().boxed()
 }
 
 #[allow(clippy::needless_pass_by_value)]
-async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
+async fn list_titles(db: PgPool) -> Result<Response, ServerError> {
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -51,8 +51,7 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
         .group_by(t::titles::all_columns())
         .order(t::title)
         .load_async(&db)
-        .await
-        .map_err(custom)?
+        .await?
         .into_iter()
         .map(|(title, c, first, last)| {
             Ok((
@@ -62,8 +61,8 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
                 IssueRef::from_magic(last),
             ))
         })
-        .collect::<Result<Vec<_>, Rejection>>()?;
-    Builder::new().html(|o| templates::titles(o, &all))
+        .collect::<Result<Vec<_>, ServerError>>()?;
+    Ok(Builder::new().html(|o| templates::titles(o, &all))?)
 }
 
 #[derive(Deserialize)]
@@ -76,7 +75,7 @@ async fn one_title(
     db: PgPool,
     slug: String,
     page: PageParam,
-) -> Result<Response, Rejection> {
+) -> Result<Response, ServerError> {
     let (slug, strip) = if let Some(strip) = slug.strip_prefix("weekdays-") {
         (strip.to_string(), Some(false))
     } else if let Some(strip) = slug.strip_prefix("sundays-") {
@@ -88,7 +87,7 @@ async fn one_title(
         .filter(t::slug.eq(slug))
         .first_async::<Title>(&db)
         .await
-        .map_err(custom_or_404)?;
+        .or_404()?;
 
     let articles_raw = a::articles
         .select(a::articles::all_columns())
@@ -100,7 +99,7 @@ async fn one_title(
         .group_by(a::articles::all_columns())
         .load_async::<Article>(&db)
         .await
-        .map_err(custom)?;
+        .or_404()?;
     let mut articles = Vec::with_capacity(articles_raw.len());
     for article in articles_raw.into_iter() {
         let published = i::issues
@@ -108,14 +107,9 @@ async fn one_title(
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
             .load_async::<IssueRef>(&db)
-            .await
-            .map_err(custom)?;
-        articles.push((
-            FullArticle::load_async(article, &db)
-                .await
-                .map_err(custom)?,
-            published,
-        ));
+            .await?;
+        articles
+            .push((FullArticle::load_async(article, &db).await?, published));
     }
 
     let episodes = e::episodes
@@ -128,18 +122,20 @@ async fn one_title(
         .group_by(crate::schema::episodes::all_columns);
 
     let episodes = match strip {
-        Some(sun) => episodes
-            .filter(e::orig_sundays.eq(sun))
-            .filter(e::orig_date.is_not_null())
-            .order(e::orig_date)
-            .load_async::<Episode>(&db)
-            .await
-            .map_err(custom)?,
-        None => episodes
-            .order(min(i::magic))
-            .load_async::<Episode>(&db)
-            .await
-            .map_err(custom)?,
+        Some(sun) => {
+            episodes
+                .filter(e::orig_sundays.eq(sun))
+                .filter(e::orig_date.is_not_null())
+                .order(e::orig_date)
+                .load_async::<Episode>(&db)
+                .await?
+        }
+        None => {
+            episodes
+                .order(min(i::magic))
+                .load_async::<Episode>(&db)
+                .await?
+        }
     };
 
     let (episodes_raw, pages) =
@@ -147,32 +143,28 @@ async fn one_title(
 
     let mut episodes = Vec::with_capacity(episodes_raw.len());
     for episode in episodes_raw.into_iter() {
-        episodes.push(
-            FullEpisode::load_details_async(episode, &db)
-                .await
-                .map_err(custom)?,
-        );
+        episodes.push(FullEpisode::load_details_async(episode, &db).await?);
     }
 
-    Builder::new().html(|o| {
+    Ok(Builder::new().html(|o| {
         templates::title(o, &title, pages.as_ref(), &articles, &episodes)
-    })
+    })?)
 }
 
 pub async fn oldslug(
     db: PgPool,
     slug: String,
-) -> Result<impl Reply, Rejection> {
+) -> Result<impl Reply, ServerError> {
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;
-        return redirect(&format!("/s/{}", goda_svg.name));
+        return Ok(redirect(&format!("/s/{}", goda_svg.name)));
     }
     if slug == "apple-touch-icon.png"
         || slug == "apple-touch-icon-precomposed.png"
     {
         use templates::statics::sc_png;
-        return redirect(&format!("/s/{}", sc_png.name));
+        return Ok(redirect(&format!("/s/{}", sc_png.name)));
     }
     let target = slug.replace("_", "-").replace(".html", "");
 
@@ -181,10 +173,9 @@ pub async fn oldslug(
             .filter(i::year.eq(year))
             .select(count_star())
             .first_async::<i64>(&db)
-            .await
-            .map_err(custom)?;
+            .await?;
         if issues > 0 {
-            return redirect(&format!("/{}", year));
+            return Ok(redirect(&format!("/{}", year)));
         }
     }
     let target = slug.replace("weekdays-", "").replace("sundays-", "");
@@ -193,10 +184,9 @@ pub async fn oldslug(
         .filter(t::slug.eq(target.clone()))
         .select(count_star())
         .first_async::<i64>(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
     if n == 1 {
-        return redirect(&format!("/titles/{}", target));
+        return Ok(redirect(&format!("/titles/{}", target)));
     }
     let target = t::titles
         .filter(
@@ -212,6 +202,6 @@ pub async fn oldslug(
         .select(t::slug)
         .first_async::<String>(&db)
         .await
-        .map_err(custom_or_404)?;
-    redirect(&format!("/titles/{}", target))
+        .or_404()?;
+    Ok(redirect(&format!("/titles/{}", target)))
 }
