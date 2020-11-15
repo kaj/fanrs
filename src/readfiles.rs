@@ -30,7 +30,7 @@ pub struct Args {
     all: bool,
 
     /// Year(s) to read data for.
-    #[structopt(name = "year")]
+    #[structopt(name = "year", required_unless("all"))]
     years: Vec<u32>,
 }
 
@@ -44,11 +44,6 @@ impl Args {
                 load_year(&self.basedir, year, &db)?;
             }
         } else {
-            if self.years.is_empty() {
-                return Err(format_err!(
-                    "No year(s) to read files for given."
-                ));
-            }
             for year in self.years {
                 load_year(&self.basedir, year as i16, &db)?;
             }
@@ -57,7 +52,7 @@ impl Args {
         let start = Instant::now();
         sql_query("refresh materialized view creator_contributions;")
             .execute(&db)?;
-        println!("Updated creators view in {:?}", start.elapsed());
+        println!("Updated creators view in {:.3?}", start.elapsed());
         Ok(())
     }
 }
