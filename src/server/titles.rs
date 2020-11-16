@@ -91,13 +91,13 @@ async fn one_title(
         .map_err(custom_or_404)?;
 
     let articles_raw = a::articles
-        .select(a::articles::all_columns())
+        .select(Article::columns)
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(r::kind.eq(RefKey::TITLE_ID))
         .filter(r::slug.eq(title.slug.clone()))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
-        .group_by(a::articles::all_columns())
+        .group_by(Article::columns)
         .load_async::<Article>(&db)
         .await
         .map_err(custom)?;
@@ -120,12 +120,12 @@ async fn one_title(
 
     let episodes = e::episodes
         .filter(e::title.eq(title.id))
-        .select(e::episodes::all_columns())
+        .select(Episode::columns)
         .inner_join(
             ep::episode_parts
                 .inner_join(p::publications.inner_join(i::issues)),
         )
-        .group_by(crate::schema::episodes::all_columns);
+        .group_by(Episode::columns);
 
     let episodes = match strip {
         Some(sun) => episodes

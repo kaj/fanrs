@@ -407,11 +407,11 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
             .select((
                 (
                     t::titles::all_columns(),
-                    e::episodes::all_columns(),
+                    Episode::columns,
                     (ep::id, ep::part_no, ep::part_name),
                 )
                     .nullable(),
-                a::articles::all_columns().nullable(),
+                Article::columns.nullable(),
                 p::seqno,
                 p::best_plac,
                 p::label,

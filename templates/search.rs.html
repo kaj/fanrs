@@ -41,20 +41,21 @@
   <section class="searchresults">
     <h2>Episoder och artiklar</h2>
     @for hit in hits {
-      @if let Hit::Episode{ title, fe } = hit {
-        <section class="episode @fe.bestclass()">
+      @match hit {
+        Hit::Episode{ title, fe, rank } => {
+        <section class="episode @fe.bestclass()" data-rank="@rank">
           <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
           @:epmisc(&fe)
         </section>
       }
-      @if let Hit::Article{ article, published } = hit {
-        <section class="article">
+      Hit::Article{ article, published, rank } => {
+        <section class="article" data-rank="@rank">
           @:artmisc(article)
           @if let Some((last_pub, pubs)) = published.split_last()
           {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
         </section>
       }
-    }
+    }}
   </section>
   }
 })

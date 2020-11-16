@@ -15,6 +15,10 @@ pub struct Article {
 }
 
 impl Article {
+    #[allow(non_upper_case_globals)] // consistent with diesel
+    pub const columns: (a::id, a::title, a::subtitle, a::note) =
+        (a::id, a::title, a::subtitle, a::note);
+
     pub fn get_or_create(
         title: &str,
         subtitle: Option<&str>,
@@ -22,6 +26,7 @@ impl Article {
         db: &PgConnection,
     ) -> Result<Article, Error> {
         if let Some(article) = a::articles
+            .select(Article::columns)
             .filter(a::title.eq(title))
             .filter(a::subtitle.is_not_distinct_from(subtitle))
             .filter(a::note.is_not_distinct_from(note))
@@ -36,6 +41,7 @@ impl Article {
                     a::subtitle.eq(subtitle),
                     a::note.eq(note),
                 ))
+                .returning(Article::columns)
                 .get_result(db)?)
         }
     }

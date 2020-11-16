@@ -1,4 +1,5 @@
 use super::{OtherMag, RefKey, Title};
+use crate::schema::episodes::dsl as e;
 use crate::server::PgPool;
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
@@ -28,6 +29,38 @@ pub struct Episode {
 }
 
 impl Episode {
+    #[allow(non_upper_case_globals)] // consistent with diesel
+    pub const columns: (
+        e::id,
+        e::title,
+        e::episode,
+        e::teaser,
+        e::note,
+        e::copyright,
+        e::orig_lang,
+        e::orig_episode,
+        e::orig_date,
+        e::orig_to_date,
+        e::orig_sundays,
+        e::orig_mag,
+        e::strip_from,
+        e::strip_to,
+    ) = (
+        e::id,
+        e::title,
+        e::episode,
+        e::teaser,
+        e::note,
+        e::copyright,
+        e::orig_lang,
+        e::orig_episode,
+        e::orig_date,
+        e::orig_to_date,
+        e::orig_sundays,
+        e::orig_mag,
+        e::strip_from,
+        e::strip_to,
+    );
     pub fn get_or_create(
         title: &Title,
         name: Option<&str>,
@@ -38,6 +71,7 @@ impl Episode {
     ) -> Result<Episode, Error> {
         use crate::schema::episodes::dsl;
         dsl::episodes
+            .select(Self::columns)
             .filter(dsl::title.eq(title.id))
             .filter(dsl::episode.eq(name))
             .first::<Episode>(db)
@@ -52,6 +86,7 @@ impl Episode {
                         dsl::note.eq(note),
                         dsl::copyright.eq(copyright),
                     ))
+                    .returning(Self::columns)
                     .get_result(db)
             })
     }
@@ -71,25 +106,32 @@ impl Episode {
                     dsl::note.eq(note),
                     dsl::copyright.eq(copyright),
                 ))
+                .returning(Self::columns)
                 .get_result(db),
             (Some(teaser), Some(note), None) => q
                 .set((dsl::teaser.eq(teaser), dsl::note.eq(note)))
+                .returning(Self::columns)
                 .get_result(db),
             (Some(teaser), None, Some(copyright)) => q
                 .set((dsl::teaser.eq(teaser), dsl::copyright.eq(copyright)))
+                .returning(Self::columns)
                 .get_result(db),
-            (Some(teaser), None, None) => {
-                q.set(dsl::teaser.eq(teaser)).get_result(db)
-            }
+            (Some(teaser), None, None) => q
+                .set(dsl::teaser.eq(teaser))
+                .returning(Self::columns)
+                .get_result(db),
             (None, Some(note), Some(copyright)) => q
                 .set((dsl::note.eq(note), dsl::copyright.eq(copyright)))
+                .returning(Self::columns)
                 .get_result(db),
-            (None, Some(note), None) => {
-                q.set(dsl::note.eq(note)).get_result(db)
-            }
-            (None, None, Some(copyright)) => {
-                q.set(dsl::copyright.eq(copyright)).get_result(db)
-            }
+            (None, Some(note), None) => q
+                .set(dsl::note.eq(note))
+                .returning(Self::columns)
+                .get_result(db),
+            (None, None, Some(copyright)) => q
+                .set(dsl::copyright.eq(copyright))
+                .returning(Self::columns)
+                .get_result(db),
             (None, None, None) => Ok(self),
         }
     }

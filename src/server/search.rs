@@ -15,10 +15,13 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte};
-use diesel::dsl::{any, max, sql};
+use diesel::dsl::{any, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
+use diesel_full_text_search::{
+    ts_rank, websearch_to_tsquery, TsVectorExtensions,
+};
 use serde::{Deserialize, Serialize};
 use tokio_diesel::{AsyncConnection, AsyncError, AsyncRunQueryDsl};
 use warp::http::Response;
@@ -158,6 +161,7 @@ impl SearchQuery {
             && self.p.is_empty()
             && self.k.is_empty()
     }
+
     fn do_search(
         &self,
         db: &PgConnection,
@@ -176,6 +180,8 @@ impl SearchQuery {
             .map(|word| format!("%{}%", word))
             .collect::<Vec<_>>();
 
+        let ts_query = websearch_to_tsquery(self.q.clone());
+
         let mut creators = c::creators
             .select(c::creators::all_columns())
             .left_join(ca::creator_aliases)
@@ -191,7 +197,11 @@ impl SearchQuery {
 
         let mut episodes = e::episodes
             .inner_join(t::titles)
-            .select((t::titles::all_columns(), e::episodes::all_columns()))
+            .select((
+                t::titles::all_columns(),
+                Episode::columns,
+                ts_rank(e::ts, ts_query.clone()),
+            ))
             .inner_join(
                 ep::episode_parts
                     .inner_join(p::publications.inner_join(i::issues)),
@@ -199,7 +209,7 @@ impl SearchQuery {
             .into_boxed();
 
         let mut articles = a::articles
-            .select(a::articles::all_columns())
+            .select((Article::columns, ts_rank(a::ts, ts_query.clone())))
             .inner_join(p::publications.inner_join(i::issues))
             .into_boxed();
 
@@ -207,22 +217,11 @@ impl SearchQuery {
             titles = titles.filter(t::title.ilike(word));
             creators = creators.filter(ca::name.ilike(word));
             refkeys = refkeys.filter(r::title.ilike(word));
-            episodes = episodes.filter(
-                e::episode
-                    .ilike(word)
-                    .or(e::orig_episode.ilike(word))
-                    .or(e::teaser.ilike(word))
-                    .or(e::note.ilike(word))
-                    .or(e::copyright.ilike(word)),
-            );
-            articles = articles.filter(
-                a::title
-                    .ilike(word)
-                    .or(a::subtitle.ilike(word))
-                    .or(a::note.ilike(word)),
-            );
         }
-
+        if !self.q.is_empty() {
+            episodes = episodes.filter(e::ts.matches(&ts_query));
+            articles = articles.filter(a::ts.matches(&ts_query));
+        }
         for title in &self.t {
             creators = creators.filter(
                 ca::id.eq(any(eb::episodes_by
@@ -338,25 +337,29 @@ impl SearchQuery {
         };
 
         let mut episodes = episodes
-            .order(max(i::magic).desc())
-            .group_by((t::titles::all_columns(), e::episodes::all_columns()))
+            .order(ts_rank(e::ts, &ts_query).desc())
+            .group_by((t::titles::all_columns(), Episode::columns))
             .limit(max_hits)
-            .load::<(Title, Episode)>(db)?
+            .load(db)?
             .into_iter()
-            .map(|(title, ep)| Hit::episode(title, ep, db))
+            .map(|(title, ep, rank)| Hit::episode(title, ep, rank, db))
             .collect::<Result<Vec<_>, _>>()?;
 
         let articles = articles
-            .order(max(i::magic).desc())
+            .order(ts_rank(a::ts, &ts_query).desc())
             .group_by(a::articles::all_columns())
             .limit(max_hits)
             .load(db)?
             .into_iter()
-            .map(|article| Hit::article(article, db))
+            .map(|(article, rank)| Hit::article(article, rank, db))
             .collect::<Result<Vec<_>, diesel::result::Error>>()?;
 
         episodes.extend(articles.into_iter());
-        episodes.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
+        episodes.sort_by(|a, b| {
+            b.rank()
+                .partial_cmp(&a.rank())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         episodes.truncate(max_hits as usize);
 
         Ok((titles, creators, refkeys, episodes))
@@ -368,10 +371,12 @@ pub enum Hit {
     Episode {
         title: Title,
         fe: FullEpisode,
+        rank: f32,
     },
     Article {
         article: FullArticle,
         published: Vec<IssueRef>,
+        rank: f32,
     },
 }
 
@@ -379,14 +384,16 @@ impl Hit {
     fn episode(
         title: Title,
         episode: Episode,
+        rank: f32,
         db: &PgConnection,
     ) -> Result<Hit, diesel::result::Error> {
-        FullEpisode::load_details(episode, db)
-            .map(|fe| Hit::Episode { title, fe })
+        let fe = FullEpisode::load_details(episode, db)?;
+        Ok(Hit::Episode { title, fe, rank })
     }
 
     fn article(
         article: Article,
+        rank: f32,
         db: &PgConnection,
     ) -> Result<Hit, diesel::result::Error> {
         let published = i::issues
@@ -397,13 +404,14 @@ impl Hit {
         Ok(Hit::Article {
             article: FullArticle::load(article, db)?,
             published,
+            rank,
         })
     }
 
-    fn lastpub(&self) -> Option<&IssueRef> {
+    fn rank(&self) -> f32 {
         match self {
-            Hit::Episode { fe, .. } => fe.published.last(),
-            Hit::Article { published, .. } => published.last(),
+            Hit::Episode { rank, .. } => *rank,
+            Hit::Article { rank, .. } => *rank,
         }
     }
 }
