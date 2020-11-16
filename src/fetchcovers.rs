@@ -1,12 +1,12 @@
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::DbOpt;
+use anyhow::{anyhow, Result};
 use diesel::dsl::now;
 use diesel::pg::upsert::excluded;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use failure::{format_err, Error};
-use reqwest::{Client, Response};
+use reqwest::{self, Client, Response};
 use scraper::{Html, Selector};
 use structopt::StructOpt;
 
@@ -26,7 +26,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub async fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<()> {
         let db = self.db.get_db()?;
         let mut client = WikiClient::new();
         let query = i::issues
@@ -57,7 +57,7 @@ async fn load_cover(
     id: i32,
     year: i16,
     number_str: &str,
-) -> Result<(), Error> {
+) -> Result<()> {
     match client.fetchcover(year, number_str).await {
         Ok(imgdata) => {
             diesel::insert_into(c::covers)
@@ -109,7 +109,7 @@ impl WikiClient {
         &mut self,
         year: i16,
         number_str: &str,
-    ) -> Result<impl AsRef<[u8]>, Error> {
+    ) -> Result<impl AsRef<[u8]>> {
         let url2 = select_href(
             &self
                 .get(&format!("/Fantomen_{}/{}", number_str, year))
@@ -121,34 +121,29 @@ impl WikiClient {
         // Scullmark is sometimes used for no cover scanned yet.
         // The Mini_sweden may be the next image when there is no cover image.
         if url2.contains("Scullmark.gif") || url2.contains("Mini_sweden") {
-            return Err(format_err!("Cover missing"));
+            return Err(anyhow!("Cover missing"));
         }
         let imgurl =
             select_href(&self.get(&url2).await?.text().await?, &self.sel2)?;
         Ok(self.get(&imgurl).await?.bytes().await?)
     }
 
-    async fn get(&mut self, url: &str) -> Result<Response, Error> {
+    async fn get(&mut self, url: &str) -> reqwest::Result<Response> {
         let url1 = format!("http://www.phantomwiki.org{}", url);
-        let resp = self.client.get(&url1).send().await?;
-        if resp.status().is_success() {
-            Ok(resp)
-        } else {
-            Err(format_err!("Got {}", resp.status()))
-        }
+        self.client.get(&url1).send().await?.error_for_status()
     }
 }
 
-fn select_href(html: &str, selector: &Selector) -> Result<String, Error> {
+fn select_href(html: &str, selector: &Selector) -> Result<String> {
     let doc = Html::parse_document(&html);
     let elem = doc
         .select(selector)
         .next()
-        .ok_or_else(|| format_err!("Selector {:?} missing", selector))?
+        .ok_or_else(|| anyhow!("Selector {:?} missing", selector))?
         .value();
     let href = elem
         .attr("href")
-        .ok_or_else(|| format_err!("Attribute href missing in {:?}", elem))?
+        .ok_or_else(|| anyhow!("Attribute href missing in {:?}", elem))?
         .to_string();
     Ok(href)
 }

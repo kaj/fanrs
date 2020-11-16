@@ -14,10 +14,9 @@ mod server;
 
 use crate::checkstrips::check_strips;
 use crate::listissues::list_issues;
+use anyhow::{Context, Result};
 use dbopt::DbOpt;
 use dotenv::dotenv;
-use failure::Error;
-use std::process::exit;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -47,7 +46,7 @@ enum Fanrs {
 }
 
 impl Fanrs {
-    async fn run(self) -> Result<(), Error> {
+    async fn run(self) -> Result<()> {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
@@ -60,23 +59,14 @@ impl Fanrs {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     match dotenv() {
         Ok(_) => (),
         Err(ref err) if err.not_found() => (),
-        Err(err) => {
-            eprintln!("Failed to read env: {}", err);
-            exit(1);
-        }
+        Err(e) => return Err(e).context("Failed to read .env"),
     }
     env_logger::init();
-    match Fanrs::from_args().run().await {
-        Ok(()) => (),
-        Err(error) => {
-            eprintln!("Error: {}", error);
-            exit(1);
-        }
-    }
+    Fanrs::from_args().run().await
 }
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));

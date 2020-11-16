@@ -2,10 +2,10 @@ use crate::models::{
     Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
 };
 use crate::DbOpt;
+use anyhow::{anyhow, Context, Result};
 use chrono::{Datelike, Local, NaiveDate};
 use diesel::prelude::*;
 use diesel::sql_query;
-use failure::{format_err, Error};
 use roxmltree::{Document, Node};
 use slug::slugify;
 use std::fs::read_to_string;
@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use structopt::StructOpt;
 
-type Result<T> = std::result::Result<T, Error>;
 static XMLNS: &str = "http://www.w3.org/XML/1998/namespace";
 
 #[derive(StructOpt)]
@@ -59,7 +58,7 @@ impl Args {
 
 fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     do_load_year(base, year, db)
-        .map_err(|e| format_err!("Error reading data for {}: {}", year, e))
+        .with_context(|| format!("Failed to read data for {}", year))
 }
 
 fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
@@ -69,17 +68,14 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
                 match elem.tag_name().name() {
                     "info" => (), // ignore
                     "issue" => {
-                        register_issue(year, elem, db).map_err(|e| {
-                            format_err!(
-                                "In issue {}: {}",
+                        register_issue(year, elem, db).with_context(|| {
+                            format!(
+                                "Error reading issue {}:",
                                 elem.attribute("nr").unwrap_or("?"),
-                                e
                             )
                         })?
                     }
-                    _other => {
-                        return Err(format_err!("Unexpected {:?}", elem));
-                    }
+                    _ => return Err(unexpected_element(&elem)),
                 }
             }
         }
@@ -94,16 +90,16 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
 }
 
 fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
-    let nr = i
-        .attribute("nr")
-        .ok_or_else(|| format_err!("nr missing"))
-        .and_then(|s| Ok(s.parse()?))?;
+    let nr =
+        parse_attribute(i, "nr")?.ok_or_else(|| anyhow!("nr missing"))?;
     let issue = Issue::get_or_create(
         year,
         nr,
-        i.attribute("pages").and_then(|s| s.parse().ok()),
-        i.attribute("price").and_then(|s| s.parse().ok()),
-        get_child(i, "omslag").and_then(get_best_plac),
+        parse_attribute(i, "pages")?,
+        parse_attribute(i, "price")?,
+        get_child(i, "omslag")
+            .and_then(|e| get_best_plac(e).transpose())
+            .transpose()?,
         db,
     )?;
     println!("Found issue {}", issue);
@@ -128,13 +124,7 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
             "text" => register_article(&issue, seqno, c, db)?,
             "serie" => register_serie(&issue, seqno, c, db)?,
             "skick" => (), // ignore
-            _ => {
-                return Err(format_err!(
-                    "Unexpected element {:?} in issue {}",
-                    c,
-                    issue,
-                ))
-            }
+            _ => return Err(unexpected_element(&c)),
         }
     }
     Ok(())
@@ -171,7 +161,7 @@ fn register_article(
                 }
             }
             "ref" => article.set_refs(&parse_refs(e)?, db)?,
-            _other => return Err(format_err!("Unknown {:?} in text", e)),
+            _ => return Err(unexpected_element(&e)),
         }
     }
     Ok(())
@@ -196,12 +186,12 @@ fn register_serie(
     let part = get_child(c, "part");
     Part::publish(
         &episode,
-        part.and_then(|p| p.attribute("no"))
-            .and_then(|n| n.parse().ok()),
+        part.and_then(|p| parse_attribute(p, "no").transpose())
+            .transpose()?,
         part.and_then(|p| p.text()),
         &issue,
         Some(seqno as i16),
-        get_best_plac(c),
+        get_best_plac(c)?,
         &get_text_norm(c, "label").unwrap_or_default(),
         db,
     )?;
@@ -235,27 +225,24 @@ fn register_serie(
                         .execute(db)?;
                 }
             }
-            "ref" => {
-                episode.set_refs(&parse_refs(e)?, db).map_err(|err| {
-                    format_err!("{} while handling {:?}", err, e)
-                })?
-            }
+            "ref" => episode
+                .set_refs(&parse_refs(e)?, db)
+                .with_context(|| format!("Error while handling {:?}", e))?,
             "prevpub" => match e
                 .first_element_child()
                 .map(|e| e.tag_name().name())
             {
                 Some("fa") => {
                     let nr = get_text(e, "fa").unwrap().parse()?;
-                    let year = get_text(e, "year")
-                        .ok_or_else(|| format_err!("year missing"))?
-                        .parse()?;
+                    let year = get_req_text(e, "year")?.parse()?;
+                    // FIXME: This best_plac and label is not for that publication!
                     Part::publish(
                         &episode,
                         None,
                         None,
                         &Issue::get_or_create_ref(year, nr, db)?,
                         None,
-                        get_best_plac(c),
+                        get_best_plac(c)?,
                         &get_text_norm(c, "label").unwrap_or_default(),
                         db,
                     )?;
@@ -287,7 +274,7 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 }
-                _other => return Err(format_err!("Unknown prevpub {:?}", e)),
+                _other => return Err(anyhow!("Unknown prevpub {:?}", e)),
             },
             "daystrip" => {
                 if let Some(from) = get_text(e, "from") {
@@ -312,10 +299,10 @@ fn register_serie(
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 } else {
-                    return Err(format_err!("Unknown daystrip {:?}", e));
+                    return Err(anyhow!("Unknown daystrip {:?}", e));
                 }
             }
-            _other => return Err(format_err!("Unknown {:?} in serie", e)),
+            _other => return Err(unexpected_element(&e)),
         }
     }
     Ok(())
@@ -333,7 +320,7 @@ fn parse_ref(e: Node) -> Result<RefKey> {
         "serie" => e.text().map(RefKey::title).ok_or("Serie without title"),
         _ => Err("Unknown reference"),
     }
-    .map_err(|err| format_err!("{} in {:?}", err, e))
+    .map_err(|err| anyhow!("{} in {:?}", err, e))
 }
 
 #[test]
@@ -358,8 +345,7 @@ fn test_parse_refs() -> Result<()> {
 }
 
 fn get_req_text<'a>(e: Node<'a, 'a>, name: &str) -> Result<&'a str> {
-    get_text(e, name)
-        .ok_or_else(|| format_err!("{:?} missing child {}", e, name))
+    get_text(e, name).ok_or_else(|| anyhow!("{:?} missing child {}", e, name))
 }
 
 fn get_text<'a>(e: Node<'a, 'a>, name: &str) -> Option<&'a str> {
@@ -370,19 +356,18 @@ fn get_text_norm(e: Node, name: &str) -> Option<String> {
     get_text(e, name).map(normalize_space)
 }
 
-fn get_best_plac(e: Node) -> Option<i16> {
+fn get_best_plac(e: Node) -> Result<Option<i16>> {
     get_child(e, "best")
-        .and_then(|e| e.attribute("plac").and_then(|s| s.parse().ok()))
+        .and_then(|e| parse_attribute(e, "plac").transpose())
+        .transpose()
 }
 
 fn get_creators(by: Node, db: &PgConnection) -> Result<Vec<Creator>> {
     let one_creator = |e: Node| -> Result<Creator> {
-        let name = e
-            .text()
-            .ok_or_else(|| format_err!("missing name in {:?}", e))?;
-        Ok(Creator::get_or_create(name, db).map_err(|e| {
-            format_err!("Failed to create creator {:?}: {}", name, e)
-        })?)
+        let name =
+            e.text().ok_or_else(|| anyhow!("missing name in {:?}", e))?;
+        Creator::get_or_create(name, db)
+            .with_context(|| format!("Failed to create creator {:?}", name))
     };
     let who = child_elems(by)
         .map(one_creator)
@@ -454,7 +439,7 @@ fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
                     }
                 }
             }
-            _other => panic!("Unknown element {:?}", e),
+            _ => return Err(unexpected_element(&e)),
         }
     }
     Ok(())
@@ -595,4 +580,19 @@ fn normalize_space(s: &str) -> String {
 fn test_normalize_space() {
     assert_eq!(normalize_space("foo bar"), "foo bar");
     assert_eq!(normalize_space("\n  foo\n\tbar \n"), "foo bar");
+}
+
+use std::str::FromStr;
+fn parse_attribute<T: FromStr>(e: Node, name: &str) -> Result<Option<T>>
+where
+    <T as std::str::FromStr>::Err: 'static + Send + Sync + std::error::Error,
+{
+    e.attribute(name)
+        .map(|s| s.parse())
+        .transpose()
+        .with_context(|| format!("Bad attribute {:?}", name))
+}
+
+fn unexpected_element(e: &Node) -> anyhow::Error {
+    anyhow!("Unexpected element {:?}", e)
 }

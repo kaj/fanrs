@@ -1,5 +1,5 @@
 use crate::models::Nr;
-use failure::{format_err, Error};
+use anyhow::{anyhow, Result};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -11,13 +11,13 @@ pub struct CountPages {
 }
 
 impl CountPages {
-    pub fn run(self) -> Result<(), Error> {
+    pub fn run(self) -> Result<()> {
         let mut issue = self.issue;
         for pages in self.pages.windows(2) {
             // Irrefutable, because pages are 2-windows of a slice.
             if let [start, end] = pages {
                 if end <= start {
-                    return Err(format_err!("Page numbers must increase"));
+                    return Err(anyhow!("Page numbers must increase"));
                 }
                 println!("{:>6}: {:3}", issue, end - start);
                 issue = (issue.last() + 1).to_string().parse()?;
