@@ -21,7 +21,7 @@ pub struct Issue {
     pub magic: i16,
 }
 
-#[derive(Clone, Debug, Ord, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IssueRef {
     pub year: i16,
     pub number: Nr,
@@ -209,13 +209,16 @@ impl FromStr for IssueRef {
     }
 }
 
+impl Ord for IssueRef {
+    fn cmp(&self, rhs: &IssueRef) -> Ordering {
+        self.year
+            .cmp(&rhs.year)
+            .then_with(|| self.number.cmp(&rhs.number))
+    }
+}
 impl PartialOrd for IssueRef {
     fn partial_cmp(&self, rhs: &IssueRef) -> Option<Ordering> {
-        Some(
-            self.year
-                .cmp(&rhs.year)
-                .then_with(|| self.number.cmp(&rhs.number)),
-        )
+        Some(self.cmp(rhs))
     }
 }
 
@@ -233,7 +236,7 @@ impl ToHtml for IssueRef {
 }
 
 /// A number of an issue (excluding year).
-#[derive(Clone, Debug, Ord, PartialEq, Eq, Queryable)]
+#[derive(Clone, Debug, PartialEq, Eq, Queryable)]
 pub struct Nr {
     number: i16,
     nr_str: String,
@@ -273,8 +276,13 @@ impl FromStr for Nr {
     }
 }
 
+impl Ord for Nr {
+    fn cmp(&self, rhs: &Nr) -> Ordering {
+        self.number.cmp(&rhs.number)
+    }
+}
 impl PartialOrd for Nr {
     fn partial_cmp(&self, rhs: &Nr) -> Option<Ordering> {
-        Some(self.number.cmp(&rhs.number))
+        Some(self.cmp(rhs))
     }
 }

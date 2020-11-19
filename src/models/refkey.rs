@@ -56,7 +56,7 @@ impl IdRefKey {
     }
 }
 
-#[derive(Debug, Ord, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum RefKey {
     /// slug
     Fa(String),
@@ -256,10 +256,15 @@ impl ToHtml for RefKey {
     }
 }
 
+impl Ord for RefKey {
+    fn cmp(&self, rhs: &RefKey) -> Ordering {
+        // Note: Should sort by kind first, but only used inside same kind.
+        self.name().cmp(&rhs.name())
+    }
+}
 impl PartialOrd for RefKey {
     fn partial_cmp(&self, rhs: &RefKey) -> Option<Ordering> {
-        // Note: Should sort by kind first, but only used inside same kind.
-        Some(self.name().cmp(&rhs.name()))
+        Some(self.cmp(rhs))
     }
 }
 
