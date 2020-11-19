@@ -1,0 +1,32 @@
+@use crate::models::{Creator, Issue};
+@use crate::server::{ContentSummary, YearLinks};
+@use super::page;
+
+@(year: u16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<ContentSummary>)])
+@:page(&format!("Årgång {}", year), {
+  <p>Se även @year_links.</p>
+}, {
+  <div class="yearsummary">
+  @for (issue, cover_by, contents) in issues {
+  <section class="issue" id="i@issue.number">
+    <header>
+      <h2>Nr @issue.number_str</h2>
+      @if issue.pages.is_some() || issue.price.is_some() {<p class="pp">
+	@if let Some(ref pages) = issue.pages {<span>@pages sidor</span>}
+	@if let Some(ref price) = issue.price {<span>Pris @price</span>}
+      </p>}
+      @if let Some((last_c, creators)) = cover_by.split_last()
+      {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
+    </header>
+    <div class="info cover@if let Some(b) = issue.cover_best { best@b}">
+      <a class="img" href="/@issue.year/@issue.number"><img src="/c/f@issue.year-@issue.number&#46;jpg" alt=""></a>
+      @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
+    </div>
+    <div class="content"><ul>
+      @for item in contents {<li>@item
+      }
+    </ul></div>
+  </section>
+  }
+  </div>
+})

@@ -226,7 +226,7 @@ impl ToHtml for IssueRef {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         write!(
             out,
-            "<a href='/{y}#i{n}'><span class='ifwide'>Fa</span> \
+            "<a href='/{y}/{n}'><span class='ifwide'>Fa</span> \
              {ns}\u{200b}/{y}</a>",
             y = self.year,
             n = self.number.number,
