@@ -14,7 +14,7 @@ ructe = { version = "0.13", features = ["sass", "warp02"] }
 anyhow = "1.0"
 chrono = "0.4.6"
 dotenv = "0.15.0"
-env_logger = "0.7.1"
+env_logger = "0.8"
 log = "0.4.8"
 lazy_static = "1.4.0"
 mime = "0.3"
