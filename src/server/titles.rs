@@ -77,15 +77,15 @@ async fn one_title(
     slug: String,
     page: PageParam,
 ) -> Result<Response, Rejection> {
-    let (slug, strip) = if slug.starts_with("weekdays-") {
-        (&slug["weekdays-".len()..], Some(false))
-    } else if slug.starts_with("sundays-") {
-        (&slug["sundays-".len()..], Some(true))
+    let (slug, strip) = if let Some(strip) = slug.strip_prefix("weekdays-") {
+        (strip.to_string(), Some(false))
+    } else if let Some(strip) = slug.strip_prefix("sundays-") {
+        (strip.to_string(), Some(true))
     } else {
-        (slug.as_ref(), None)
+        (slug, None)
     };
     let title = t::titles
-        .filter(t::slug.eq(slug.to_string()))
+        .filter(t::slug.eq(slug))
         .first_async::<Title>(&db)
         .await
         .map_err(custom_or_404)?;
