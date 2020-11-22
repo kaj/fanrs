@@ -1,4 +1,4 @@
-use super::{custom, redirect, PgPool};
+use super::{redirect, PgPool, ServerError};
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::templates::statics::xcover_jpg;
@@ -8,15 +8,14 @@ use mime::IMAGE_JPEG;
 use std::str::FromStr;
 use tokio_diesel::{AsyncRunQueryDsl, OptionalExtension};
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
-use warp::http::{Response, StatusCode};
-use warp::reject::not_found;
-use warp::{Rejection, Reply};
+use warp::http::{response::Builder, StatusCode};
+use warp::reply::Response;
+use warp::Reply;
 
-#[allow(clippy::needless_pass_by_value)]
 pub async fn cover_image(
     db: PgPool,
     issue: CoverRef,
-) -> Result<impl Reply, Rejection> {
+) -> Result<Response, ServerError> {
     let data = i::issues
         .inner_join(c::covers)
         .select(c::image)
@@ -24,20 +23,21 @@ pub async fn cover_image(
         .filter(i::number.eq(issue.number))
         .first_async::<Vec<u8>>(&db)
         .await
-        .optional()
-        .map_err(custom)?;
+        .optional()?;
 
     if let Some(data) = data {
         let medium_expires = Utc::now() + Duration::days(90);
-        Ok(Response::builder()
+        Ok(Builder::new()
             .header(CONTENT_TYPE, IMAGE_JPEG.as_ref())
             .header(EXPIRES, medium_expires.to_rfc2822())
-            .body(data))
+            .body(data.into())
+            .unwrap())
     } else {
-        Ok(Response::builder()
+        Ok(Builder::new()
             .status(StatusCode::NOT_FOUND)
             .header(CONTENT_TYPE, xcover_jpg.mime.as_ref())
-            .body(xcover_jpg.content.to_vec()))
+            .body(xcover_jpg.content.to_vec().into())
+            .unwrap())
     }
 }
 
@@ -66,18 +66,17 @@ pub async fn redirect_cover(
     db: PgPool,
     year: CYear,
     issue: SIssue,
-) -> Result<impl Reply, Rejection> {
+) -> Result<impl Reply, ServerError> {
     let exists = i::issues
         .filter(i::year.eq(year.0))
         .filter(i::number.eq(issue.0))
         .count()
         .get_result_async::<i64>(&db)
-        .await
-        .map_err(custom)?;
+        .await?;
     if exists > 0 {
-        redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))
+        Ok(redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0)))
     } else {
-        Err(not_found())
+        Err(ServerError::not_found())
     }
 }
 

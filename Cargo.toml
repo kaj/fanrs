@@ -26,7 +26,8 @@ slug = "0.1.4"
 structopt = { version = "0.3.2", features = ["wrap_help"] }
 tokio = { version = "0.2", features = ["macros"] }
 tokio-diesel = "0.3.0"
-warp = { version = "0.2.0", default-features = false }
+#warp = { version = "0.2.0", default-features = false }
+warp = { git = "https://github.com/cjbassi/warp", branch="error", default-features = false }
 roxmltree = "0.13.0"
 
 [dependencies.diesel]
