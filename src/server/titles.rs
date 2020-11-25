@@ -44,7 +44,7 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
         ))
         .select((
             t::titles::all_columns(),
-            sql("count(*)"),
+            sql("count(distinct episodes.id)"),
             sql::<SmallInt>("min(magic)"),
             sql::<SmallInt>("max(magic)"),
         ))

@@ -3,7 +3,13 @@
 @use super::statics::sortable_js;
 
 @(titles: &[(Title, i64, IssueRef, IssueRef)])
-@:page("Serier", {}, {
+@:page("Serier", {
+  <p>Antal episoder syftar på separata episoder. Om ett äventyr är
+    publicerat i flera delar eller repriserat flera gånger så är det
+    fortfarande ett äventyr.
+    Några tidningar saknas fortfarande i indexet, serier och episoder
+    publicerade där ingår naturligtvis inte i den här listan.</p>
+}, {
 <section>
   <table class="sortable">
     <thead>
