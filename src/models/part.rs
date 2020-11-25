@@ -119,7 +119,7 @@ impl ToHtml for Part {
             }
         }
         if let Some(ref name) = self.name {
-            write!(out, "{}", name)?;
+            name.to_html(out)?;
         }
         write!(out, "</span>")
     }
