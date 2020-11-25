@@ -3,11 +3,17 @@
 @use super::statics::sortable_js;
 
 @(titles: &[(RefKey, i64, Option<IssueRef>, Option<IssueRef>)])
-@:page("Personer, platser och företeelser i Fantomens värld", {}, {
+@:page("Personer, platser och företeelser i Fantomens värld", {
+  <p>Antal episoder syftar på separata episoder. Om ett äventyr är
+    publicerat i flera delar eller repriserat flera gånger så är det
+    fortfarande ett äventyr.
+    Några tidningar saknas fortfarande i indexet, äventyr
+    publicerade där ingår naturligtvis inte i den här listan.</p>
+}, {
 <section>
   <table class="sortable">
     <thead>
-      <tr><th class=" dir-d ">Titel</th><th><span class="ifwide">Antal</span> episoder</th><th>Först</th><th>Senast</th></tr>
+      <tr><th class=" dir-d ">Titel</th><th>Antal <span class="ifwide">episoder</span></th><th>Först</th><th>Senast</th></tr>
     </thead>
     <tbody>
       @for (refkey, n, first, last) in titles {

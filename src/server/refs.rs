@@ -52,7 +52,7 @@ async fn list_refs(db: PgPool) -> Result<ByteResponse, Rejection> {
         )))
         .select((
             r::refkeys::all_columns(),
-            sql("count(*)"),
+            sql("count(distinct episodes.id)"),
             sql::<SmallInt>("min(magic)").nullable(),
             sql::<SmallInt>("max(magic)").nullable(),
         ))

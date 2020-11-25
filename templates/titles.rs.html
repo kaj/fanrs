@@ -3,7 +3,7 @@
 @use super::statics::sortable_js;
 
 @(titles: &[(Title, i64, IssueRef, IssueRef)])
-@:page("Serier", {
+@:page("Serier i Fantomentidningen", {
   <p>Antal episoder syftar på separata episoder. Om ett äventyr är
     publicerat i flera delar eller repriserat flera gånger så är det
     fortfarande ett äventyr.
@@ -13,7 +13,7 @@
 <section>
   <table class="sortable">
     <thead>
-      <tr><th class=" dir-d ">Titel</th><th><span class="ifwide">Antal</span> episoder</th><th>Först</th><th>Senast</th></tr>
+      <tr><th class=" dir-d ">Titel</th><th>Antal <span class="ifwide">episoder</span></th><th>Först</th><th>Senast</th></tr>
     </thead>
     <tbody>
       @for (title, n, first, last) in titles {
