@@ -1,12 +1,11 @@
-@use crate::models::{Creator, Issue};
-@use crate::server::{PublishedInfo, PublishedContent::{EpisodePart, Text}, YearLinks};
+@use crate::server::{IssueDetails, PublishedContent::{EpisodePart, Text}, YearLinks};
 @use super::{artmisc, epmisc, page};
 
-@(year: u16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<PublishedInfo>)])
+@(year: u16, year_links: &YearLinks, issues: &[IssueDetails])
 @:page(&format!("Årgång {}", year), {
   <p>Se även @year_links.</p>
 }, {
-  @for (issue, cover_by, contents) in issues {
+  @for IssueDetails{ issue, cover_by, contents } in issues {
   <section class="issue" id="i@issue.number">
     <header>
       <h2>Nr @issue.number_str</h2>

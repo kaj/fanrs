@@ -111,6 +111,10 @@ impl Issue {
             .execute(db)?;
         Ok(())
     }
+    /// Site-relative url to the cover image of this issue.
+    pub fn cover_url(&self) -> String {
+        format!("/c/f{}-{}.jpg", self.year, self.number)
+    }
 }
 
 impl fmt::Display for Issue {

@@ -414,113 +414,56 @@ async fn issue(
         .await
         .map_err(custom)?;
 
-    let c_columns = (c::id, ca::name, c::slug);
-    let cover_by = c::creators
+    let details =
+        IssueDetails::load_full(issue, &db).await.map_err(custom)?;
+    let years = YearLinks::load(year, db).await?.link_current();
+    Builder::new().html(|o| templates::issue(o, &years, &details, &pubyear))
+}
+
+async fn cover_by(
+    issue_id: i32,
+    db: &PgPool,
+) -> Result<Vec<Creator>, AsyncError> {
+    c::creators
         .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-        .select(c_columns)
-        .filter(cb::issue_id.eq(issue.id))
+        .select((c::id, ca::name, c::slug))
+        .filter(cb::issue_id.eq(issue_id))
         .load_async(&db)
         .await
-        .map_err(custom)?;
-
-    let mut have_main = false;
-    let content_raw = p::publications
-        .left_outer_join(
-            ep::episode_parts.inner_join(e::episodes.inner_join(t::titles)),
-        )
-        .left_outer_join(a::articles)
-        .select((
-            (
-                t::titles::all_columns(),
-                e::episodes::all_columns(),
-                (ep::id, ep::part_no, ep::part_name),
-            )
-                .nullable(),
-            a::articles::all_columns().nullable(),
-            p::seqno,
-            p::best_plac,
-            p::label,
-        ))
-        .filter(p::issue.eq(issue.id))
-        .order(p::seqno)
-        .load_async::<(
-            Option<(Title, Episode, Part)>,
-            Option<Article>,
-            Option<i16>,
-            Option<i16>,
-            String,
-        )>(&db)
-        .await
-        .map_err(custom)?;
-    let mut contents = Vec::with_capacity(content_raw.len());
-    for row in content_raw.into_iter() {
-        match row {
-            (Some((t, mut e, part)), None, seqno, b, label) => {
-                let classnames = if e.teaser.is_none() || !part.is_first() {
-                    e.teaser = None;
-                    "episode noteaser"
-                } else if t.title == "Fantomen" && !have_main {
-                    have_main = true;
-                    "episode main"
-                } else {
-                    "episode"
-                };
-                let content = PublishedContent::EpisodePart {
-                    title: t,
-                    episode: FullEpisode::in_issue(e, &issue, &db)
-                        .await
-                        .map_err(custom)?,
-                    part,
-                    best_plac: b,
-                    label,
-                };
-                contents.push(PublishedInfo {
-                    content,
-                    seqno,
-                    classnames,
-                });
-            }
-            (None, Some(a), seqno, None, _label) => {
-                contents.push(PublishedInfo {
-                    content: PublishedContent::Text(
-                        FullArticle::load_async(a, &db)
-                            .await
-                            .map_err(custom)?,
-                    ),
-                    seqno,
-                    classnames: "article",
-                });
-            }
-            row => panic!("Strange row: {:?}", row),
-        }
-    }
-
-    let years = YearLinks::load(year, db).await?.link_current();
-    Builder::new().html(|o| {
-        templates::issue(o, &years, &issue, &cover_by, &contents, &pubyear)
-    })
 }
 
 async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
-    let issues_raw: Vec<Issue> = i::issues
+    use futures::stream::{self, StreamExt, TryStreamExt};
+    let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
         .load_async(&db)
         .await
         .map_err(custom)?;
-    if issues_raw.is_empty() {
+    if issues.is_empty() {
         return Err(not_found());
     }
-    let mut issues = Vec::with_capacity(issues_raw.len());
-    for issue in issues_raw.into_iter() {
-        let c_columns = (c::id, ca::name, c::slug);
-        let cover_by = c::creators
-            .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-            .select(c_columns)
-            .filter(cb::issue_id.eq(issue.id))
-            .load_async(&db)
-            .await
-            .map_err(custom)?;
+    let issues = stream::iter(issues)
+        .then(|issue| IssueDetails::load_full(issue, &db))
+        .try_collect::<Vec<_>>()
+        .await
+        .map_err(custom)?;
+    let years = YearLinks::load(year, db).await?;
+    Builder::new().html(|o| templates::year(o, year, &years, &issues))
+}
+
+pub struct IssueDetails {
+    pub issue: Issue,
+    pub cover_by: Vec<Creator>,
+    pub contents: Vec<PublishedInfo>,
+}
+
+impl IssueDetails {
+    async fn load_full(
+        issue: Issue,
+        db: &PgPool,
+    ) -> Result<IssueDetails, AsyncError> {
+        let cover_by = cover_by(issue.id, &db).await?;
 
         let mut have_main = false;
         let content_raw = p::publications
@@ -550,8 +493,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 Option<i16>,
                 String,
             )>(&db)
-            .await
-            .map_err(custom)?;
+            .await?;
         let mut contents = Vec::with_capacity(content_raw.len());
         for row in content_raw.into_iter() {
             match row {
@@ -569,8 +511,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                     let content = PublishedContent::EpisodePart {
                         title: t,
                         episode: FullEpisode::in_issue(e, &issue, &db)
-                            .await
-                            .map_err(custom)?,
+                            .await?,
                         part,
                         best_plac: b,
                         label,
@@ -584,9 +525,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 (None, Some(a), seqno, None, _label) => {
                     contents.push(PublishedInfo {
                         content: PublishedContent::Text(
-                            FullArticle::load_async(a, &db)
-                                .await
-                                .map_err(custom)?,
+                            FullArticle::load_async(a, &db).await?,
                         ),
                         seqno,
                         classnames: "article",
@@ -595,10 +534,12 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 row => panic!("Strange row: {:?}", row),
             }
         }
-        issues.push((issue, cover_by, contents));
+        Ok(IssueDetails {
+            issue,
+            cover_by,
+            contents,
+        })
     }
-    let years = YearLinks::load(year, db).await?;
-    Builder::new().html(|o| templates::year(o, year, &years, &issues))
 }
 
 fn custom_or_404(e: AsyncError) -> Rejection {
