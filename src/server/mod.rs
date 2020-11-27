@@ -420,18 +420,6 @@ async fn issue(
     Builder::new().html(|o| templates::issue(o, &years, &details, &pubyear))
 }
 
-async fn cover_by(
-    issue_id: i32,
-    db: &PgPool,
-) -> Result<Vec<Creator>, AsyncError> {
-    c::creators
-        .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-        .select((c::id, ca::name, c::slug))
-        .filter(cb::issue_id.eq(issue_id))
-        .load_async(&db)
-        .await
-}
-
 async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
     use futures::stream::{self, StreamExt, TryStreamExt};
     let issues = i::issues
@@ -540,6 +528,18 @@ impl IssueDetails {
             contents,
         })
     }
+}
+
+async fn cover_by(
+    issue_id: i32,
+    db: &PgPool,
+) -> Result<Vec<Creator>, AsyncError> {
+    c::creators
+        .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
+        .select((c::id, ca::name, c::slug))
+        .filter(cb::issue_id.eq(issue_id))
+        .load_async(&db)
+        .await
 }
 
 fn custom_or_404(e: AsyncError) -> Rejection {
