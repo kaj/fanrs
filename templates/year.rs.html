@@ -10,7 +10,7 @@
     <header>
       <h2>Nr @issue.number_str</h2>
       <div class="info cover@if let Some(b) = issue.cover_best { best@b}">
-	<span class="img"><img src="/c/f@issue.year-@issue.number&#46;jpg" alt=""></span>
+	<span class="img"><img src="@issue.cover_url()" alt=""></span>
 	<div class="innerinfo">
 	  @if let Some((last_c, creators)) = cover_by.split_last()
 	  {<p>Omslag av @for c in creators {@c, }@last_c.</p>}

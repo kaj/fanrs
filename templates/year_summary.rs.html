@@ -19,7 +19,7 @@
       {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
     </header>
     <div class="info cover@if let Some(b) = issue.cover_best { best@b}">
-      <a class="img" href="/@issue.year/@issue.number"><img src="/c/f@issue.year-@issue.number&#46;jpg" alt=""></a>
+      <a class="img" href="/@issue.year/@issue.number"><img src="@issue.cover_url()" alt=""></a>
       @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
     </div>
     <div class="content"><ul>
