@@ -1,0 +1,51 @@
+@use crate::models::{IssueRef};
+@use crate::server::{IssueDetails, PublishedContent::{EpisodePart, Text}, YearLinks};
+@use super::{artmisc, epmisc, page};
+
+@(year_links: &YearLinks, issue: &IssueDetails, pubyear: &[IssueRef])
+@:page(&format!("Fantomen {}/{}", issue.issue.number_str, issue.issue.year), {
+  <p>
+  @if let Some(ref pages) = issue.issue.pages {<span>@pages sidor.</span>}
+  @if let Some(ref price) = issue.issue.price {<span>Pris @price.</span>}
+  <p>Se även @year_links.</p>
+}, {
+  <section class="issue">
+    <header>
+      <h2>Nr @issue.issue.number_str</h2>
+      <div class="info cover@if let Some(b) = issue.issue.cover_best { best@b}">
+	<span class="img"><img src="@issue.issue.cover_url()" alt=""></span>
+	<div class="innerinfo">
+	  @if let Some((last_c, creators)) = issue.cover_by.split_last()
+	  {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
+	  @if let Some(b) = issue.issue.cover_best {<p>Nr @b i bästa omslag.</p>}
+	  @if issue.issue.pages.is_some() || issue.issue.price.is_some() {<p class="pp">
+	    @if let Some(ref pages) = issue.issue.pages {<span>@pages sidor</span>}
+	    @if let Some(ref price) = issue.issue.price {<span>Pris @price</span>}
+	  </p>}
+	</div>
+      </div>
+    </header>
+    <div class="content">
+      @for item in &issue.contents {
+      <section class="@item.classnames()" @if let Some(seqno) = item.seqno {data-seq="@seqno"}>
+	@match &item.content {
+	EpisodePart{title, episode, part, best_plac, label} => {
+	@if label != "" {<p class="info label">@label:</p> }
+	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>
+	@:epmisc(&episode)
+	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @issue.issue.year.</p>}
+	}
+	Text(article) => {@:artmisc(article)}
+	}
+      </section>
+      }
+    </div>
+  </section>
+
+  <section>
+    <h2>Alla nummer @issue.issue.year</h2>
+    <p class="yearcovers">@for i in pubyear {
+      <a href="/@i.year/@i.number.first()" title="Fa @i.number/@i.year"><img src="@i.cover_url()" alt="@i.number"></a>
+    }</p>
+  </section>
+})

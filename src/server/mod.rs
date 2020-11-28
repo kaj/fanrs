@@ -5,6 +5,7 @@ mod publist;
 mod refs;
 pub mod search;
 mod titles;
+mod yearsummary;
 
 use self::covers::{cover_image, redirect_cover};
 pub use self::creators::CoverSet;
@@ -12,10 +13,11 @@ pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
 use self::refs::{get_all_fa, one_fa};
 use self::search::{search, search_autocomplete};
+pub use yearsummary::ContentSummary;
 
 use crate::models::{
-    Article, Creator, CreatorSet, Episode, Issue, OtherMag, Part, RefKey,
-    RefKeySet, Title,
+    Article, Creator, CreatorSet, Episode, Issue, IssueRef, OtherMag, Part,
+    RefKey, RefKeySet, Title,
 };
 use crate::schema::articles::dsl as a;
 use crate::schema::covers_by::dsl as cb;
@@ -112,7 +114,23 @@ impl Args {
                 .and(path("robots.txt"))
                 .and(end())
                 .and_then(robots_txt))
-            .or(goh().and(s()).and(param()).and(end()).and_then(list_year))
+            .or(goh()
+                .and(s())
+                .and(param())
+                .and(end())
+                .and_then(yearsummary::year_summary))
+            .or(goh()
+                .and(s())
+                .and(param())
+                .and(param())
+                .and(end())
+                .and_then(issue))
+            .or(goh()
+                .and(s())
+                .and(param())
+                .and(path("details"))
+                .and(end())
+                .and_then(list_year))
             .or(goh()
                 .and(s())
                 .and(param())
@@ -332,7 +350,7 @@ fn text_to_fa_html(text: &str) -> Html<String> {
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
-    let html = FA.replace_all(&html, "<a href='/$y#i$i'>Fa $ii/$y</a>");
+    let html = FA.replace_all(&html, "<a href='/$y/$i'>Fa $ii/$y</a>");
     let html = URL.replace_all(&html, "<a href='$p://$l'>$l</a>");
     Html(html.to_string())
 }
@@ -357,14 +375,14 @@ fn text_to_fa_html_b() {
 fn text_to_fa_html_c() {
     assert_eq!(
         text_to_fa_html("See Fa 7 1980.").0,
-        "See <a href='/1980#i7'>Fa 7/1980</a>.",
+        "See <a href='/1980/7'>Fa 7/1980</a>.",
     )
 }
 #[test]
 fn text_to_fa_html_d() {
     assert_eq!(
         text_to_fa_html("See Fa 25-26/2019.").0,
-        "See <a href='/2019#i25'>Fa 25-26/2019</a>.",
+        "See <a href='/2019/25'>Fa 25-26/2019</a>.",
     )
 }
 
@@ -376,26 +394,64 @@ fn text_to_fa_html_e() {
     )
 }
 
+async fn issue(
+    db: PgPool,
+    year: u16,
+    issue: u8,
+) -> Result<impl Reply, Rejection> {
+    let issue: Issue = i::issues
+        .filter(i::year.eq(year as i16))
+        .filter(i::number.eq(i16::from(issue)))
+        .first_async(&db)
+        .await
+        .map_err(custom_or_404)?;
+
+    let pubyear = i::issues
+        .select((i::year, (i::number, i::number_str)))
+        .filter(i::year.eq(issue.year))
+        .order(i::number)
+        .load_async::<IssueRef>(&db)
+        .await
+        .map_err(custom)?;
+
+    let details =
+        IssueDetails::load_full(issue, &db).await.map_err(custom)?;
+    let years = YearLinks::load(year, db).await?.link_current();
+    Builder::new().html(|o| templates::issue(o, &years, &details, &pubyear))
+}
+
 async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
-    let issues_raw: Vec<Issue> = i::issues
+    use futures::stream::{self, StreamExt, TryStreamExt};
+    let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
         .load_async(&db)
         .await
         .map_err(custom)?;
-    if issues_raw.is_empty() {
+    if issues.is_empty() {
         return Err(not_found());
     }
-    let mut issues = Vec::with_capacity(issues_raw.len());
-    for issue in issues_raw.into_iter() {
-        let c_columns = (c::id, ca::name, c::slug);
-        let cover_by = c::creators
-            .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
-            .select(c_columns)
-            .filter(cb::issue_id.eq(issue.id))
-            .load_async(&db)
-            .await
-            .map_err(custom)?;
+    let issues = stream::iter(issues)
+        .then(|issue| IssueDetails::load_full(issue, &db))
+        .try_collect::<Vec<_>>()
+        .await
+        .map_err(custom)?;
+    let years = YearLinks::load(year, db).await?;
+    Builder::new().html(|o| templates::year(o, year, &years, &issues))
+}
+
+pub struct IssueDetails {
+    pub issue: Issue,
+    pub cover_by: Vec<Creator>,
+    pub contents: Vec<PublishedInfo>,
+}
+
+impl IssueDetails {
+    async fn load_full(
+        issue: Issue,
+        db: &PgPool,
+    ) -> Result<IssueDetails, AsyncError> {
+        let cover_by = cover_by(issue.id, &db).await?;
 
         let mut have_main = false;
         let content_raw = p::publications
@@ -425,8 +481,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 Option<i16>,
                 String,
             )>(&db)
-            .await
-            .map_err(custom)?;
+            .await?;
         let mut contents = Vec::with_capacity(content_raw.len());
         for row in content_raw.into_iter() {
             match row {
@@ -444,8 +499,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                     let content = PublishedContent::EpisodePart {
                         title: t,
                         episode: FullEpisode::in_issue(e, &issue, &db)
-                            .await
-                            .map_err(custom)?,
+                            .await?,
                         part,
                         best_plac: b,
                         label,
@@ -459,9 +513,7 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 (None, Some(a), seqno, None, _label) => {
                     contents.push(PublishedInfo {
                         content: PublishedContent::Text(
-                            FullArticle::load_async(a, &db)
-                                .await
-                                .map_err(custom)?,
+                            FullArticle::load_async(a, &db).await?,
                         ),
                         seqno,
                         classnames: "article",
@@ -470,15 +522,24 @@ async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
                 row => panic!("Strange row: {:?}", row),
             }
         }
-        issues.push((issue, cover_by, contents));
+        Ok(IssueDetails {
+            issue,
+            cover_by,
+            contents,
+        })
     }
-    let years = i::issues
-        .select((sql::<SmallInt>("min(year)"), sql::<SmallInt>("max(year)")))
-        .first_async::<(i16, i16)>(&db)
+}
+
+async fn cover_by(
+    issue_id: i32,
+    db: &PgPool,
+) -> Result<Vec<Creator>, AsyncError> {
+    c::creators
+        .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
+        .select((c::id, ca::name, c::slug))
+        .filter(cb::issue_id.eq(issue_id))
+        .load_async(&db)
         .await
-        .map_err(custom)?;
-    let years = YearLinks::new(years.0 as u16, year, years.1 as u16);
-    Builder::new().html(|o| templates::year(o, year, &years, &issues))
 }
 
 fn custom_or_404(e: AsyncError) -> Rejection {
@@ -521,11 +582,32 @@ pub struct YearLinks {
     first: u16,
     shown: u16,
     last: u16,
+    link_current: bool,
 }
 
 impl YearLinks {
+    async fn load(year: u16, db: PgPool) -> Result<Self, Rejection> {
+        let (first, last) = i::issues
+            .select((
+                sql::<SmallInt>("min(year)"),
+                sql::<SmallInt>("max(year)"),
+            ))
+            .first_async::<(i16, i16)>(&db)
+            .await
+            .map_err(custom)?;
+        Ok(YearLinks::new(first as u16, year, last as u16))
+    }
     fn new(first: u16, shown: u16, last: u16) -> Self {
-        YearLinks { first, shown, last }
+        YearLinks {
+            first,
+            shown,
+            last,
+            link_current: false,
+        }
+    }
+    fn link_current(mut self) -> Self {
+        self.link_current = true;
+        self
     }
 }
 
@@ -534,7 +616,11 @@ impl ToHtml for YearLinks {
         let shown = self.shown;
         let one = |out: &mut dyn Write, y: u16| -> io::Result<()> {
             if y == shown {
-                write!(out, "<b>{}</b>", y)?;
+                if self.link_current {
+                    write!(out, "<a href='/{}'><b>{}</b></a>", y, y)?;
+                } else {
+                    write!(out, "<b>{}</b>", y)?;
+                }
             } else {
                 write!(out, "<a href='/{}'>{}</a>", y, y)?;
             }

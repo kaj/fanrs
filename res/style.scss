@@ -183,7 +183,7 @@ div.cover {
 	    margin: 0;
 	    padding: 0;
 	    position: absolute;
-	    right: -.3em;
+	    right: 0;
 	    width: 1.9rem;
 	}
     }
@@ -473,5 +473,88 @@ section.articles {
     .article {
         flex-basis:26em;
         flex-grow:1;
+    }
+}
+
+
+div.yearsummary {
+    flex-flow: row wrap;
+    display: flex;
+    margin: .7em -.3em;
+    align-items: start;
+
+    .issue {
+        margin: .3em;
+        flex: 24em 1 1;
+        display: grid;
+        grid-auto-columns: 2fr 1fr;
+        overflow: hidden;
+        grid-gap: .3em;
+
+        > header {
+            display: flex;
+            flex-flow: row wrap;
+            align-items: baseline;
+            justify-content: space-between;
+            p {
+                margin: 0;
+            }
+        }
+        .info.cover {
+            overflow: hidden;
+            .img, img {
+                width: -moz-available;
+                display: block;
+            }
+            p {
+                font-size: 90%;
+                margin: 0;
+            }
+        }
+        .content {
+            grid-column: 1 / 3;
+            margin: 0;
+            padding: 0;
+
+            ul {
+                font-size: 90%;
+                background: rgba(255,255,255,0.4);
+                margin: 0;
+                border-radius: .3em;
+                padding: .3em .3em .3em 1.2em;
+                width: -moz-available;
+            }
+        }
+    }
+}
+
+@media (min-width: 25em) {
+    div.yearsummary .issue {
+        grid-auto-columns: 10em auto;
+        > header {
+            grid-column: 1 / 3;
+        }
+        .info.cover {
+            grid-column: 1 / 2;
+            width: 10em;
+        }
+        .content {
+            grid-column: 2 / 3;
+        }
+    }
+}
+
+p.yearcovers {
+    text-align: center;
+    line-height: 11vw;
+    margin-top: -6vw;
+    img {
+        width: 3vw;
+        transition: width 500ms;
+        vertical-align: bottom;
+    }
+    img:hover, a:focus img {
+        width: 7vw;
+        transition: width 100ms;
     }
 }
