@@ -528,7 +528,7 @@ div.yearsummary {
     }
 }
 
-@media (min-width: 25em) {
+@media (min-width: 20em) {
     div.yearsummary .issue {
         grid-auto-columns: 10em auto;
         > header {
