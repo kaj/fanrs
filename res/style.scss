@@ -546,10 +546,11 @@ div.yearsummary {
 
 p.yearcovers {
     text-align: center;
-    line-height: 11vw;
-    margin-top: -6vw;
+    line-height: max(11vw, 7ch);
+    margin-top: calc(-8vw + 3ch);
     img {
         width: 3vw;
+        min-width: 4ch;
         transition: width 500ms;
         vertical-align: bottom;
     }
