@@ -41,6 +41,7 @@ use lazy_static::lazy_static;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
+use std::net::SocketAddr;
 use structopt::StructOpt;
 use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 use warp::filters::BoxedFilter;
@@ -55,6 +56,10 @@ use warp::{self, reject::not_found, Filter, Rejection, Reply};
 pub struct Args {
     #[structopt(flatten)]
     db: DbOpt,
+
+    /// Adress to listen on
+    #[structopt(long, default_value = "127.0.0.1:1536")]
+    bind: SocketAddr,
 }
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
@@ -137,7 +142,7 @@ impl Args {
                 .and(end())
                 .and_then(titles::oldslug))
             .recover(customize_error);
-        warp::serve(routes).run(([127, 0, 0, 1], 1536)).await;
+        warp::serve(routes).run(self.bind).await;
         Ok(())
     }
 }
