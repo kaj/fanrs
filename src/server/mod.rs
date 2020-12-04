@@ -631,28 +631,16 @@ impl ToHtml for YearLinks {
             }
             Ok(())
         };
-        let from = if self.shown > self.first + 7 {
-            self.shown - 5
-        } else {
-            self.first
-        };
-        let to = if self.shown + 7 < self.last {
-            self.shown + 5
-        } else {
-            self.last
-        };
-        if from > self.first {
-            one(out, self.first)?;
-            write!(out, " … ")?;
-        }
-        one(out, from)?;
-        for y in from + 1..=to {
-            write!(out, ", ")?;
-            one(out, y)?;
-        }
-        if to < self.last {
-            write!(out, " … ")?;
-            one(out, self.last)?;
+        one(out, self.first)?;
+        let mut skip = false;
+        for y in self.first + 1..=self.last {
+            if y % 10 == 0 || (y as i16 - shown as i16).abs() < 3 {
+                out.write_all(if skip { "… ".as_bytes() } else { b", " })?;
+                one(out, y)?;
+                skip = false;
+            } else {
+                skip = true;
+            }
         }
         Ok(())
     }
