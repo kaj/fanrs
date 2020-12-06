@@ -235,17 +235,8 @@ fn register_serie(
                 Some("fa") => {
                     let nr = get_text(e, "fa").unwrap().parse()?;
                     let year = get_req_text(e, "year")?.parse()?;
-                    // FIXME: This best_plac and label is not for that publication!
-                    Part::publish(
-                        &episode,
-                        None,
-                        None,
-                        &Issue::get_or_create_ref(year, nr, db)?,
-                        None,
-                        get_best_plac(c)?,
-                        &get_text_norm(c, "label").unwrap_or_default(),
-                        db,
-                    )?;
+                    let issue = Issue::get_or_create_ref(year, nr, db)?;
+                    Part::prevpub(&episode, &issue, db)?;
                 }
                 Some("date") if e.attribute("role") == Some("orig") => {
                     let date: NaiveDate =
