@@ -177,7 +177,7 @@ fn register_serie(
     use crate::schema::episodes_by::dsl as eb;
     let episode = Episode::get_or_create(
         &Title::get_or_create(get_req_text(c, "title")?, db)?,
-        get_text_norm(c, "episode").as_deref(),
+        get_episode_name(c).as_deref(),
         get_text_norm(c, "teaser").as_deref(),
         get_text_norm(c, "note").as_deref(),
         get_text_norm(c, "copyright").as_deref(),
@@ -306,6 +306,15 @@ fn register_serie(
         }
     }
     Ok(())
+}
+
+fn get_episode_name(c: Node) -> Option<String> {
+    if let Some(e) = get_child(c, "episode") {
+        if e.attribute("role").is_none() {
+            return e.text().map(normalize_space);
+        }
+    }
+    None
 }
 
 fn parse_refs(parent: Node) -> Result<Vec<RefKey>> {
