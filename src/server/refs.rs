@@ -24,10 +24,20 @@ use warp::{self, Filter, Rejection};
 
 type ByteResponse = warp::reply::Response;
 
+pub fn fa_route(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
+    use warp::path::{end, param};
+    param()
+        .and(end())
+        .and(goh())
+        .and(s)
+        .and_then(one_fa)
+        .boxed()
+}
+
 pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
     use warp::path::{end, param};
-    let list = goh().and(end()).and(s.clone()).and_then(list_refs);
-    let one = goh().and(s).and(param()).and(end()).and_then(one_ref);
+    let list = end().and(goh()).and(s.clone()).and_then(list_refs);
+    let one = param().and(end()).and(goh()).and(s).and_then(one_ref);
     list.or(one).unify().boxed()
 }
 
@@ -73,16 +83,13 @@ async fn list_refs(db: PgPool) -> Result<ByteResponse, Rejection> {
     Response::builder().html(|o| templates::refkeys(o, &all))
 }
 
-pub async fn one_fa(
-    db: PgPool,
-    slug: String,
-) -> Result<ByteResponse, Rejection> {
+async fn one_fa(slug: String, db: PgPool) -> Result<ByteResponse, Rejection> {
     one_ref_impl(db, slug, RefKey::FA_ID).await
 }
 
 async fn one_ref(
-    db: PgPool,
     slug: String,
+    db: PgPool,
 ) -> Result<ByteResponse, Rejection> {
     one_ref_impl(db, slug, RefKey::KEY_ID).await
 }

@@ -160,8 +160,8 @@ async fn one_title(
 }
 
 pub async fn oldslug(
-    db: PgPool,
     slug: String,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     // Special case:
     if slug == "favicon.ico" {

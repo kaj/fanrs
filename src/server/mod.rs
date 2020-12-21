@@ -11,7 +11,6 @@ use self::covers::{cover_image, redirect_cover};
 pub use self::creators::CoverSet;
 pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
-use self::refs::{get_all_fa, one_fa};
 use self::search::{search, search_autocomplete};
 pub use yearsummary::ContentSummary;
 
@@ -79,67 +78,62 @@ impl Args {
         use warp::filters::query::query;
         use warp::{path, path::end, path::param, path::tail};
         let routes = warp::any()
-            .and(goh().and(path("s")).and(tail()).and_then(static_file))
-            .or(goh()
-                .and(path("c"))
-                .and(s())
+            .and(path("s").and(tail()).and(goh()).and_then(static_file))
+            .or(path("c")
                 .and(param())
                 .and(end())
+                .and(goh())
+                .and(s())
                 .and_then(cover_image))
-            .or(goh().and(end()).and(s()).and_then(frontpage))
-            .or(goh()
-                .and(path("search"))
+            .or(end().and(goh()).and(s()).and_then(frontpage))
+            .or(path("search")
                 .and(end())
-                .and(s())
                 .and(query())
+                .and(goh())
+                .and(s())
                 .and_then(search))
-            .or(goh()
-                .and(path("ac"))
+            .or(path("ac")
                 .and(end())
-                .and(s())
                 .and(query())
+                .and(goh())
+                .and(s())
                 .and_then(search_autocomplete))
             .or(path("titles").and(titles::routes(s())))
-            .or(goh()
-                .and(path("fa"))
-                .and(s())
-                .and(param())
-                .and(end())
-                .and_then(one_fa))
+            .or(path("fa").and(refs::fa_route(s())))
             .or(path("what").and(refs::what_routes(s())))
             .or(path("who").and(creators::routes(s())))
-            .or(goh()
-                .and(path("static"))
-                .and(s())
+            .or(path("static")
                 .and(param())
                 .and(param())
                 .and(end())
+                .and(goh())
+                .and(s())
                 .and_then(redirect_cover))
-            .or(goh()
-                .and(path("robots.txt"))
+            .or(path("robots.txt")
                 .and(end())
+                .and(goh())
                 .and_then(robots_txt))
-            .or(goh()
-                .and(s())
-                .and(param())
+            .or(param()
                 .and(end())
+                .and(goh())
+                .and(s())
                 .and_then(yearsummary::year_summary))
-            .or(goh()
-                .and(s())
-                .and(param())
+            .or(param()
                 .and(param())
                 .and(end())
-                .and_then(issue))
-            .or(goh()
+                .and(goh())
                 .and(s())
-                .and(param())
+                .and_then(issue))
+            .or(param()
                 .and(path("details"))
                 .and(end())
-                .and_then(list_year))
-            .or(goh()
+                .and(goh())
                 .and(s())
-                .and(param())
+                .and_then(list_year))
+            .or(param()
                 .and(end())
+                .and(goh())
+                .and(s())
                 .and_then(titles::oldslug))
             .recover(customize_error);
         warp::serve(routes).run(self.bind).await;
@@ -187,7 +181,7 @@ async fn frontpage(db: PgPool) -> Result<impl Reply, Rejection> {
         .await
         .map_err(custom)?;
 
-    let all_fa = get_all_fa(&db).await.map_err(custom)?;
+    let all_fa = refs::get_all_fa(&db).await.map_err(custom)?;
 
     let num = 50;
     let titles = Title::cloud(num, &db).await.map_err(custom)?;
@@ -400,9 +394,9 @@ fn text_to_fa_html_e() {
 }
 
 async fn issue(
-    db: PgPool,
     year: u16,
     issue: u8,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let issue: Issue = i::issues
         .filter(i::year.eq(year as i16))
@@ -425,7 +419,7 @@ async fn issue(
     Builder::new().html(|o| templates::issue(o, &years, &details, &pubyear))
 }
 
-async fn list_year(db: PgPool, year: u16) -> Result<impl Reply, Rejection> {
+async fn list_year(year: u16, db: PgPool) -> Result<impl Reply, Rejection> {
     use futures::stream::{self, StreamExt, TryStreamExt};
     let issues = i::issues
         .filter(i::year.eq(year as i16))

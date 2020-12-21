@@ -16,8 +16,8 @@ use warp::http::response::Builder;
 use warp::{self, reject::not_found, Rejection, Reply};
 
 pub async fn year_summary(
-    db: PgPool,
     year: u16,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let issues: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))

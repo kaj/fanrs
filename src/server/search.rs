@@ -27,8 +27,8 @@ use warp::{self, Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn search(
-    db: PgPool,
     query: Vec<(String, String)>,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let query = SearchQuery::load(query, &db).await.map_err(custom)?;
     let (query, titles, creators, refkeys, episodes) = db
@@ -41,8 +41,8 @@ pub async fn search(
 }
 
 pub async fn search_autocomplete(
-    db: PgPool,
     query: AcQuery,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let q = format!("%{}%", query.q);
     let mut titles = t::titles

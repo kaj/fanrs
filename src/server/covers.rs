@@ -14,8 +14,8 @@ use warp::{Rejection, Reply};
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn cover_image(
-    db: PgPool,
     issue: CoverRef,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let data = i::issues
         .inner_join(c::covers)
@@ -63,9 +63,9 @@ impl FromStr for CoverRef {
 }
 
 pub async fn redirect_cover(
-    db: PgPool,
     year: CYear,
     issue: SIssue,
+    db: PgPool,
 ) -> Result<impl Reply, Rejection> {
     let exists = i::issues
         .filter(i::year.eq(year.0))
