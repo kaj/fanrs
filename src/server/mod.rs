@@ -463,7 +463,7 @@ impl IssueDetails {
                 (
                     t::titles::all_columns(),
                     e::episodes::all_columns(),
-                    (ep::id, ep::part_no, ep::part_name),
+                    (ep::part_no, ep::part_name),
                 )
                     .nullable(),
                 a::articles::all_columns().nullable(),

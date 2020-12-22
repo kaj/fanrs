@@ -45,7 +45,7 @@ impl PartsPublished {
                 .inner_join(p::publications.inner_join(ep::episode_parts))
                 .select((
                     (i::year, (i::number, i::number_str)),
-                    (ep::id, ep::part_no, ep::part_name),
+                    (ep::part_no, ep::part_name),
                     p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode))
@@ -63,7 +63,7 @@ impl PartsPublished {
                 .inner_join(p::publications.inner_join(ep::episode_parts))
                 .select((
                     (i::year, (i::number, i::number_str)),
-                    (ep::id, ep::part_no, ep::part_name),
+                    (ep::part_no, ep::part_name),
                     p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode))
@@ -84,7 +84,7 @@ impl PartsPublished {
                 .inner_join(p::publications.inner_join(ep::episode_parts))
                 .select((
                     (i::year, (i::number, i::number_str)),
-                    (ep::id, ep::part_no, ep::part_name),
+                    (ep::part_no, ep::part_name),
                     p::best_plac,
                 ))
                 .filter(ep::episode.eq(episode.id))

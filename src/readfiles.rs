@@ -184,11 +184,15 @@ fn register_serie(
         db,
     )?;
     let part = get_child(c, "part");
+    let part = Part {
+        no: part
+            .and_then(|p| parse_attribute(p, "no").transpose())
+            .transpose()?,
+        name: part.and_then(|p| p.text()).map(String::from),
+    };
     Part::publish(
         &episode,
-        part.and_then(|p| parse_attribute(p, "no").transpose())
-            .transpose()?,
-        part.and_then(|p| p.text()),
+        &part,
         &issue,
         Some(seqno as i16),
         get_best_plac(c)?,

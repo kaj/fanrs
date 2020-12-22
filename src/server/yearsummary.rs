@@ -1,5 +1,5 @@
 use super::{custom, PgPool, YearLinks};
-use crate::models::{Creator, Issue};
+use crate::models::{Creator, Issue, Part};
 use crate::schema::articles::dsl as a;
 use crate::schema::episode_parts::dsl as ep;
 use crate::schema::episodes::dsl as e;
@@ -49,7 +49,7 @@ async fn load_summary(
         )
         .left_outer_join(a::articles)
         .select((
-            (t::slug, t::title, e::episode, ep::part_no, ep::part_name)
+            (t::slug, t::title, e::episode, (ep::part_no, ep::part_name))
                 .nullable(),
             (a::title, a::subtitle).nullable(),
         ))
@@ -87,8 +87,7 @@ pub struct ComicSummary {
     slug: String,
     title: String,
     episode: Option<String>,
-    part_no: Option<i16>,
-    part_name: Option<String>,
+    part: Part,
 }
 
 // <strong><a href="/titles/slug">title</a>[episode]</strong> [part]
@@ -102,18 +101,9 @@ impl ToHtml for ComicSummary {
             episode.to_html(out)?;
         }
         out.write_all(b"</strong>")?;
-        if self.part_no.is_some() || self.part_name.is_some() {
-            out.write_all(b" <span class='part'>")?;
-            if let Some(no) = self.part_no {
-                write!(out, "del {}", no)?;
-                if self.part_name.is_some() {
-                    out.write_all(b": ")?;
-                }
-            }
-            if let Some(ref name) = &self.part_name {
-                name.to_html(out)?;
-            }
-            out.write_all(b"</span>")?;
+        if self.part.is_part() {
+            out.write_all(b" ")?;
+            self.part.to_html(out)?;
         }
         Ok(())
     }
