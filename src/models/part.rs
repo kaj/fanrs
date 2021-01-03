@@ -74,7 +74,7 @@ impl Part {
                     old_seqno
                 );
             }
-            if label != "" && old_label != label {
+            if !label.is_empty() && old_label != label {
                 diesel::update(p::publications)
                     .set(p::label.eq(label))
                     .filter(p::id.eq(id))

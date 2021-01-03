@@ -30,7 +30,7 @@
       <section class="@item.classnames()" @if let Some(seqno) = item.seqno {data-seq="@seqno"}>
 	@match &item.content {
 	EpisodePart{title, episode, part, best_plac, label} => {
-	@if label != "" {<p class="info label">@label:</p> }
+	@if !label.is_empty() {<p class="info label">@label:</p> }
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>
 	@:epmisc(&episode)
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @issue.issue.year.</p>}
