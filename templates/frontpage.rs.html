@@ -8,16 +8,16 @@
 }, {
   <div class="wrapfour">
   <section class="front">
-    <header><h2>Fantomenätten</h2></header>
+    <h2>Fantomenätten</h2>
     <p class="article">
       @if let Some((last_fa, all_fa)) = all_fa.split_last()
       {@for fa in all_fa {<a href="@fa.url()">@fa.short()</a>, }
       <a href="@last_fa.url()">@last_fa.short()</a>.}
     </p>
   </section>
-  <section class="front search">@:searchbox(&SearchQuery::empty())</section>
+  <section class="front search" aria-label="Sök">@:searchbox(&SearchQuery::empty())</section>
   <section class="front">
-    <header><h2>Årgångar</h2></header>
+    <h2>Årgångar</h2>
     <p class="article">
       @if let Some((last_year, years)) = years.split_last()
       {@for year in years {<a href="/@year">@year</a>, }
@@ -25,7 +25,7 @@
     </p>
   </section>
   <section class="front">
-    <header><h2>Se även</h2></header>
+    <h2>Se även</h2>
     <div class="article">
       <ul>
       <li><a href="http://www.phantomwiki.org/">Phantom Wiki</a>
