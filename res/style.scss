@@ -75,6 +75,13 @@ h3 .part {
 }
 p { margin: 0 0 1ex; }
 
+:link {
+    color: #007;
+}
+:visited {
+    color: #306;
+}
+
 section {
     border-radius: .5em;
     border: solid .5px black;
