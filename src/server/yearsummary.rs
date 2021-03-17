@@ -52,16 +52,17 @@ async fn load_summary(
             (t::slug, t::title, e::episode, (ep::part_no, ep::part_name))
                 .nullable(),
             (a::title, a::subtitle).nullable(),
+            p::best_plac,
         ))
         .filter(p::issue.eq(issue.id))
         .order(p::seqno)
-        .load_async::<(Option<ComicSummary>, Option<ArticleSummary>)>(&db)
+        .load_async::<(Option<ComicSummary>, Option<ArticleSummary>, Option<i16>)>(&db)
         .await
         .map_err(custom)?
         .into_iter()
         .map(|i| match i {
-            (Some(c), None) => ContentSummary::Comic(c),
-            (None, Some(a)) => ContentSummary::Text(a),
+            (Some(c), None, plac) => ContentSummary::Comic(c, plac),
+            (None, Some(a), _) => ContentSummary::Text(a),
             _ => unreachable!(),
         })
         .collect::<Vec<_>>();
@@ -69,14 +70,28 @@ async fn load_summary(
 }
 
 pub enum ContentSummary {
-    Comic(ComicSummary),
+    Comic(ComicSummary, Option<i16>),
     Text(ArticleSummary),
+}
+impl ContentSummary {
+    pub fn get_class(&self) -> String {
+        match self {
+            ContentSummary::Comic(_, plac) => {
+                if let Some(plac) = plac.filter(|p| *p <= 3) {
+                    format!("comic best{}", plac)
+                } else {
+                    "comic".into()
+                }
+            }
+            ContentSummary::Text(_) => String::new(),
+        }
+    }
 }
 
 impl ToHtml for ContentSummary {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         match self {
-            ContentSummary::Comic(c) => c.to_html(out),
+            ContentSummary::Comic(c, _plac) => c.to_html(out),
             ContentSummary::Text(a) => a.to_html(out),
         }
     }

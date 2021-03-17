@@ -23,7 +23,7 @@
       @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
     </div>
     <div class="content"><ul>
-      @for item in contents {<li>@item
+      @for item in contents {<li class="@item.get_class()">@item
       }
     </ul></div>
   </section>

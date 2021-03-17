@@ -170,6 +170,26 @@ section.episode {
     }
 }
 
+li.comic {
+    &.best1::before {
+	content: url(static_name("best1_svg"));
+    }
+    &.best2::before {
+	content: url(static_name("best2_svg"));
+    }
+    &.best3::before {
+	content: url(static_name("best3_svg"));
+    }
+    &.best1, &.best2, &.best3 {
+	&::before {
+	    float: right;
+	    margin: 0;
+	    padding: 0;
+	    width: 1.9em;
+        }
+    }
+}
+
 div.cover {
     &.best1 .img::before {
 	content: url(static_name("best1_svg"));
