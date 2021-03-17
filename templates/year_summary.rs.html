@@ -10,7 +10,7 @@
   @for (issue, cover_by, contents) in issues {
   <section class="issue" id="i@issue.number">
     <header>
-      <h2>Nr @issue.number_str</h2>
+      <h2><a href="/@issue.year/@issue.number">Nr @issue.number_str</a></h2>
       @if issue.pages.is_some() || issue.price.is_some() {<p class="pp">
 	@if let Some(ref pages) = issue.pages {<span>@pages sidor</span>}
 	@if let Some(ref price) = issue.price {<span>Pris @price</span>}
@@ -19,7 +19,7 @@
       {<p>Omslag av @for c in creators {@c, }@last_c.</p>}
     </header>
     <div class="info cover@if let Some(b) = issue.cover_best { best@b}">
-      <a class="img" href="/@issue.year/@issue.number"><img src="@issue.cover_url()" alt=""></a>
+      <div class="img"><img src="@issue.cover_url()" alt=""></div>
       @if let Some(b) = issue.cover_best {<p>Nr @b i bästa omslag.</p>}
     </div>
     <div class="content"><ul>
