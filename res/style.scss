@@ -334,29 +334,24 @@ section.front {
         p { margin: 0 1em; }
     }
 }
-section.titles h2::before {
-    content: url(static_name("prat.svg"));
-    display: inline-block;
-    height: 1em;
-    margin-right: 1ex;
-    vertical-align: text-top;
-    width: 1em;
+
+section.titles h2,
+section.refkeys h2,
+section.creators h2 {
+    background-position: 100% 50%;
+    background-repeat: no-repeat;
+    background-size: contain;
+    margin-right: .3em;
+    padding-right: 2em;
 }
-section.refkeys h2::before {
-    content: url(static_name("goda.svg"));
-    display: inline-block;
-    height: 1em;
-    margin-right: 1ex;
-    vertical-align: text-top;
-    width: 1em;
+section.titles h2 {
+    background-image: url(static_name("prat.svg"));
 }
-section.creators h2::before {
-    content: url(static_name("creator.svg"));
-    display: inline-block;
-    height: 1em;
-    margin-right: 1ex;
-    vertical-align: text-top;
-    width: 1em;
+section.refkeys h2 {
+    background-image: url(static_name("goda.svg"));
+}
+section.creators h2 {
+    background-image: url(static_name("creator.svg"));
 }
 
 #search {
