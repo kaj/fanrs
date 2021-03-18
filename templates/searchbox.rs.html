@@ -3,8 +3,9 @@
 
 @(query: &SearchQuery)
 <form id="search" action="/search">
+  <label for="q">Sök i Fantomenindexet</label>
   <div class="q">
-    <input type="search" name="q" value="@query.q"><input type="submit" value="Sök">
+    <input type="search" name="q" id="q" value="@query.q"><input type="submit" value="Sök">
   </div>
   <div class="refs">
     @for t in &query.t {

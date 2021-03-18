@@ -355,6 +355,9 @@ section.creators h2 {
 }
 
 #search {
+    label[for="q"] {
+        font-weight: bold;
+    }
     div.q {
         display: flex;
         flex-flow: row nowrap;
