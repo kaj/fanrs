@@ -163,7 +163,7 @@ section.episode {
     &.best1, &.best2, &.best3 {
 	&::before {
 	    float: right;
-	    margin: -.3em -.3em .5em -.8em;
+	    margin: -.3em -.3em 0 .2em;
 	    padding: 0;
 	    width: 1.9em;
 	}
