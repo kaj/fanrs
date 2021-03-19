@@ -122,10 +122,10 @@ impl fmt::Display for Issue {
         write!(out, "{}/{}", self.number_str, self.year)?;
         match (&self.pages, &self.price) {
             (Some(ref pages), Some(ref price)) => {
-                write!(out, " ({} sidor, {})", pages, price)
+                write!(out, " ({} sidor, pris {})", pages, price)
             }
             (Some(ref pages), None) => write!(out, " ({} sidor)", pages),
-            (None, Some(ref price)) => write!(out, " ({})", price),
+            (None, Some(ref price)) => write!(out, " (pris {})", price),
             (None, None) => Ok(()),
         }
     }

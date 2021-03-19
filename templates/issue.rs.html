@@ -3,7 +3,7 @@
 @use super::{artmisc, epmisc, page};
 
 @(year_links: &YearLinks, issue: &IssueDetails, pubyear: &[IssueRef])
-@:page(&format!("Fantomen {}/{}", issue.issue.number_str, issue.issue.year), {
+@:page(&format!("Fantomen {}/{}", issue.issue.number_str, issue.issue.year), &issue.description(), {
   <p>
   @if let Some(ref pages) = issue.issue.pages {<span>@pages sidor.</span>}
   @if let Some(ref price) = issue.issue.price {<span>Pris @price.</span>}

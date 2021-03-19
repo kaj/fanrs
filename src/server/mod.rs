@@ -527,6 +527,17 @@ impl IssueDetails {
             contents,
         })
     }
+    pub fn description(&self) -> String {
+        let mut result = format!("Innehållet i Fantomen {}.", self.issue);
+        for c in &self.contents {
+            if let PublishedContent::EpisodePart { title, .. } = &c.content {
+                result.push(' ');
+                result.push_str(&title.title);
+                result.push('.');
+            }
+        }
+        result
+    }
 }
 
 async fn cover_by(

@@ -1,5 +1,5 @@
 @use super::statics::{goda_svg, sc_png, style_css};
-@(title: &str, inhead: Content, content: Content)
+@(title: &str, description: &str, inhead: Content, content: Content)
 
 <!doctype html>
 <html lang="sv">
@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <link rel="stylesheet" href="/s/@style_css.name"/>
     <link rel="shortcut icon" href="/s/@goda_svg.name"/>
+    <meta name="description" content="@description"/>
   </head>
   <body>
     <header>

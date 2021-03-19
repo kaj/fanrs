@@ -3,7 +3,7 @@
 @use super::{artmisc, epmisc, page};
 
 @(refkey: &RefKey, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
-@:page(&refkey.name(), {}, {
+@:page(&refkey.name(), &format!("Om {} i den svenska Fantomentidnigen.", &refkey.name()), {}, {
   @if !articles.is_empty() {
   <section class="articles">
     <h2>Artiklar</h2>

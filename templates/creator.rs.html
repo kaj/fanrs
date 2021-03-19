@@ -3,7 +3,7 @@
 @use super::{artmisc, epmisc, page};
 
 @(creator: &Creator, about: &[(FullArticle, Vec<IssueRef>)], covers: &CoverSet, episodes: &[(Title, FullEpisode)], articles_by: &[(FullArticle, Vec<IssueRef>)], other: &OtherContribs)
-@:page(&creator.name, {
+@:page(&creator.name, &format!("Index över hur {} medverkat i den svenska Fantomentidningen", creator.name), {
   <p>Här listas vad <strong>@creator.name</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@creator.name&amp;go=go"
 	title="Sök &quot;@creator.name&quot; i Seriewikin">Seriewikin</a>,

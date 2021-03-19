@@ -2,7 +2,7 @@
 @use warp::http::status::StatusCode;
 
 @(code: StatusCode)
-@:page("Något gick snett", {}, {
+@:page("Något gick snett", "(Tekniskt fel.)", {}, {
   <section>
     <h2 lang="en">@code</h2>
     <p class="article">Något gick snett.

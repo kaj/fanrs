@@ -2,7 +2,7 @@
 @use super::{artmisc, epmisc, page};
 
 @(year: u16, year_links: &YearLinks, issues: &[IssueDetails])
-@:page(&format!("Årgång {}", year), {
+@:page(&format!("Årgång {}", year), &format!("Den svenska Fantomentidningen, årgång {}.", year), {
   <p>Se även @year_links.</p>
 }, {
   @for IssueDetails{ issue, cover_by, contents } in issues {

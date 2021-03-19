@@ -3,7 +3,7 @@
 @use super::{artmisc, epmisc, page, searchbox};
 
 @(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], hits: &[Hit])
-@:page("Sök", {@:searchbox(q)}, {
+@:page("Sök", "Här kan du söka i allt data som finns i Fantomenindexet.", {@:searchbox(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
     <h2>Serier</h2>

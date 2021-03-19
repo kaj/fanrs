@@ -3,7 +3,7 @@
 @use super::{artmisc, epmisc, page};
 
 @(title: &Title, pages: Option<&Paginator>, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[FullEpisode])
-@:page(&title.title, {
+@:page(&title.title, &format!("De gånger serien {} publicerats i svenska Fantomentidningen.", title.title), {
   <p>Här listas de gånger serien <strong>@title.title</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
 	title="Sök &quot;@title.title&quot; i Seriewikin">Seriewikin</a>,
