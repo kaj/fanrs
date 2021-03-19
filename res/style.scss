@@ -531,6 +531,8 @@ div.yearsummary {
             overflow: hidden;
             .img, img {
                 width: -moz-available;
+                width: -webkit-fill-available;
+                width: fill-available;
                 display: block;
             }
             p {
@@ -550,6 +552,8 @@ div.yearsummary {
                 border-radius: .3em;
                 padding: .3em .3em .3em 1.2em;
                 width: -moz-available;
+                width: -webkit-fill-available;
+                width: fill-available;
             }
         }
     }
