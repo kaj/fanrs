@@ -1,6 +1,6 @@
 [package]
 name = "fanrs"
-version = "0.9.4"
+version = "0.9.5-PRE"
 authors = ["Rasmus Kaj <kaj@kth.se>"]
 description = "Manage and serve index of the Phantom comic books, fantomenindex.krats.se"
 edition = "2018"
