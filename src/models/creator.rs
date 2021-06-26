@@ -75,14 +75,8 @@ impl Creator {
     ) -> Result<Cloud<Creator>, AsyncError> {
         use crate::models::creator_contributions::creator_contributions::dsl as cc;
         let creators = cc::creator_contributions
-            .select((
-                (cc::id, cc::name, cc::slug),
-                cc::n_episodes + cc::n_covers + cc::n_articles,
-            ))
-            .order_by(
-                (cc::n_episodes * 3 + cc::n_covers * 2 + cc::n_articles)
-                    .desc(),
-            )
+            .select(((cc::id, cc::name, cc::slug), cc::score))
+            .order_by(cc::score.desc())
             .limit(num)
             .load_async(db)
             .await?;
@@ -100,7 +94,7 @@ impl CloudItem for Creator {
     fn write_item(
         &self,
         out: &mut dyn Write,
-        n: i64,
+        n: i32,
         w: u8,
     ) -> io::Result<()> {
         write!(

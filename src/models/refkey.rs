@@ -9,6 +9,7 @@ use diesel::dsl::sql;
 use diesel::pg::{Pg, PgConnection};
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel::sql_types::{Integer, SmallInt, Text};
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
@@ -188,7 +189,7 @@ impl RefKey {
         num: i64,
         db: &PgPool,
     ) -> Result<Cloud<RefKey>, AsyncError> {
-        let c = sql("count(*)");
+        let c = sql::<Integer>("cast(count(*) as integer)");
         let refkeys = r::refkeys
             .left_join(er::episode_refkeys.left_join(e::episodes))
             .select(((r::kind, r::title, r::slug), c.clone()))
@@ -222,7 +223,6 @@ impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
     }
 }
 
-use diesel::sql_types::{SmallInt, Text};
 impl Queryable<(SmallInt, Text, Text), Pg> for RefKey {
     type Row = (i16, String, String);
 
@@ -272,7 +272,7 @@ impl CloudItem for RefKey {
     fn write_item(
         &self,
         out: &mut dyn Write,
-        n: i64,
+        n: i32,
         w: u8,
     ) -> io::Result<()> {
         write!(

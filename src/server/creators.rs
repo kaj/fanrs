@@ -38,6 +38,7 @@ async fn list_creators(db: PgPool) -> Result<Response, Rejection> {
     let all = cc::creator_contributions
         .select((
             (cc::id, cc::name, cc::slug),
+            cc::score,
             cc::n_episodes,
             cc::n_covers,
             cc::n_articles,

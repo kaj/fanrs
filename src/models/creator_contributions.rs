@@ -3,9 +3,10 @@ use super::{Creator, IssueRef};
 #[derive(Queryable)]
 pub struct CreatorContributions {
     pub creator: Creator,
-    pub n_episodes: i64,
-    pub n_covers: i64,
-    pub n_articles: i64,
+    pub score: i32,
+    pub n_episodes: i32,
+    pub n_covers: i32,
+    pub n_articles: i32,
     pub first_issue: Option<IssueRef>,
     pub latest_issue: Option<IssueRef>,
 }
@@ -17,9 +18,10 @@ table! {
         id -> Int4,
         name -> Varchar,
         slug -> Varchar,
-        n_episodes -> Int8,
-        n_covers -> Int8,
-        n_articles -> Int8,
+        score -> Int4,
+        n_episodes -> Int4,
+        n_covers -> Int4,
+        n_articles -> Int4,
         first_issue -> Nullable<Int2>,
         latest_issue -> Nullable<Int2>,
     }

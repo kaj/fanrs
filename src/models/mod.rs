@@ -30,17 +30,17 @@ pub trait CloudItem: Ord {
     fn write_item(
         &self,
         out: &mut dyn Write,
-        n: i64,
+        n: i32,
         w: u8,
     ) -> io::Result<()>;
 }
 
 pub struct Cloud<T: CloudItem> {
-    data: Vec<(T, i64, u8)>,
+    data: Vec<(T, i32, u8)>,
 }
 
 impl<T: CloudItem> Cloud<T> {
-    fn from_ordered(data: Vec<(T, i64)>) -> Self {
+    fn from_ordered(data: Vec<(T, i32)>) -> Self {
         let num = data.len();
         let mut data = data
             .into_iter()

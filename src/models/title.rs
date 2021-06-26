@@ -59,7 +59,8 @@ impl Title {
         db: &PgPool,
     ) -> Result<Cloud<Title>, AsyncError> {
         use diesel::dsl::sql;
-        let c = sql("count(*)");
+        use diesel::sql_types::Integer;
+        let c = sql::<Integer>("cast(count(*) as integer)");
         let titles = t::titles
             .left_join(e::episodes.left_join(ep::episode_parts))
             .select((t::titles::all_columns(), c.clone()))
@@ -88,7 +89,7 @@ impl CloudItem for Title {
     fn write_item(
         &self,
         out: &mut dyn Write,
-        n: i64,
+        n: i32,
         w: u8,
     ) -> io::Result<()> {
         write!(
