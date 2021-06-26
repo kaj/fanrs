@@ -124,14 +124,11 @@ impl Episode {
         }
     }
     pub fn orig_dates(&self) -> Option<OrigDates> {
-        match self.orig_date {
-            Some(date) => Some(OrigDates {
-                from: date,
-                to: self.orig_to_date,
-                sun: self.sun,
-            }),
-            None => None,
-        }
+        self.orig_date.map(|date| OrigDates {
+            from: date,
+            to: self.orig_to_date,
+            sun: self.sun,
+        })
     }
     pub fn strip_nrs(&self) -> Option<(i32, i32)> {
         match (self.strip_from, self.strip_to) {

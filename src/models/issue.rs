@@ -93,7 +93,7 @@ impl Issue {
         use crate::schema::issues::dsl as i;
         let magic = ((year - 1950) * 64 + number.number) * 2
             + if number.nr_str.contains('-') { 1 } else { 0 };
-        Ok(diesel::insert_into(i::issues)
+        diesel::insert_into(i::issues)
             .values((
                 i::year.eq(year),
                 i::number.eq(number.number),
@@ -103,7 +103,7 @@ impl Issue {
                 i::cover_best.eq(cover_best),
                 i::magic.eq(magic),
             ))
-            .get_result(db)?)
+            .get_result(db)
     }
     pub fn clear(&self, db: &PgConnection) -> Result<(), Error> {
         use crate::schema::publications::dsl as p;
