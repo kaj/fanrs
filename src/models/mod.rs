@@ -45,7 +45,7 @@ impl<T: CloudItem> Cloud<T> {
         let mut data = data
             .into_iter()
             .enumerate()
-            .map(|(n, (title, c))| (title, c, (8 * (num - n) / num) as u8))
+            .map(|(n, (item, c))| (item, c, (17 * (num - n) / num / 2) as u8))
             .collect::<Vec<_>>();
         data.sort_by(|a, b| a.0.cmp(&b.0));
         Cloud { data }

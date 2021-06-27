@@ -32,7 +32,7 @@ from
    left outer join ((
        creator_aliases ca
        left outer join articles_by ab on ab.by_id = ca.id
-       left outer join publications p ON p.article_id = ab.id
+       left outer join publications p ON p.article_id = ab.article_id
      )
      left outer join issues i ON i.id = p.issue
    ) on ca.creator_id = c.id
