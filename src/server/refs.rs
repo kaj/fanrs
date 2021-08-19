@@ -1,5 +1,6 @@
 use super::{
-    custom, goh, redirect, FullArticle, FullEpisode, PgFilter, PgPool,
+    custom, goh, redirect, DbError, FullArticle, FullEpisode, PgFilter,
+    PgPool,
 };
 use crate::models::{Article, Episode, IdRefKey, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -16,7 +17,6 @@ use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::{Integer, SmallInt};
 use diesel::QueryDsl;
-use tokio_diesel::{AsyncError, AsyncRunQueryDsl, OptionalExtension};
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::reject::not_found;
@@ -41,12 +41,11 @@ pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
     list.or(one).unify().boxed()
 }
 
-pub async fn get_all_fa(db: &PgPool) -> Result<Vec<RefKey>, AsyncError> {
+pub fn get_all_fa(db: &PgConnection) -> Result<Vec<RefKey>, DbError> {
     Ok(r::refkeys
         .filter(r::kind.eq(RefKey::FA_ID))
         .order((sql::<Integer>("cast(substr(slug, 1, 2) as int)"), r::slug))
-        .load_async::<IdRefKey>(db)
-        .await?
+        .load::<IdRefKey>(db)?
         .into_iter()
         .map(|rk| rk.refkey)
         .collect())
@@ -54,7 +53,7 @@ pub async fn get_all_fa(db: &PgPool) -> Result<Vec<RefKey>, AsyncError> {
 
 #[allow(clippy::needless_pass_by_value)]
 async fn list_refs(db: PgPool) -> Result<ByteResponse, Rejection> {
-    let db = db.get().map_err(custom)?;
+    let db = db.get().await.map_err(custom)?;
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
         .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
@@ -99,11 +98,11 @@ async fn one_ref_impl(
     slug: String,
     kind: i16,
 ) -> Result<ByteResponse, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let refkey = r::refkeys
         .filter(r::kind.eq(kind))
         .filter(r::slug.eq(slug.clone()))
-        .first_async::<IdRefKey>(&db)
-        .await
+        .first::<IdRefKey>(&db)
         .optional()
         .map_err(custom)?;
     let refkey = if let Some(refkey) = refkey {
@@ -136,8 +135,7 @@ async fn one_ref_impl(
                 .filter(r::kind.eq(kind))
                 .filter(r::slug.eq(target.clone()))
                 .select(count_star())
-                .first_async::<i64>(&db)
-                .await
+                .first::<i64>(&db)
                 .map_err(custom)?;
             if n == 1 {
                 return redirect(&format!(
@@ -157,8 +155,7 @@ async fn one_ref_impl(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load_async::<Article>(&db)
-        .await
+        .load::<Article>(&db)
         .map_err(custom)?;
 
     let mut articles = Vec::with_capacity(raw_articles.len());
@@ -167,13 +164,10 @@ async fn one_ref_impl(
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load_async::<IssueRef>(&db)
-            .await
+            .load::<IssueRef>(&db)
             .map_err(custom)?;
         articles.push((
-            FullArticle::load_async(article, &db)
-                .await
-                .map_err(custom)?,
+            FullArticle::load(article, &db).map_err(custom)?,
             published,
         ));
     }
@@ -189,14 +183,11 @@ async fn one_ref_impl(
         )
         .order(min(i::magic))
         .group_by((t::titles::all_columns(), e::episodes::all_columns()))
-        .load_async::<(Title, Episode)>(&db)
-        .await
+        .load::<(Title, Episode)>(&db)
         .map_err(custom)?;
     let mut episodes = Vec::with_capacity(raw_episodes.len());
     for (t, ep) in raw_episodes.into_iter() {
-        let e = FullEpisode::load_details_async(ep, &db)
-            .await
-            .map_err(custom)?;
+        let e = FullEpisode::load_details(ep, &db).map_err(custom)?;
         episodes.push((t, e));
     }
 

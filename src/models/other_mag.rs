@@ -1,8 +1,6 @@
 use crate::schema::other_mags::dsl as om;
-use crate::server::PgPool;
 use diesel::prelude::*;
 use diesel::result::Error;
-use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 #[derive(Debug, Queryable, PartialOrd, Ord, PartialEq, Eq)]
 pub struct OtherMag {
@@ -17,12 +15,7 @@ impl OtherMag {
     pub fn get_by_id(id: i32, db: &PgConnection) -> Result<OtherMag, Error> {
         om::other_mags.filter(om::id.eq(id)).first::<OtherMag>(db)
     }
-    pub async fn get_by_id_async(
-        id: i32,
-        db: &PgPool,
-    ) -> Result<OtherMag, AsyncError> {
-        om::other_mags.filter(om::id.eq(id)).first_async(db).await
-    }
+
     pub fn get_or_create(
         name: String,
         issue: Option<i16>,

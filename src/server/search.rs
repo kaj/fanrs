@@ -20,7 +20,6 @@ use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
 use serde::{Deserialize, Serialize};
-use tokio_diesel::{AsyncConnection, AsyncError, AsyncRunQueryDsl};
 use warp::http::Response;
 use warp::reply::json;
 use warp::{self, Rejection, Reply};
@@ -30,11 +29,10 @@ pub async fn search(
     query: Vec<(String, String)>,
     db: PgPool,
 ) -> Result<impl Reply, Rejection> {
-    let query = SearchQuery::load(query, &db).await.map_err(custom)?;
-    let (query, titles, creators, refkeys, episodes) = db
-        .run(|c| query.do_search(c).map(|(t, c, r, e)| (query, t, c, r, e)))
-        .await
-        .map_err(custom)?;
+    let db = db.get().await.map_err(custom)?;
+    let query = SearchQuery::load(query, &db).map_err(custom)?;
+    let (titles, creators, refkeys, episodes) =
+        query.do_search(&db).map_err(custom)?;
     Response::builder().html(|o| {
         templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
     })
@@ -44,14 +42,14 @@ pub async fn search_autocomplete(
     query: AcQuery,
     db: PgPool,
 ) -> Result<impl Reply, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let q = format!("%{}%", query.q);
     let mut titles = t::titles
         .select((t::title, t::slug))
         .filter(t::title.ilike(q.clone()))
         .order_by(t::title)
         .limit(8)
-        .load_async::<(String, String)>(&db)
-        .await
+        .load::<(String, String)>(&db)
         .map_err(custom)?
         .into_iter()
         .map(|(t, s)| Completion::title(t, s))
@@ -64,8 +62,7 @@ pub async fn search_autocomplete(
             .group_by(c::slug)
             .order(sql::<Text>("min(creator_aliases.name)"))
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load_async::<(String, String)>(&db)
-            .await
+            .load::<(String, String)>(&db)
             .map_err(custom)?
             .into_iter()
             .map(|(t, s)| Completion::creator(t, s))
@@ -78,8 +75,7 @@ pub async fn search_autocomplete(
             .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
             .order(r::title)
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load_async::<(i16, String, String)>(&db)
-            .await
+            .load::<(i16, String, String)>(&db)
             .map_err(custom)?
             .into_iter()
             .map(|(k, t, s)| Completion::refkey(k, t, s))
@@ -133,20 +129,18 @@ impl SearchQuery {
             k: vec![],
         }
     }
-    async fn load(
+    fn load(
         query: Vec<(String, String)>,
-        db: &PgPool,
-    ) -> Result<Self, AsyncError> {
+        db: &PgConnection,
+    ) -> Result<Self, diesel::result::Error> {
         let mut result = SearchQuery::empty();
         for (key, val) in query {
             match key.as_ref() {
                 "q" => result.q = val,
-                "t" => result.t.push(Title::from_slug(val, db).await?),
-                "p" => {
-                    result.p.push(Creator::from_slug_async(val, db).await?)
-                }
-                "k" => result.k.push(IdRefKey::key_from_slug(val, db).await?),
-                "f" => result.k.push(IdRefKey::fa_from_slug(val, db).await?),
+                "t" => result.t.push(Title::from_slug(val, db)?),
+                "p" => result.p.push(Creator::from_slug(&val, db)?),
+                "k" => result.k.push(IdRefKey::key_from_slug(val, db)?),
+                "f" => result.k.push(IdRefKey::fa_from_slug(val, db)?),
                 _ => (), // ignore unknown query parameters
             }
         }

@@ -4,9 +4,9 @@ use crate::schema::issues::dsl as i;
 use crate::templates::statics::xcover_jpg;
 use chrono::{Duration, Utc};
 use diesel::prelude::*;
+use diesel::OptionalExtension;
 use mime::IMAGE_JPEG;
 use std::str::FromStr;
-use tokio_diesel::{AsyncRunQueryDsl, OptionalExtension};
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::{Response, StatusCode};
 use warp::reject::not_found;
@@ -22,8 +22,7 @@ pub async fn cover_image(
         .select(c::image)
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
-        .first_async::<Vec<u8>>(&db)
-        .await
+        .first::<Vec<u8>>(&db.get().await.map_err(custom)?)
         .optional()
         .map_err(custom)?;
 
@@ -67,12 +66,12 @@ pub async fn redirect_cover(
     issue: SIssue,
     db: PgPool,
 ) -> Result<impl Reply, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let exists = i::issues
         .filter(i::year.eq(year.0))
         .filter(i::number.eq(issue.0))
         .count()
-        .get_result_async::<i64>(&db)
-        .await
+        .get_result::<i64>(&db)
         .map_err(custom)?;
     if exists > 0 {
         redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))

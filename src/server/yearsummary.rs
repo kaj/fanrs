@@ -1,4 +1,4 @@
-use super::{custom, PgPool, YearLinks};
+use super::{custom, DbError, PgPool, YearLinks};
 use crate::models::{Creator, Issue, Part};
 use crate::schema::articles::dsl as a;
 use crate::schema::episode_parts::dsl as ep;
@@ -9,9 +9,7 @@ use crate::schema::titles::dsl as t;
 use crate::templates::{self, RenderRucte, ToHtml};
 use diesel::prelude::*;
 use diesel::QueryDsl;
-use futures::stream::{self, StreamExt, TryStreamExt};
 use std::io::{self, Write};
-use tokio_diesel::AsyncRunQueryDsl;
 use warp::http::response::Builder;
 use warp::{self, reject::not_found, Rejection, Reply};
 
@@ -19,29 +17,30 @@ pub async fn year_summary(
     year: u16,
     db: PgPool,
 ) -> Result<impl Reply, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let issues: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load_async(&db)
-        .await
+        .load(&db)
         .map_err(custom)?;
     if issues.is_empty() {
         return Err(not_found());
     }
-    let issues = stream::iter(issues)
-        .then(|issue| load_summary(issue, &db))
-        .try_collect::<Vec<_>>()
-        .await?;
+    let issues = issues
+        .into_iter()
+        .map(|issue| load_summary(issue, &db))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(custom)?;
 
-    let years = YearLinks::load(year, db).await?;
+    let years = YearLinks::load(year, &db)?;
     Builder::new().html(|o| templates::year_summary(o, year, &years, &issues))
 }
 
-async fn load_summary(
+fn load_summary(
     issue: Issue,
-    db: &PgPool,
-) -> Result<(Issue, Vec<Creator>, Vec<ContentSummary>), Rejection> {
-    let cover_by = super::cover_by(issue.id, db).await.map_err(custom)?;
+    db: &PgConnection,
+) -> Result<(Issue, Vec<Creator>, Vec<ContentSummary>), DbError> {
+    let cover_by = super::cover_by(issue.id, db)?;
 
     let contents = p::publications
         .left_outer_join(
@@ -56,9 +55,7 @@ async fn load_summary(
         ))
         .filter(p::issue.eq(issue.id))
         .order(p::seqno)
-        .load_async::<(Option<ComicSummary>, Option<ArticleSummary>, Option<i16>)>(db)
-        .await
-        .map_err(custom)?
+        .load(db)?
         .into_iter()
         .map(|i| match i {
             (Some(c), None, plac) => ContentSummary::Comic(c, plac),

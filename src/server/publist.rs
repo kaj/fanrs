@@ -1,4 +1,4 @@
-use super::PgPool;
+use super::DbError;
 use crate::models::{
     Creator, CreatorSet, Episode, Issue, IssueRef, PartInIssue, Title,
 };
@@ -15,7 +15,6 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use std::collections::BTreeMap;
 use std::io::{self, Write};
-use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 pub struct PartsPublished {
     issues: Vec<PartInIssue>,
@@ -26,20 +25,14 @@ impl PartsPublished {
     pub fn for_episode(
         episode: &Episode,
         db: &PgConnection,
-    ) -> Result<PartsPublished, diesel::result::Error> {
+    ) -> Result<PartsPublished, DbError> {
         PartsPublished::for_episode_id(episode.id, db)
-    }
-    pub async fn for_episode_async(
-        episode: &Episode,
-        db: &PgPool,
-    ) -> Result<PartsPublished, AsyncError> {
-        PartsPublished::for_episode_id_async(episode.id, db).await
     }
 
     pub fn for_episode_id(
         episode: i32,
         db: &PgConnection,
-    ) -> Result<PartsPublished, diesel::result::Error> {
+    ) -> Result<PartsPublished, DbError> {
         Ok(PartsPublished {
             issues: i::issues
                 .inner_join(p::publications.inner_join(ep::episode_parts))
@@ -54,31 +47,12 @@ impl PartsPublished {
             others: false,
         })
     }
-    pub async fn for_episode_id_async(
-        episode: i32,
-        db: &PgPool,
-    ) -> Result<PartsPublished, AsyncError> {
-        Ok(PartsPublished {
-            issues: i::issues
-                .inner_join(p::publications.inner_join(ep::episode_parts))
-                .select((
-                    (i::year, (i::number, i::number_str)),
-                    (ep::part_no, ep::part_name),
-                    p::best_plac,
-                ))
-                .filter(ep::episode.eq(episode))
-                .order((i::year, i::number))
-                .load_async::<PartInIssue>(db)
-                .await?,
-            others: false,
-        })
-    }
 
-    pub async fn for_episode_except(
+    pub fn for_episode_except(
         episode: &Episode,
         issue: &Issue,
-        db: &PgPool,
-    ) -> Result<PartsPublished, AsyncError> {
+        db: &PgConnection,
+    ) -> Result<PartsPublished, DbError> {
         Ok(PartsPublished {
             issues: i::issues
                 .inner_join(p::publications.inner_join(ep::episode_parts))
@@ -90,8 +64,7 @@ impl PartsPublished {
                 .filter(ep::episode.eq(episode.id))
                 .filter(i::id.ne(issue.id))
                 .order((i::year, i::number))
-                .load_async::<PartInIssue>(db)
-                .await?,
+                .load::<PartInIssue>(db)?,
             others: true,
         })
     }
@@ -149,10 +122,10 @@ pub struct OtherContribs {
 }
 
 impl OtherContribs {
-    pub async fn for_creator(
+    pub fn for_creator(
         creator: &Creator,
-        db: &PgPool,
-    ) -> Result<OtherContribs, AsyncError> {
+        db: &PgConnection,
+    ) -> Result<OtherContribs, DbError> {
         let oe_columns = (t::titles::all_columns(), e::id, e::episode);
         let other_episodes = e::episodes
             .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
@@ -166,13 +139,11 @@ impl OtherContribs {
             )
             .order(min(i::magic))
             .group_by(oe_columns)
-            .load_async::<(Title, i32, Option<String>)>(db)
-            .await?;
+            .load::<(Title, i32, Option<String>)>(db)?;
 
         let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (title, episode_id, episode) in other_episodes {
-            let published =
-                PartsPublished::for_episode_id_async(episode_id, db).await?;
+            let published = PartsPublished::for_episode_id(episode_id, db)?;
             oe.entry(title).or_default().push((episode, published));
         }
 
@@ -182,8 +153,7 @@ impl OtherContribs {
             .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
             .select(eb::role)
             .distinct()
-            .load_async::<String>(db)
-            .await?
+            .load::<String>(db)?
             .into_iter()
             .map(|r| match r.as_ref() {
                 "color" => "färgläggare",

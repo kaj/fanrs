@@ -16,7 +16,6 @@ use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
 use serde::Deserialize;
-use tokio_diesel::AsyncRunQueryDsl;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reject::not_found;
@@ -38,6 +37,7 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 
 #[allow(clippy::needless_pass_by_value)]
 async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -50,8 +50,7 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
         ))
         .group_by(t::titles::all_columns())
         .order(t::title)
-        .load_async(&db)
-        .await
+        .load(&db)
         .map_err(custom)?
         .into_iter()
         .map(|(title, c, first, last)| {
@@ -77,6 +76,7 @@ async fn one_title(
     slug: String,
     page: PageParam,
 ) -> Result<Response, Rejection> {
+    let db = db.get().await.map_err(custom)?;
     let (slug, strip) = if let Some(strip) = slug.strip_prefix("weekdays-") {
         (strip.to_string(), Some(false))
     } else if let Some(strip) = slug.strip_prefix("sundays-") {
@@ -86,8 +86,7 @@ async fn one_title(
     };
     let title = t::titles
         .filter(t::slug.eq(slug))
-        .first_async::<Title>(&db)
-        .await
+        .first::<Title>(&db)
         .map_err(custom_or_404)?;
 
     let articles_raw = a::articles
@@ -98,8 +97,7 @@ async fn one_title(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load_async::<Article>(&db)
-        .await
+        .load::<Article>(&db)
         .map_err(custom)?;
     let mut articles = Vec::with_capacity(articles_raw.len());
     for article in articles_raw.into_iter() {
@@ -107,13 +105,10 @@ async fn one_title(
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load_async::<IssueRef>(&db)
-            .await
+            .load::<IssueRef>(&db)
             .map_err(custom)?;
         articles.push((
-            FullArticle::load_async(article, &db)
-                .await
-                .map_err(custom)?,
+            FullArticle::load(article, &db).map_err(custom)?,
             published,
         ));
     }
@@ -132,13 +127,11 @@ async fn one_title(
             .filter(e::orig_sundays.eq(sun))
             .filter(e::orig_date.is_not_null())
             .order(e::orig_date)
-            .load_async::<Episode>(&db)
-            .await
+            .load::<Episode>(&db)
             .map_err(custom)?,
         None => episodes
             .order(min(i::magic))
-            .load_async::<Episode>(&db)
-            .await
+            .load::<Episode>(&db)
             .map_err(custom)?,
     };
 
@@ -147,11 +140,8 @@ async fn one_title(
 
     let mut episodes = Vec::with_capacity(episodes_raw.len());
     for episode in episodes_raw.into_iter() {
-        episodes.push(
-            FullEpisode::load_details_async(episode, &db)
-                .await
-                .map_err(custom)?,
-        );
+        episodes
+            .push(FullEpisode::load_details(episode, &db).map_err(custom)?);
     }
 
     Builder::new().html(|o| {
@@ -176,12 +166,12 @@ pub async fn oldslug(
     }
     let target = slug.replace("_", "-").replace(".html", "");
 
+    let db = db.get().await.map_err(custom)?;
     if let Ok(year) = target.parse::<i16>() {
         let issues = i::issues
             .filter(i::year.eq(year))
             .select(count_star())
-            .first_async::<i64>(&db)
-            .await
+            .first::<i64>(&db)
             .map_err(custom)?;
         if issues > 0 {
             return redirect(&format!("/{}", year));
@@ -192,8 +182,7 @@ pub async fn oldslug(
     let n = t::titles
         .filter(t::slug.eq(target.clone()))
         .select(count_star())
-        .first_async::<i64>(&db)
-        .await
+        .first::<i64>(&db)
         .map_err(custom)?;
     if n == 1 {
         return redirect(&format!("/titles/{}", target));
@@ -210,8 +199,7 @@ pub async fn oldslug(
             ),
         )
         .select(t::slug)
-        .first_async::<String>(&db)
-        .await
+        .first::<String>(&db)
         .map_err(custom_or_404)?;
     redirect(&format!("/titles/{}", target))
 }
