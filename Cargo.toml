@@ -13,6 +13,7 @@ ructe = { version = "0.13.4", features = ["sass", "warp02"] }
 [dependencies]
 anyhow = "1.0"
 chrono = "0.4.6"
+deadpool-diesel = { version = "0.1.2", features = ["postgres"] }
 dotenv = "0.15.0"
 env_logger = "0.9.0"
 futures = "0.3" # Must match warp
@@ -20,17 +21,16 @@ log = "0.4.8"
 lazy_static = "1.4.0"
 mime = "0.3"
 regex = "1.5.4"
-reqwest = "0.10.1"
+reqwest = "0.11.4"
 serde = { version = "1.0.88", features = ["derive"] }
 scraper = "0.12.0"
 slug = "0.1.4"
 structopt = { version = "0.3.2", features = ["wrap_help"] }
-tokio = { version = "0.2", features = ["macros"] }
-tokio-diesel = "0.3.0"
-warp = { version = "0.2.0", default-features = false }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+warp = { version = "0.3.0", default-features = false }
 roxmltree = { version = "0.14", features = ["std"] }
 
 [dependencies.diesel]
 version = "1.4.0"
 default-features = false # get rid of 32-column-tables support
-features = ["chrono", "r2d2", "postgres"]
+features = ["chrono", "postgres"]

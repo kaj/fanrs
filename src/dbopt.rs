@@ -1,11 +1,9 @@
+use deadpool_diesel::postgres::{Manager, Pool};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool, PoolError};
-use log::debug;
-use std::time::{Duration, Instant};
 use structopt::StructOpt;
 
-pub type PgPool = Pool<ConnectionManager<PgConnection>>;
+pub type PgPool = Pool;
 
 #[derive(StructOpt)]
 pub struct DbOpt {
@@ -21,14 +19,7 @@ impl DbOpt {
     }
 
     /// Get a database connection pool from the configured url.
-    pub fn get_pool(&self) -> Result<PgPool, PoolError> {
-        let time = Instant::now();
-        let pool = Pool::builder()
-            .min_idle(Some(3))
-            .test_on_check_out(false)
-            .connection_timeout(Duration::from_millis(500))
-            .build(ConnectionManager::new(&self.db_url))?;
-        debug!("Created db pool in {:?}", time.elapsed());
-        Ok(pool)
+    pub fn get_pool(&self) -> PgPool {
+        Pool::new(Manager::new(&self.db_url), 8)
     }
 }

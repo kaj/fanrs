@@ -50,7 +50,7 @@ impl Fanrs {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
             Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
-            Fanrs::RunServer(args) => Ok(args.run().await?),
+            Fanrs::RunServer(args) => Ok(args.run().await),
             Fanrs::FetchCovers(args) => args.run().await,
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
             Fanrs::CountPages(args) => args.run(),
@@ -58,7 +58,7 @@ impl Fanrs {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<()> {
     match dotenv() {
         Ok(_) => (),

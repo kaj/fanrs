@@ -3,7 +3,6 @@ use crate::schema;
 use crate::schema::episode_refkeys::dsl as er;
 use crate::schema::episodes::dsl as e;
 use crate::schema::refkeys::dsl as r;
-use crate::server::PgPool;
 use crate::templates::ToHtml;
 use diesel::dsl::sql;
 use diesel::pg::{Pg, PgConnection};
@@ -13,7 +12,6 @@ use diesel::sql_types::{Integer, SmallInt, Text};
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
-use tokio_diesel::{AsyncError, AsyncRunQueryDsl};
 
 #[derive(Debug)]
 pub struct IdRefKey {
@@ -22,29 +20,28 @@ pub struct IdRefKey {
 }
 
 impl IdRefKey {
-    pub async fn key_from_slug(
+    pub fn key_from_slug(
         slug: String,
-        db: &PgPool,
-    ) -> Result<Self, AsyncError> {
-        IdRefKey::from_slug_async(slug, RefKey::KEY_ID, db).await
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
+        IdRefKey::from_slug(slug, RefKey::KEY_ID, db)
     }
-    pub async fn fa_from_slug(
+    pub fn fa_from_slug(
         slug: String,
-        db: &PgPool,
-    ) -> Result<Self, AsyncError> {
-        IdRefKey::from_slug_async(slug, RefKey::FA_ID, db).await
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
+        IdRefKey::from_slug(slug, RefKey::FA_ID, db)
     }
-    async fn from_slug_async(
+    fn from_slug(
         slug: String,
         kind: i16,
-        db: &PgPool,
-    ) -> Result<Self, AsyncError> {
+        db: &PgConnection,
+    ) -> Result<Self, Error> {
         r::refkeys
             .select(r::refkeys::all_columns())
             .filter(r::kind.eq(kind))
             .filter(r::slug.eq(slug))
-            .first_async(db)
-            .await
+            .first(db)
     }
     pub fn name(&self) -> String {
         self.refkey.name()
@@ -185,10 +182,10 @@ impl RefKey {
         }
     }
 
-    pub async fn cloud(
+    pub fn cloud(
         num: i64,
-        db: &PgPool,
-    ) -> Result<Cloud<RefKey>, AsyncError> {
+        db: &PgConnection,
+    ) -> Result<Cloud<RefKey>, Error> {
         let c = sql::<Integer>("cast(count(*) as integer)");
         let refkeys = r::refkeys
             .left_join(er::episode_refkeys.left_join(e::episodes))
@@ -197,8 +194,7 @@ impl RefKey {
             .group_by(r::refkeys::all_columns())
             .order(c.desc())
             .limit(num)
-            .load_async(db)
-            .await?;
+            .load(db)?;
         Ok(Cloud::from_ordered(refkeys))
     }
 }
