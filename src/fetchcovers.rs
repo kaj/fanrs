@@ -135,7 +135,7 @@ impl WikiClient {
 }
 
 fn select_href(html: &str, selector: &Selector) -> Result<String> {
-    let doc = Html::parse_document(&html);
+    let doc = Html::parse_document(html);
     let elem = doc
         .select(selector)
         .next()

@@ -115,10 +115,7 @@ impl Episode {
         if let (Some(lang), Some(episode)) =
             (&self.orig_lang, &self.orig_episode)
         {
-            Some(OrigEpisode {
-                lang: &lang,
-                episode: &episode,
-            })
+            Some(OrigEpisode { lang, episode })
         } else {
             None
         }

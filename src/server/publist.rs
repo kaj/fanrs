@@ -96,7 +96,7 @@ impl PartsPublished {
         })
     }
     pub fn small(&self) -> SmallPartsPublished {
-        SmallPartsPublished(&self)
+        SmallPartsPublished(self)
     }
     pub fn last(&self) -> Option<&IssueRef> {
         self.issues.last().map(|p| &p.0)

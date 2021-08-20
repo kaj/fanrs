@@ -41,7 +41,7 @@ async fn load_summary(
     issue: Issue,
     db: &PgPool,
 ) -> Result<(Issue, Vec<Creator>, Vec<ContentSummary>), Rejection> {
-    let cover_by = super::cover_by(issue.id, &db).await.map_err(custom)?;
+    let cover_by = super::cover_by(issue.id, db).await.map_err(custom)?;
 
     let contents = p::publications
         .left_outer_join(
@@ -56,7 +56,7 @@ async fn load_summary(
         ))
         .filter(p::issue.eq(issue.id))
         .order(p::seqno)
-        .load_async::<(Option<ComicSummary>, Option<ArticleSummary>, Option<i16>)>(&db)
+        .load_async::<(Option<ComicSummary>, Option<ArticleSummary>, Option<i16>)>(db)
         .await
         .map_err(custom)?
         .into_iter()

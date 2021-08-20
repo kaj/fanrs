@@ -103,7 +103,7 @@ impl RefKey {
             RefKey::Key(t, s) => (RefKey::KEY_ID, t.clone(), s.clone()),
             RefKey::Who(n, _s) => {
                 use super::Creator;
-                let alias = Creator::get_or_create(&n, db)?;
+                let alias = Creator::get_or_create(n, db)?;
                 let actual = Creator::from_slug(&alias.slug, db)?;
                 (RefKey::WHO_ID, actual.name, actual.slug)
             }

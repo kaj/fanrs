@@ -311,8 +311,8 @@ impl FullArticle {
         article: Article,
         db: &PgConnection,
     ) -> Result<FullArticle, diesel::result::Error> {
-        let refs = RefKeySet::for_article(&article, &db)?;
-        let creators = CreatorSet::for_article(&article, &db)?;
+        let refs = RefKeySet::for_article(&article, db)?;
+        let creators = CreatorSet::for_article(&article, db)?;
         Ok(FullArticle {
             article,
             refs,
@@ -323,8 +323,8 @@ impl FullArticle {
         article: Article,
         db: &PgPool,
     ) -> Result<FullArticle, AsyncError> {
-        let refs = RefKeySet::for_article_async(&article, &db).await?;
-        let creators = CreatorSet::for_article_async(&article, &db).await?;
+        let refs = RefKeySet::for_article_async(&article, db).await?;
+        let creators = CreatorSet::for_article_async(&article, db).await?;
         Ok(FullArticle {
             article,
             refs,
@@ -450,7 +450,7 @@ impl IssueDetails {
         issue: Issue,
         db: &PgPool,
     ) -> Result<IssueDetails, AsyncError> {
-        let cover_by = cover_by(issue.id, &db).await?;
+        let cover_by = cover_by(issue.id, db).await?;
 
         let mut have_main = false;
         let content_raw = p::publications
@@ -479,7 +479,7 @@ impl IssueDetails {
                 Option<i16>,
                 Option<i16>,
                 String,
-            )>(&db)
+            )>(db)
             .await?;
         let mut contents = Vec::with_capacity(content_raw.len());
         for row in content_raw.into_iter() {
@@ -497,8 +497,7 @@ impl IssueDetails {
                     };
                     let content = PublishedContent::EpisodePart {
                         title: t,
-                        episode: FullEpisode::in_issue(e, &issue, &db)
-                            .await?,
+                        episode: FullEpisode::in_issue(e, &issue, db).await?,
                         part,
                         best_plac: b,
                         label,
@@ -512,7 +511,7 @@ impl IssueDetails {
                 (None, Some(a), seqno, None, _label) => {
                     contents.push(PublishedInfo {
                         content: PublishedContent::Text(
-                            FullArticle::load_async(a, &db).await?,
+                            FullArticle::load_async(a, db).await?,
                         ),
                         seqno,
                         classnames: "article",
@@ -548,7 +547,7 @@ async fn cover_by(
         .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
         .select((c::id, ca::name, c::slug))
         .filter(cb::issue_id.eq(issue_id))
-        .load_async(&db)
+        .load_async(db)
         .await
 }
 

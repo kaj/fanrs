@@ -44,7 +44,7 @@
       @if let Hit::Episode{ title, fe } = hit {
         <section class="episode @fe.bestclass()">
           <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
-          @:epmisc(&fe)
+          @:epmisc(fe)
         </section>
       }
       @if let Hit::Article{ article, published } = hit {

@@ -193,7 +193,7 @@ fn register_serie(
     Part::publish(
         &episode,
         &part,
-        &issue,
+        issue,
         Some(seqno as i16),
         get_best_plac(c)?,
         &get_text_norm(c, "label").unwrap_or_default(),
