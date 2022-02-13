@@ -49,7 +49,7 @@ async fn list_creators(db: PgPool) -> Result<Response, Rejection> {
         ))
         .load::<CreatorContributions>(&db)
         .map_err(custom)?;
-    Builder::new().html(|o| templates::creators(o, &all))
+    Ok(Builder::new().html(|o| templates::creators(o, &all))?)
 }
 
 async fn one_creator(
@@ -155,7 +155,7 @@ async fn one_creator(
     let covers = CoverSet::by(&creator, &db).map_err(custom)?;
     let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;
 
-    Builder::new().html(|o| {
+    Ok(Builder::new().html(|o| {
         templates::creator(
             o,
             &creator,
@@ -165,7 +165,7 @@ async fn one_creator(
             &articles_by,
             &others,
         )
-    })
+    })?)
 }
 
 pub struct CoverSet {

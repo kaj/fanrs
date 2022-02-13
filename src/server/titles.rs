@@ -62,7 +62,7 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
             ))
         })
         .collect::<Result<Vec<_>, Rejection>>()?;
-    Builder::new().html(|o| templates::titles(o, &all))
+    Ok(Builder::new().html(|o| templates::titles(o, &all))?)
 }
 
 #[derive(Deserialize)]
@@ -144,9 +144,9 @@ async fn one_title(
             .push(FullEpisode::load_details(episode, &db).map_err(custom)?);
     }
 
-    Builder::new().html(|o| {
+    Ok(Builder::new().html(|o| {
         templates::title(o, &title, pages.as_ref(), &articles, &episodes)
-    })
+    })?)
 }
 
 pub async fn oldslug(

@@ -185,11 +185,11 @@ async fn frontpage(pool: PgPool) -> Result<impl Reply, Rejection> {
     let refkeys = RefKey::cloud(num, &db).map_err(custom)?;
     let creators = Creator::cloud(num, &db).map_err(custom)?;
 
-    Builder::new().html(|o| {
+    Ok(Builder::new().html(|o| {
         templates::frontpage(
             o, n, &all_fa, &years, &titles, &refkeys, &creators,
         )
-    })
+    })?)
 }
 
 /// Information about an episode / part or article, as published in an issue.
@@ -382,7 +382,8 @@ async fn issue(
 
     let details = IssueDetails::load_full(issue, &db).map_err(custom)?;
     let years = YearLinks::load(year, &db)?.link_current();
-    Builder::new().html(|o| templates::issue(o, &years, &details, &pubyear))
+    Ok(Builder::new()
+        .html(|o| templates::issue(o, &years, &details, &pubyear))?)
 }
 
 async fn list_year(year: u16, db: PgPool) -> Result<impl Reply, Rejection> {
@@ -401,7 +402,7 @@ async fn list_year(year: u16, db: PgPool) -> Result<impl Reply, Rejection> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(custom)?;
     let years = YearLinks::load(year, &db)?;
-    Builder::new().html(|o| templates::year(o, year, &years, &issues))
+    Ok(Builder::new().html(|o| templates::year(o, year, &years, &issues))?)
 }
 
 pub struct IssueDetails {
@@ -524,19 +525,19 @@ fn custom_or_404(e: DbError) -> Rejection {
 fn redirect(url: &str) -> Result<Response, Rejection> {
     use warp::http::header::LOCATION;
     let msg = format!("Try {:?}", url);
-    Builder::new()
+    Ok(Builder::new()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
         .body(msg.into())
-        .map_err(custom)
+        .map_err(custom)?)
 }
 
 async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
     if err.is_not_found() {
         log::debug!("Got a 404: {:?}", err);
-        Builder::new()
+        Ok(Builder::new()
             .status(StatusCode::NOT_FOUND)
-            .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))
+            .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))?)
     } else {
         if let Some(ise) = err.find::<ISE>() {
             log::error!("Internal server error: {}", ise.0);
@@ -544,9 +545,9 @@ async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
             log::error!("Internal server error: {:?}", err);
         }
         let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
-        Builder::new()
+        Ok(Builder::new()
             .status(code)
-            .html(|o| templates::error(o, code))
+            .html(|o| templates::error(o, code))?)
     }
 }
 

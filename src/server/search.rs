@@ -33,9 +33,9 @@ pub async fn search(
     let query = SearchQuery::load(query, &db).map_err(custom)?;
     let (titles, creators, refkeys, episodes) =
         query.do_search(&db).map_err(custom)?;
-    Response::builder().html(|o| {
+    Ok(Response::builder().html(|o| {
         templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
-    })
+    })?)
 }
 
 pub async fn search_autocomplete(

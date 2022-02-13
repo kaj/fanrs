@@ -79,7 +79,7 @@ async fn list_refs(db: PgPool) -> Result<ByteResponse, Rejection> {
             )
         })
         .collect::<Vec<_>>();
-    Response::builder().html(|o| templates::refkeys(o, &all))
+    Ok(Response::builder().html(|o| templates::refkeys(o, &all))?)
 }
 
 async fn one_fa(slug: String, db: PgPool) -> Result<ByteResponse, Rejection> {
@@ -191,6 +191,7 @@ async fn one_ref_impl(
         episodes.push((t, e));
     }
 
-    Response::builder()
-        .html(|o| templates::refkey(o, &refkey.refkey, &articles, &episodes))
+    Ok(Response::builder().html(|o| {
+        templates::refkey(o, &refkey.refkey, &articles, &episodes)
+    })?)
 }

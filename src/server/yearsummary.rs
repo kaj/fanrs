@@ -33,7 +33,8 @@ pub async fn year_summary(
         .map_err(custom)?;
 
     let years = YearLinks::load(year, &db)?;
-    Builder::new().html(|o| templates::year_summary(o, year, &years, &issues))
+    Ok(Builder::new()
+        .html(|o| templates::year_summary(o, year, &years, &issues))?)
 }
 
 fn load_summary(
