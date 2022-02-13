@@ -1,5 +1,6 @@
 mod covers;
 mod creators;
+mod error;
 mod paginator;
 mod publist;
 mod refs;
@@ -9,6 +10,7 @@ mod yearsummary;
 
 use self::covers::{cover_image, redirect_cover};
 pub use self::creators::CoverSet;
+use self::error::{for_rejection, ViewError, ViewResult};
 pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
 use self::search::{search, search_autocomplete};
@@ -49,7 +51,7 @@ use warp::http::response::Builder;
 use warp::http::status::StatusCode;
 use warp::path::Tail;
 use warp::reply::Response;
-use warp::{self, reject::not_found, Filter, Rejection, Reply};
+use warp::{self, Filter, Reply};
 
 #[derive(StructOpt)]
 pub struct Args {
@@ -77,26 +79,29 @@ impl Args {
         use warp::filters::query::query;
         use warp::{path, path::end, path::param, path::tail};
         let routes = warp::any()
-            .and(path("s").and(tail()).and(goh()).and_then(static_file))
+            .and(path("s").and(tail()).and(goh()).then(static_file).map(wrap))
             .or(path("c")
                 .and(param())
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(cover_image))
-            .or(end().and(goh()).and(s()).and_then(frontpage))
+                .then(cover_image)
+                .map(wrap))
+            .or(end().and(goh()).and(s()).then(frontpage).map(wrap))
             .or(path("search")
                 .and(end())
                 .and(query())
                 .and(goh())
                 .and(s())
-                .and_then(search))
+                .then(search)
+                .map(wrap))
             .or(path("ac")
                 .and(end())
                 .and(query())
                 .and(goh())
                 .and(s())
-                .and_then(search_autocomplete))
+                .then(search_autocomplete)
+                .map(wrap))
             .or(path("titles").and(titles::routes(s())))
             .or(path("fa").and(refs::fa_route(s())))
             .or(path("what").and(refs::what_routes(s())))
@@ -107,35 +112,50 @@ impl Args {
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(redirect_cover))
+                .then(redirect_cover)
+                .map(wrap))
             .or(path("robots.txt")
                 .and(end())
                 .and(goh())
-                .and_then(robots_txt))
+                .then(robots_txt)
+                .map(wrap))
             .or(param()
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(yearsummary::year_summary))
+                .then(yearsummary::year_summary)
+                .map(wrap))
             .or(param()
                 .and(param())
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(issue))
+                .then(issue)
+                .map(wrap))
             .or(param()
                 .and(path("details"))
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(list_year))
+                .then(list_year)
+                .map(wrap))
             .or(param()
                 .and(end())
                 .and(goh())
                 .and(s())
-                .and_then(titles::oldslug))
-            .recover(customize_error);
+                .then(titles::oldslug)
+                .map(wrap))
+            .recover(for_rejection);
         warp::serve(routes).run(self.bind).await;
+    }
+}
+
+type Result<T, E = ViewError> = std::result::Result<T, E>;
+
+fn wrap(result: Result<impl Reply>) -> Response {
+    match result {
+        Ok(reply) => reply.into_response(),
+        Err(err) => err.into_response(),
     }
 }
 
@@ -143,7 +163,7 @@ impl Args {
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
 #[allow(clippy::needless_pass_by_value)]
-async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
+async fn static_file(name: Tail) -> Result<impl Reply> {
     use crate::templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
@@ -153,37 +173,35 @@ async fn static_file(name: Tail) -> Result<impl Reply, Rejection> {
             .body(data.content))
     } else {
         log::info!("Static file {:?} not found", name);
-        Err(not_found())
+        Err(ViewError::NotFound)
     }
 }
 
-async fn robots_txt() -> Result<impl Reply, Rejection> {
+async fn robots_txt() -> Result<impl Reply> {
     Ok(Builder::new()
         .header(CONTENT_TYPE, TEXT_PLAIN.as_ref())
         .body("User-agent: *\nDisallow: /search\nDisallow: /ac\n"))
 }
 
-async fn frontpage(pool: PgPool) -> Result<impl Reply, Rejection> {
-    let db = pool.get().await.map_err(custom)?;
+async fn frontpage(pool: PgPool) -> Result<impl Reply> {
+    let db = pool.get().await?;
     let n = p::publications
         .select(sql("count(distinct issue)"))
         .filter(not(p::seqno.is_null()))
-        .first(&db)
-        .map_err(custom)?;
+        .first(&db)?;
 
     let years = i::issues
         .select(i::year)
         .distinct()
         .order(i::year)
-        .load(&db)
-        .map_err(custom)?;
+        .load(&db)?;
 
-    let all_fa = refs::get_all_fa(&db).map_err(custom)?;
+    let all_fa = refs::get_all_fa(&db)?;
 
     let num = 50;
-    let titles = Title::cloud(num, &db).map_err(custom)?;
-    let refkeys = RefKey::cloud(num, &db).map_err(custom)?;
-    let creators = Creator::cloud(num, &db).map_err(custom)?;
+    let titles = Title::cloud(num, &db)?;
+    let refkeys = RefKey::cloud(num, &db)?;
+    let creators = Creator::cloud(num, &db)?;
 
     Ok(Builder::new().html(|o| {
         templates::frontpage(
@@ -361,46 +379,40 @@ fn text_to_fa_html_e() {
     )
 }
 
-async fn issue(
-    year: u16,
-    issue: u8,
-    db: PgPool,
-) -> Result<impl Reply, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
+    let db = db.get().await?;
     let issue: Issue = i::issues
         .filter(i::year.eq(year as i16))
         .filter(i::number.eq(i16::from(issue)))
         .first(&db)
-        .map_err(custom_or_404)?;
+        .optional()?
+        .ok_or(ViewError::NotFound)?;
 
     let pubyear = i::issues
         .select((i::year, (i::number, i::number_str)))
         .filter(i::year.eq(issue.year))
         .order(i::number)
-        .load::<IssueRef>(&db)
-        .map_err(custom)?;
+        .load::<IssueRef>(&db)?;
 
-    let details = IssueDetails::load_full(issue, &db).map_err(custom)?;
+    let details = IssueDetails::load_full(issue, &db)?;
     let years = YearLinks::load(year, &db)?.link_current();
     Ok(Builder::new()
         .html(|o| templates::issue(o, &years, &details, &pubyear))?)
 }
 
-async fn list_year(year: u16, db: PgPool) -> Result<impl Reply, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+async fn list_year(year: u16, db: PgPool) -> Result<impl Reply> {
+    let db = db.get().await?;
     let issues = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load(&db)
-        .map_err(custom)?;
+        .load(&db)?;
     if issues.is_empty() {
-        return Err(not_found());
+        return Err(ViewError::NotFound);
     }
     let issues = issues
         .into_iter()
         .map(|issue| IssueDetails::load_full(issue, &db))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(custom)?;
+        .collect::<Result<Vec<_>, _>>()?;
     let years = YearLinks::load(year, &db)?;
     Ok(Builder::new().html(|o| templates::year(o, year, &years, &issues))?)
 }
@@ -515,40 +527,14 @@ fn cover_by(
         .load(db)
 }
 
-fn custom_or_404(e: DbError) -> Rejection {
-    match e {
-        DbError::NotFound => not_found(),
-        e => custom(e),
-    }
-}
-
-fn redirect(url: &str) -> Result<Response, Rejection> {
+fn redirect(url: &str) -> Result<Response> {
     use warp::http::header::LOCATION;
     let msg = format!("Try {:?}", url);
-    Ok(Builder::new()
+    Builder::new()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
         .body(msg.into())
-        .map_err(custom)?)
-}
-
-async fn customize_error(err: Rejection) -> Result<impl Reply, Rejection> {
-    if err.is_not_found() {
-        log::debug!("Got a 404: {:?}", err);
-        Ok(Builder::new()
-            .status(StatusCode::NOT_FOUND)
-            .html(|o| templates::notfound(o, StatusCode::NOT_FOUND))?)
-    } else {
-        if let Some(ise) = err.find::<ISE>() {
-            log::error!("Internal server error: {}", ise.0);
-        } else {
-            log::error!("Internal server error: {:?}", err);
-        }
-        let code = StatusCode::INTERNAL_SERVER_ERROR; // FIXME
-        Ok(Builder::new()
-            .status(code)
-            .html(|o| templates::error(o, code))?)
-    }
+        .ise()
 }
 
 pub struct YearLinks {
@@ -559,14 +545,13 @@ pub struct YearLinks {
 }
 
 impl YearLinks {
-    fn load(year: u16, db: &PgConnection) -> Result<Self, Rejection> {
+    fn load(year: u16, db: &PgConnection) -> Result<Self> {
         let (first, last) = i::issues
             .select((
                 sql::<SmallInt>("min(year)"),
                 sql::<SmallInt>("max(year)"),
             ))
-            .first::<(i16, i16)>(db)
-            .map_err(custom)?;
+            .first::<(i16, i16)>(db)?;
         Ok(YearLinks::new(first as u16, year, last as u16))
     }
     fn new(first: u16, shown: u16, last: u16) -> Self {
@@ -614,13 +599,4 @@ impl ToHtml for YearLinks {
         }
         Ok(())
     }
-}
-
-use warp::reject::Reject;
-#[derive(Debug)]
-struct ISE(String);
-impl Reject for ISE {}
-
-fn custom<E: std::fmt::Display + std::fmt::Debug>(e: E) -> Rejection {
-    warp::reject::custom(ISE(format!("{}\nDetails: ({:#?})", e, e)))
 }

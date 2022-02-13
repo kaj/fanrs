@@ -1,6 +1,6 @@
 use super::{
-    custom, custom_or_404, goh, redirect, FullArticle, FullEpisode,
-    Paginator, PgFilter, PgPool, RenderRucte,
+    goh, redirect, wrap, FullArticle, FullEpisode, Paginator, PgFilter,
+    PgPool, RenderRucte, Result, ViewError,
 };
 use crate::models::{Article, Episode, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -18,26 +18,24 @@ use diesel::sql_types::SmallInt;
 use serde::Deserialize;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
-use warp::reject::not_found;
-use warp::{self, reply::Response, Filter, Rejection, Reply};
+use warp::{self, reply::Response, Filter, Reply};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::filters::query::query;
     use warp::path::{end, param};
     let s = || s.clone();
-    let list = goh().and(end()).and(s()).and_then(list_titles);
+    let list = goh().and(end()).and(s()).then(list_titles);
     let one = goh()
         .and(s())
         .and(param())
         .and(end())
         .and(query())
-        .and_then(one_title);
-    list.or(one).unify().boxed()
+        .then(one_title);
+    list.or(one).unify().map(wrap).boxed()
 }
 
-#[allow(clippy::needless_pass_by_value)]
-async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+async fn list_titles(db: PgPool) -> Result<Response> {
+    let db = db.get().await?;
     let all = t::titles
         .left_join(e::episodes.left_join(
             ep::episode_parts.left_join(p::publications.left_join(i::issues)),
@@ -50,18 +48,17 @@ async fn list_titles(db: PgPool) -> Result<Response, Rejection> {
         ))
         .group_by(t::titles::all_columns())
         .order(t::title)
-        .load(&db)
-        .map_err(custom)?
+        .load(&db)?
         .into_iter()
         .map(|(title, c, first, last)| {
-            Ok((
+            (
                 title,
                 c,
                 IssueRef::from_magic(first),
                 IssueRef::from_magic(last),
-            ))
+            )
         })
-        .collect::<Result<Vec<_>, Rejection>>()?;
+        .collect::<Vec<_>>();
     Ok(Builder::new().html(|o| templates::titles(o, &all))?)
 }
 
@@ -70,13 +67,12 @@ pub struct PageParam {
     p: Option<usize>,
 }
 
-#[allow(clippy::needless_pass_by_value)]
 async fn one_title(
     db: PgPool,
     slug: String,
     page: PageParam,
-) -> Result<Response, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+) -> Result<Response> {
+    let db = db.get().await?;
     let (slug, strip) = if let Some(strip) = slug.strip_prefix("weekdays-") {
         (strip.to_string(), Some(false))
     } else if let Some(strip) = slug.strip_prefix("sundays-") {
@@ -87,7 +83,8 @@ async fn one_title(
     let title = t::titles
         .filter(t::slug.eq(slug))
         .first::<Title>(&db)
-        .map_err(custom_or_404)?;
+        .optional()?
+        .ok_or(ViewError::NotFound)?;
 
     let articles_raw = a::articles
         .select(a::articles::all_columns())
@@ -97,20 +94,15 @@ async fn one_title(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)
-        .map_err(custom)?;
+        .load::<Article>(&db)?;
     let mut articles = Vec::with_capacity(articles_raw.len());
     for article in articles_raw.into_iter() {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)
-            .map_err(custom)?;
-        articles.push((
-            FullArticle::load(article, &db).map_err(custom)?,
-            published,
-        ));
+            .load::<IssueRef>(&db)?;
+        articles.push((FullArticle::load(article, &db)?, published));
     }
 
     let episodes = e::episodes
@@ -127,21 +119,16 @@ async fn one_title(
             .filter(e::orig_sundays.eq(sun))
             .filter(e::orig_date.is_not_null())
             .order(e::orig_date)
-            .load::<Episode>(&db)
-            .map_err(custom)?,
-        None => episodes
-            .order(min(i::magic))
-            .load::<Episode>(&db)
-            .map_err(custom)?,
+            .load::<Episode>(&db)?,
+        None => episodes.order(min(i::magic)).load::<Episode>(&db)?,
     };
 
-    let (episodes_raw, pages) =
-        Paginator::if_needed(episodes, page.p).map_err(|()| not_found())?;
+    let (episodes_raw, pages) = Paginator::if_needed(episodes, page.p)
+        .map_err(|()| ViewError::NotFound)?;
 
     let mut episodes = Vec::with_capacity(episodes_raw.len());
     for episode in episodes_raw.into_iter() {
-        episodes
-            .push(FullEpisode::load_details(episode, &db).map_err(custom)?);
+        episodes.push(FullEpisode::load_details(episode, &db)?);
     }
 
     Ok(Builder::new().html(|o| {
@@ -149,10 +136,7 @@ async fn one_title(
     })?)
 }
 
-pub async fn oldslug(
-    slug: String,
-    db: PgPool,
-) -> Result<impl Reply, Rejection> {
+pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
     // Special case:
     if slug == "favicon.ico" {
         use templates::statics::goda_svg;
@@ -166,13 +150,12 @@ pub async fn oldslug(
     }
     let target = slug.replace("_", "-").replace(".html", "");
 
-    let db = db.get().await.map_err(custom)?;
+    let db = db.get().await?;
     if let Ok(year) = target.parse::<i16>() {
         let issues = i::issues
             .filter(i::year.eq(year))
             .select(count_star())
-            .first::<i64>(&db)
-            .map_err(custom)?;
+            .first::<i64>(&db)?;
         if issues > 0 {
             return redirect(&format!("/{}", year));
         }
@@ -182,8 +165,7 @@ pub async fn oldslug(
     let n = t::titles
         .filter(t::slug.eq(target.clone()))
         .select(count_star())
-        .first::<i64>(&db)
-        .map_err(custom)?;
+        .first::<i64>(&db)?;
     if n == 1 {
         return redirect(&format!("/titles/{}", target));
     }
@@ -200,6 +182,7 @@ pub async fn oldslug(
         )
         .select(t::slug)
         .first::<String>(&db)
-        .map_err(custom_or_404)?;
+        .optional()?
+        .ok_or(ViewError::NotFound)?;
     redirect(&format!("/titles/{}", target))
 }

@@ -1,6 +1,6 @@
 use super::{
-    custom, custom_or_404, goh, redirect, DbError, FullArticle, FullEpisode,
-    OtherContribs, PgFilter, PgPool,
+    goh, redirect, wrap, DbError, FullArticle, FullEpisode, OtherContribs,
+    PgFilter, PgPool, Result, ViewError,
 };
 use crate::models::creator_contributions::CreatorContributions;
 use crate::models::{
@@ -25,17 +25,17 @@ use diesel::prelude::*;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reply::Response;
-use warp::{self, Filter, Rejection, Reply};
+use warp::{self, Filter, Reply};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::path::{end, param};
-    let list = goh().and(end()).and(s.clone()).and_then(list_creators);
-    let one = goh().and(s).and(param()).and(end()).and_then(one_creator);
-    list.or(one).unify().boxed()
+    let list = goh().and(end()).and(s.clone()).then(list_creators);
+    let one = goh().and(s).and(param()).and(end()).then(one_creator);
+    list.or(one).unify().map(wrap).boxed()
 }
 
-async fn list_creators(db: PgPool) -> Result<Response, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+async fn list_creators(db: PgPool) -> Result<Response> {
+    let db = db.get().await?;
     use crate::models::creator_contributions::creator_contributions::dsl as cc;
     let all = cc::creator_contributions
         .select((
@@ -47,21 +47,16 @@ async fn list_creators(db: PgPool) -> Result<Response, Rejection> {
             cc::first_issue,
             cc::latest_issue,
         ))
-        .load::<CreatorContributions>(&db)
-        .map_err(custom)?;
+        .load::<CreatorContributions>(&db)?;
     Ok(Builder::new().html(|o| templates::creators(o, &all))?)
 }
 
-async fn one_creator(
-    db: PgPool,
-    slug: String,
-) -> Result<Response, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
+    let db = db.get().await?;
     let creator = c::creators
         .filter(c::slug.eq(slug.clone()))
         .first::<Creator>(&db)
-        .optional()
-        .map_err(custom)?;
+        .optional()?;
     let creator = if let Some(creator) = creator {
         creator
     } else {
@@ -79,7 +74,8 @@ async fn one_creator(
             .or_filter(c::slug.ilike(target))
             .select(c::slug)
             .first::<String>(&db)
-            .map_err(custom_or_404)?;
+            .optional()?
+            .ok_or(ViewError::NotFound)?;
         log::debug!("Found replacement: {:?}", found);
         return redirect(&format!("/who/{}", found));
     };
@@ -92,20 +88,15 @@ async fn one_creator(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)
-        .map_err(custom)?;
+        .load::<Article>(&db)?;
     let mut about = Vec::with_capacity(about_raw.len());
     for article in about_raw.into_iter() {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)
-            .map_err(custom)?;
-        about.push((
-            FullArticle::load(article, &db).map_err(custom)?,
-            published,
-        ));
+            .load::<IssueRef>(&db)?;
+        about.push((FullArticle::load(article, &db)?, published));
     }
 
     let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
@@ -121,11 +112,10 @@ async fn one_creator(
         )
         .order(min(i::magic))
         .group_by(e_t_columns)
-        .load::<(Title, Episode)>(&db)
-        .map_err(custom)?;
+        .load::<(Title, Episode)>(&db)?;
     let mut main_episodes = Vec::with_capacity(main_episodes_raw.len());
     for (t, ep) in main_episodes_raw.into_iter() {
-        let e = FullEpisode::load_details(ep, &db).map_err(custom)?;
+        let e = FullEpisode::load_details(ep, &db)?;
         main_episodes.push((t, e));
     }
 
@@ -136,24 +126,19 @@ async fn one_creator(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)
-        .map_err(custom)?;
+        .load::<Article>(&db)?;
     let mut articles_by = Vec::with_capacity(articles_by_raw.len());
     for article in articles_by_raw.into_iter() {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)
-            .map_err(custom)?;
-        articles_by.push((
-            FullArticle::load(article, &db).map_err(custom)?,
-            published,
-        ))
+            .load::<IssueRef>(&db)?;
+        articles_by.push((FullArticle::load(article, &db)?, published))
     }
 
-    let covers = CoverSet::by(&creator, &db).map_err(custom)?;
-    let others = OtherContribs::for_creator(&creator, &db).map_err(custom)?;
+    let covers = CoverSet::by(&creator, &db)?;
+    let others = OtherContribs::for_creator(&creator, &db)?;
 
     Ok(Builder::new().html(|o| {
         templates::creator(

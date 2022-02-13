@@ -1,4 +1,4 @@
-use super::{custom, redirect, PgPool};
+use super::{redirect, PgPool, Result, ViewError};
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::templates::statics::xcover_jpg;
@@ -9,22 +9,17 @@ use mime::IMAGE_JPEG;
 use std::str::FromStr;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::{Response, StatusCode};
-use warp::reject::not_found;
-use warp::{Rejection, Reply};
+use warp::Reply;
 
 #[allow(clippy::needless_pass_by_value)]
-pub async fn cover_image(
-    issue: CoverRef,
-    db: PgPool,
-) -> Result<impl Reply, Rejection> {
+pub async fn cover_image(issue: CoverRef, db: PgPool) -> Result<impl Reply> {
     let data = i::issues
         .inner_join(c::covers)
         .select(c::image)
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
-        .first::<Vec<u8>>(&db.get().await.map_err(custom)?)
-        .optional()
-        .map_err(custom)?;
+        .first::<Vec<u8>>(&db.get().await?)
+        .optional()?;
 
     if let Some(data) = data {
         let medium_expires = Utc::now() + Duration::days(90);
@@ -65,18 +60,17 @@ pub async fn redirect_cover(
     year: CYear,
     issue: SIssue,
     db: PgPool,
-) -> Result<impl Reply, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+) -> Result<impl Reply> {
+    let db = db.get().await?;
     let exists = i::issues
         .filter(i::year.eq(year.0))
         .filter(i::number.eq(issue.0))
         .count()
-        .get_result::<i64>(&db)
-        .map_err(custom)?;
+        .get_result::<i64>(&db)?;
     if exists > 0 {
         redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))
     } else {
-        Err(not_found())
+        Err(ViewError::NotFound)
     }
 }
 

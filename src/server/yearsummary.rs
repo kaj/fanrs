@@ -1,4 +1,4 @@
-use super::{custom, DbError, PgPool, YearLinks};
+use super::{DbError, PgPool, Result, ViewError, YearLinks};
 use crate::models::{Creator, Issue, Part};
 use crate::schema::articles::dsl as a;
 use crate::schema::episode_parts::dsl as ep;
@@ -11,26 +11,21 @@ use diesel::prelude::*;
 use diesel::QueryDsl;
 use std::io::{self, Write};
 use warp::http::response::Builder;
-use warp::{self, reject::not_found, Rejection, Reply};
+use warp::{self, Reply};
 
-pub async fn year_summary(
-    year: u16,
-    db: PgPool,
-) -> Result<impl Reply, Rejection> {
-    let db = db.get().await.map_err(custom)?;
+pub async fn year_summary(year: u16, db: PgPool) -> Result<impl Reply> {
+    let db = db.get().await?;
     let issues: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load(&db)
-        .map_err(custom)?;
+        .load(&db)?;
     if issues.is_empty() {
-        return Err(not_found());
+        return Err(ViewError::NotFound);
     }
     let issues = issues
         .into_iter()
         .map(|issue| load_summary(issue, &db))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(custom)?;
+        .collect::<Result<Vec<_>, _>>()?;
 
     let years = YearLinks::load(year, &db)?;
     Ok(Builder::new()
