@@ -49,8 +49,11 @@ impl Fanrs {
     async fn run(self) -> Result<()> {
         match self {
             Fanrs::ReadFiles(args) => args.run(),
-            Fanrs::ListIssues(db) => Ok(list_issues(&db.get_db()?)?),
-            Fanrs::RunServer(args) => Ok(args.run().await),
+            Fanrs::ListIssues(db) => list_issues(&db.get_db()?),
+            Fanrs::RunServer(args) => {
+                args.run().await;
+                Ok(())
+            }
             Fanrs::FetchCovers(args) => args.run().await,
             Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
             Fanrs::CountPages(args) => args.run(),

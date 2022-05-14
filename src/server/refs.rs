@@ -122,7 +122,7 @@ async fn one_ref_impl(
             }
         }
         let target =
-            slug.to_lowercase().replace("_", "-").replace(".html", "");
+            slug.to_lowercase().replace('_', "-").replace(".html", "");
         if target != slug {
             log::debug!("Trying refkey redirect {:?} -> {:?}", slug, target);
             let n = r::refkeys

@@ -148,7 +148,7 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
         use templates::statics::sc_png;
         return redirect(&format!("/s/{}", sc_png.name));
     }
-    let target = slug.replace("_", "-").replace(".html", "");
+    let target = slug.replace('_', "-").replace(".html", "");
 
     let db = db.get().await?;
     if let Ok(year) = target.parse::<i16>() {
@@ -173,7 +173,7 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
         .filter(
             t::slug.ilike(
                 target
-                    .replace("-", "")
+                    .replace('-', "")
                     .chars()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()

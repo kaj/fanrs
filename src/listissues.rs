@@ -3,10 +3,10 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::result::Error;
 use std::collections::BTreeMap;
+use anyhow::Result;
 
-pub fn list_issues(db: &PgConnection) -> Result<(), Error> {
+pub fn list_issues(db: &PgConnection) -> Result<()> {
     let mut all = BTreeMap::<i16, Vec<Nr>>::new();
     for (year, number) in i::issues
         .select((i::year, (i::number, i::number_str)))

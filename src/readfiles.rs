@@ -462,22 +462,15 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::titles::dsl as t;
     use diesel::dsl::{all, any};
 
-    // Note: Loading these is an inefficiency, but it is the only way I find
-    // to get rid of the nullability of publications(episode_part) before
-    // comparing to non-nullable episode_parts(id).
+    let start = Instant::now();
     let published_parts = p::publications
-        .filter(p::episode_part.is_not_null())
         .select(p::episode_part)
-        .distinct()
-        .load(db)?
-        .into_iter()
-        .filter_map(|e| e)
-        .collect::<Vec<i32>>();
+        .distinct();
     let n = diesel::delete(
-        ep::episode_parts.filter(ep::id.ne(all(published_parts))),
+        ep::episode_parts.filter(ep::id.nullable().ne(all(published_parts))),
     )
     .execute(db)?;
-    println!("Delete {} junk episode parts.", n);
+    println!("Delete {} junk episode parts in {:?}.", n, start.elapsed());
 
     let n = diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(
         any(e::episodes.select(e::id).filter(
@@ -508,21 +501,22 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     .execute(db)?;
     println!("Delete {} junk titles.", n);
 
+    let start = Instant::now();
     let published_articles = p::publications
         .filter(p::article_id.is_not_null())
         .select(p::article_id)
         .distinct()
-        .load(db)?
+        .load::<Option<i32>>(db)?
         .into_iter()
-        .filter_map(|e| e)
-        .collect::<Vec<i32>>();
+        .flatten()
+        .collect::<Vec<_>>();
 
     let n = diesel::delete(
         ar::article_refkeys
             .filter(ar::article_id.ne(all(&published_articles))),
     )
     .execute(db)?;
-    println!("Delete {} junk article refkeys.", n);
+    println!("Delete {} junk article refkeys in {:?}", n, start.elapsed());
 
     let n = diesel::delete(
         r::refkeys
@@ -532,20 +526,23 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     .execute(db)?;
     println!("Delete {} junk refkeys.", n);
 
+    let start = Instant::now();
     let n = diesel::delete(
         ab::articles_by.filter(ab::article_id.ne(all(&published_articles))),
     )
     .execute(db)?;
-    println!("Delete {} junk articles-by.", n);
+    println!("Delete {} junk articles-by in {:?}.", n, start.elapsed());
 
+    let start = Instant::now();
     let n = diesel::delete(
         a::articles.filter(a::id.ne(all(&published_articles))),
     )
     .execute(db)?;
     println!(
-        "Delete {} junk articles ({} remains).",
+        "Delete {} junk articles in {:?} ({} remains).",
         n,
-        published_articles.len()
+        start.elapsed(),
+        published_articles.len(),
     );
     Ok(())
 }
