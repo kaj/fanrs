@@ -10,6 +10,7 @@ use std::io::{self, Write};
 #[derive(Debug, Queryable)]
 pub struct Episode {
     pub id: i32,
+    #[allow(unused)]
     title_id: i32,
     pub episode: Option<String>,
     pub teaser: Option<String>,

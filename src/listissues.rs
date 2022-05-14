@@ -1,10 +1,10 @@
 use crate::models::Nr;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
+use anyhow::Result;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use std::collections::BTreeMap;
-use anyhow::Result;
 
 pub fn list_issues(db: &PgConnection) -> Result<()> {
     let mut all = BTreeMap::<i16, Vec<Nr>>::new();

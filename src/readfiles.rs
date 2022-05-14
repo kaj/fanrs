@@ -463,9 +463,7 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use diesel::dsl::{all, any};
 
     let start = Instant::now();
-    let published_parts = p::publications
-        .select(p::episode_part)
-        .distinct();
+    let published_parts = p::publications.select(p::episode_part).distinct();
     let n = diesel::delete(
         ep::episode_parts.filter(ep::id.nullable().ne(all(published_parts))),
     )
