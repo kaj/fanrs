@@ -167,6 +167,16 @@ impl IssueRef {
         }
     }
 
+    pub fn load_id(&self, db: &PgConnection) -> Result<i32, Error> {
+        use crate::schema::issues::dsl as i;
+        i::issues
+            .select(i::id)
+            .filter(i::year.eq(self.year))
+            .filter(i::number.eq(self.number.number))
+            .filter(i::number_str.eq(&self.number.nr_str))
+            .first(db)
+    }
+
     pub fn sortno(&self) -> i16 {
         (self.year - 1950) * 64 + self.number.number
     }

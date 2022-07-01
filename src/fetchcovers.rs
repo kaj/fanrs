@@ -1,13 +1,16 @@
+use crate::models::IssueRef;
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::DbOpt;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use diesel::dsl::now;
 use diesel::pg::upsert::excluded;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use reqwest::{self, Client, Response};
 use scraper::{Html, Selector};
+use std::path::PathBuf;
+use tokio::fs::read;
 
 #[derive(clap::Parser)]
 pub struct Args {
@@ -22,11 +25,29 @@ pub struct Args {
     /// updated scans on the phantom wiki.
     #[clap(long)]
     update_old: bool,
+
+    #[clap(subcommand)]
+    subcmd: Option<SubCmd>,
+}
+
+#[derive(clap::Subcommand)]
+enum SubCmd {
+    /// Load a cover from a local image file.
+    ///
+    /// Note: The --no-op option is ignored for this command.
+    LoadLocal(LoadLocal),
 }
 
 impl Args {
     pub async fn run(self) -> Result<()> {
         let db = self.db.get_db()?;
+        match self.subcmd {
+            Some(SubCmd::LoadLocal(local)) => local.run(db).await,
+            None => self.do_fetch(db).await,
+        }
+    }
+
+    async fn do_fetch(self, db: PgConnection) -> Result<()> {
         let mut client = WikiClient::new();
         let query = i::issues
             .select((i::id, i::year, i::number_str))
@@ -50,6 +71,33 @@ impl Args {
     }
 }
 
+#[derive(clap::Parser)]
+struct LoadLocal {
+    /// The issue to load a cover for.
+    issue: IssueRef,
+    /// The file containing the cover.
+    /// This should be a jpeg image.
+    path: PathBuf,
+}
+
+impl LoadLocal {
+    async fn run(self, db: PgConnection) -> Result<()> {
+        let data = read(self.path).await?;
+        println!(
+            "Got {} bytes for Fa {}/{}",
+            data.len(),
+            self.issue.number,
+            self.issue.year
+        );
+        let id = self
+            .issue
+            .load_id(&db)
+            .with_context(|| format!("Failed to load {:?}", self.issue))?;
+        save_cover(id, &data, &db)?;
+        Ok(())
+    }
+}
+
 async fn load_cover(
     client: &mut WikiClient,
     db: &PgConnection,
@@ -59,19 +107,7 @@ async fn load_cover(
 ) -> Result<()> {
     match client.fetchcover(year, number_str).await {
         Ok(imgdata) => {
-            diesel::insert_into(c::covers)
-                .values((
-                    c::issue.eq(id),
-                    c::image.eq(imgdata.as_ref()),
-                    c::fetch_time.eq(now),
-                ))
-                .on_conflict(c::issue)
-                .do_update()
-                .set((
-                    c::image.eq(excluded(c::image)),
-                    c::fetch_time.eq(excluded(c::fetch_time)),
-                ))
-                .execute(db)?;
+            save_cover(id, imgdata.as_ref(), db)?;
             eprintln!(
                 "Got {} bytes of image data for {}/{}",
                 imgdata.as_ref().len(),
@@ -86,6 +122,23 @@ async fn load_cover(
             );
         }
     }
+    Ok(())
+}
+
+fn save_cover(id: i32, imgdata: &[u8], db: &PgConnection) -> Result<()> {
+    diesel::insert_into(c::covers)
+        .values((
+            c::issue.eq(id),
+            c::image.eq(imgdata.as_ref()),
+            c::fetch_time.eq(now),
+        ))
+        .on_conflict(c::issue)
+        .do_update()
+        .set((
+            c::image.eq(excluded(c::image)),
+            c::fetch_time.eq(excluded(c::fetch_time)),
+        ))
+        .execute(db)?;
     Ok(())
 }
 
