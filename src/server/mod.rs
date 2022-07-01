@@ -44,7 +44,6 @@ use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
 use std::net::SocketAddr;
-use structopt::StructOpt;
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::response::Builder;
@@ -53,13 +52,13 @@ use warp::path::Tail;
 use warp::reply::Response;
 use warp::{self, Filter, Reply};
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 pub struct Args {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     db: DbOpt,
 
     /// Adress to listen on
-    #[structopt(long, default_value = "127.0.0.1:1536")]
+    #[clap(long, default_value = "127.0.0.1:1536")]
     bind: SocketAddr,
 }
 

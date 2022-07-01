@@ -11,25 +11,24 @@ use slug::slugify;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use structopt::StructOpt;
 
 static XMLNS: &str = "http://www.w3.org/XML/1998/namespace";
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 pub struct Args {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     db: DbOpt,
 
     /// The directory containing the data files.
-    #[structopt(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
+    #[clap(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
     basedir: PathBuf,
 
     /// Read data for all years, from 1950 to current.
-    #[structopt(long, short)]
+    #[clap(long, short)]
     all: bool,
 
     /// Year(s) to read data for.
-    #[structopt(name = "year", required_unless("all"))]
+    #[clap(name = "year", required_unless("all"))]
     years: Vec<u32>,
 }
 

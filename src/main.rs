@@ -15,11 +15,11 @@ mod server;
 use crate::checkstrips::check_strips;
 use crate::listissues::list_issues;
 use anyhow::{Context, Result};
+use clap::Parser;
 use dbopt::DbOpt;
 use dotenv::dotenv;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 #[structopt(about, author)]
 enum Fanrs {
     /// Read data from xml content files.

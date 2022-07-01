@@ -1,8 +1,7 @@
 use crate::models::Nr;
 use anyhow::{anyhow, Result};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 pub struct CountPages {
     /// The issue starting at the first given page number.
     issue: Nr,

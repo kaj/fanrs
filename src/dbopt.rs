@@ -1,14 +1,13 @@
 use deadpool_diesel::postgres::{Manager, Pool};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use structopt::StructOpt;
 
 pub type PgPool = Pool;
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 pub struct DbOpt {
     /// How to connect to the postgres database.
-    #[structopt(long, env = "DATABASE_URL", hide_env_values = true)]
+    #[clap(long, env = "DATABASE_URL", hide_env_values = true)]
     db_url: String,
 }
 

@@ -8,20 +8,19 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use reqwest::{self, Client, Response};
 use scraper::{Html, Selector};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(clap::Parser)]
 pub struct Args {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     db: DbOpt,
 
     /// No operation, only check which covers would be fetched.
-    #[structopt(long)]
+    #[clap(long)]
     no_op: bool,
 
     /// Update some of the oldest fetched covers, as there may be
     /// updated scans on the phantom wiki.
-    #[structopt(long)]
+    #[clap(long)]
     update_old: bool,
 }
 
