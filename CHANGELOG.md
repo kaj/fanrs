@@ -1,5 +1,10 @@
 # Changes in fanrs
 
+## Unreleased
+
+* ...
+
+
 ## Release 0.11.2 (2022-07-01)
 
 * Add a subcommand to "fetch" cover from local file.
