@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-* ...
+* Update Ructe to 0.15.0
 
 
 ## Release 0.11.2 (2022-07-01)
