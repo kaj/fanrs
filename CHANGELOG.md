@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-* Update Ructe to 0.15.0
+* Fixed bug in detecting unused episode parts in read-files.
+* Adopt to phantomwiki updates in fetch-covers.
+* Updated ructe to 0.15.0.
+* Updated env_logger to 0.10.0.
+* Some minor fixes (suggested by updated clippy).
 
 
 ## Release 0.11.2 (2022-07-01)
