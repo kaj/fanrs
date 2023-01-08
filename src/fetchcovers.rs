@@ -164,7 +164,7 @@ impl WikiClient {
     ) -> Result<impl AsRef<[u8]>> {
         let url2 = select_href(
             &self
-                .get(&format!("/Fantomen_{}/{}", number_str, year))
+                .get(&format!("/index.php/Fantomen_{}/{}", number_str, year))
                 .await?
                 .text()
                 .await?,
@@ -181,8 +181,8 @@ impl WikiClient {
     }
 
     async fn get(&mut self, url: &str) -> reqwest::Result<Response> {
-        let url1 = format!("http://www.phantomwiki.org{}", url);
-        self.client.get(&url1).send().await?.error_for_status()
+        let url = format!("https://www.phantomwiki.org{}", url);
+        self.client.get(&url).send().await?.error_for_status()
     }
 }
 
