@@ -16,7 +16,7 @@ chrono = "0.4.6"
 clap = { version = "3.2.8", features = ["derive", "env", "wrap_help"] }
 deadpool-diesel = { version = "0.1.2", features = ["postgres"] }
 dotenv = "0.15.0"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 log = "0.4.8"
 lazy_static = "1.4.0"
 mime = "0.3"
