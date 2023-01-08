@@ -3,7 +3,7 @@
 ## Unreleased
 
 * Fixed bug in detecting unused episode parts in read-files.
-* Adopt to phantomwiki updates in fetch-covers.
+* Adopted to phantomwiki updates in fetch-covers.
 * Updated ructe to 0.15.0, env_logger to 0.10.0, roxmltree to 0.17.0,
   and scraper to 0.14.0.
 * Some minor fixes (suggested by updated clippy).
@@ -11,9 +11,9 @@
 
 ## Release 0.11.2 (2022-07-01)
 
-* Add a subcommand to "fetch" cover from local file.
-* Update from structopt to clap 3.2.
-* Add this changelog!
+* Added a subcommand to "fetch" cover from local file.
+* Updated from structopt to clap 3.2.
+* Added this changelog!
 
 
 ## Release 0.11.0 (2022-05-14)
