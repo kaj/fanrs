@@ -462,8 +462,12 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use diesel::dsl::{all, any};
 
     let start = Instant::now();
-    let published_parts = p::publications.select(p::episode_part).distinct();
+    let published_parts = p::publications
+        .select(p::episode_part)
+        .filter(p::episode_part.is_not_null())
+        .distinct();
     let n = diesel::delete(
+        // TODO: Check if .nullable() can be removed in diesel 2.0?
         ep::episode_parts.filter(ep::id.nullable().ne(all(published_parts))),
     )
     .execute(db)?;
