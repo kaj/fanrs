@@ -21,9 +21,7 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
 
     println!(
         "# Indexerade tidningar ({:?} stycken)",
-        all.iter()
-            .map(|(_, issues)| issues.len())
-            .fold(0, |n, sum| sum + n),
+        all.values().map(|issues| issues.len()).sum::<usize>()
     );
     println!();
 

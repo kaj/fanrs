@@ -395,24 +395,24 @@ fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
                 let slug = e
                     .attribute("slug")
                     .map(String::from)
-                    .unwrap_or_else(|| slugify(&name));
+                    .unwrap_or_else(|| slugify(name));
                 let creator = c::creators
                     .select((c::id, c::name, c::slug))
-                    .filter(c::name.eq(&name))
+                    .filter(c::name.eq(name))
                     .filter(c::slug.eq(&slug))
                     .first::<Creator>(db)
                     .optional()?
                     .ok_or(0)
                     .or_else(|_| {
                         diesel::insert_into(c::creators)
-                            .values((c::name.eq(&name), c::slug.eq(&slug)))
+                            .values((c::name.eq(name), c::slug.eq(&slug)))
                             .returning((c::id, c::name, c::slug))
                             .get_result::<Creator>(db)
                             .and_then(|c| {
                                 diesel::insert_into(ca::creator_aliases)
                                     .values((
                                         ca::creator_id.eq(c.id),
-                                        ca::name.eq(&name),
+                                        ca::name.eq(name),
                                     ))
                                     .execute(db)?;
                                 Ok(c)

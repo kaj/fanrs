@@ -92,7 +92,7 @@ impl Issue {
     ) -> Result<Issue, Error> {
         use crate::schema::issues::dsl as i;
         let magic = ((year - 1950) * 64 + number.number) * 2
-            + if number.nr_str.contains('-') { 1 } else { 0 };
+            + i16::from(number.nr_str.contains('-'));
         diesel::insert_into(i::issues)
             .values((
                 i::year.eq(year),

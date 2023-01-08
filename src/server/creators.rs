@@ -60,10 +60,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
     let creator = if let Some(creator) = creator {
         creator
     } else {
-        let target = slug
-            .replace('_', "%")
-            .replace('-', "%")
-            .replace(".html", "");
+        let target = slug.replace(['_', '-'], "%").replace(".html", "");
         log::info!("Looking for creator fallback {:?} -> {:?}", slug, target);
         if target == "anderas%eriksson" || target == "andreas%erikssson" {
             return redirect("/who/andreas-eriksson");
