@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
         Err(e) => return Err(e).context("Failed to read .env"),
     }
     env_logger::init();
-    Fanrs::from_args().run().await
+    Fanrs::parse().run().await
 }
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));

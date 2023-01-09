@@ -2,7 +2,7 @@ use crate::models::{
     Article, Creator, Episode, Issue, OtherMag, Part, RefKey, Title,
 };
 use crate::DbOpt;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Datelike, Local, NaiveDate};
 use diesel::prelude::*;
 use diesel::sql_query;
@@ -20,20 +20,23 @@ pub struct Args {
     db: DbOpt,
 
     /// The directory containing the data files.
-    #[clap(long, short, parse(from_os_str), env = "FANTOMEN_DATA")]
+    #[arg(long, short, env = "FANTOMEN_DATA")]
     basedir: PathBuf,
 
     /// Read data for all years, from 1950 to current.
-    #[clap(long, short)]
+    #[arg(long, short)]
     all: bool,
 
     /// Year(s) to read data for.
-    #[clap(name = "year", required_unless("all"))]
+    #[arg(name = "year")]
     years: Vec<u32>,
 }
 
 impl Args {
     pub fn run(self) -> Result<()> {
+        if self.years.is_empty() && !self.all {
+            bail!("No year specified for reading.");
+        }
         let db = self.db.get_db()?;
         read_persondata(&self.basedir, &db)?;
         if self.all {
