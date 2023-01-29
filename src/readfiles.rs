@@ -464,46 +464,66 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::titles::dsl as t;
     use diesel::dsl::{all, any};
 
-    let start = Instant::now();
-    let published_parts = p::publications
-        .select(p::episode_part)
-        .filter(p::episode_part.is_not_null())
-        .distinct();
-    let n = diesel::delete(
-        // TODO: Check if .nullable() can be removed in diesel 2.0?
-        ep::episode_parts.filter(ep::id.nullable().ne(all(published_parts))),
-    )
-    .execute(db)?;
-    println!("Delete {} junk episode parts in {:?}.", n, start.elapsed());
+    fn do_clear<F: Fn() -> Result<usize, diesel::result::Error>>(
+        what: &'static str,
+        how: F,
+    ) -> Result<()> {
+        let start = Instant::now();
+        let n = how().context(what)?;
+        println!("Cleared {} {} in {:.0?}", n, what, start.elapsed());
+        Ok(())
+    }
 
-    let n = diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(
-        any(e::episodes.select(e::id).filter(
+    do_clear("junk episode parts", || {
+        let published_parts = p::publications
+            .select(p::episode_part)
+            .filter(p::episode_part.is_not_null())
+            .distinct();
+        diesel::delete(
+            // TODO: Check if .nullable() can be removed in diesel 2.0?
+            ep::episode_parts
+                .filter(ep::id.nullable().ne(all(published_parts))),
+        )
+        .execute(db)
+    })?;
+
+    do_clear("junk episode refkeys", || {
+        diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(any(
+            e::episodes.select(e::id).filter(
+                e::id.ne(all(
+                    ep::episode_parts.select(ep::episode).distinct(),
+                )),
+            ),
+        ))))
+        .execute(db)
+    })?;
+
+    do_clear("junk episodes-by", || {
+        diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(any(
+            e::episodes.select(e::id).filter(
+                e::id.ne(all(
+                    ep::episode_parts.select(ep::episode).distinct(),
+                )),
+            ),
+        ))))
+        .execute(db)
+    })?;
+
+    do_clear("junk episodes", || {
+        diesel::delete(e::episodes.filter(
             e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
-        )),
-    )))
-    .execute(db)?;
-    println!("Delete {} junk episode refkeys.", n);
+        ))
+        .execute(db)
+    })?;
 
-    let n = diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(any(
-        e::episodes.select(e::id).filter(
-            e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
-        ),
-    ))))
-    .execute(db)?;
-    println!("Delete {} junk episodes-by.", n);
-
-    let n = diesel::delete(e::episodes.filter(
-        e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
-    ))
-    .execute(db)?;
-    println!("Delete {} junk episodes.", n);
-
-    let n = diesel::delete(
-        t::titles
-            .filter(t::id.ne(all(e::episodes.select(e::title).distinct()))),
-    )
-    .execute(db)?;
-    println!("Delete {} junk titles.", n);
+    do_clear("junk titles", || {
+        diesel::delete(
+            t::titles.filter(
+                t::id.ne(all(e::episodes.select(e::title).distinct())),
+            ),
+        )
+        .execute(db)
+    })?;
 
     let start = Instant::now();
     let published_articles = p::publications
@@ -515,39 +535,45 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
         .flatten()
         .collect::<Vec<_>>();
 
-    let n = diesel::delete(
-        ar::article_refkeys
-            .filter(ar::article_id.ne(all(&published_articles))),
-    )
-    .execute(db)?;
-    println!("Delete {} junk article refkeys in {:?}", n, start.elapsed());
+    do_clear("junk article refkeys", || {
+        diesel::delete(
+            ar::article_refkeys
+                .filter(ar::article_id.ne(all(&published_articles))),
+        )
+        .execute(db)
+    })?;
 
-    let n = diesel::delete(
-        r::refkeys
-            .filter(r::id.ne(all(er::episode_refkeys.select(er::refkey_id))))
-            .filter(r::id.ne(all(ar::article_refkeys.select(ar::refkey_id)))),
-    )
-    .execute(db)?;
-    println!("Delete {} junk refkeys.", n);
+    do_clear("junk articles-by", || {
+        diesel::delete(
+            ab::articles_by
+                .filter(ab::article_id.ne(all(&published_articles))),
+        )
+        .execute(db)
+    })?;
 
-    let start = Instant::now();
-    let n = diesel::delete(
-        ab::articles_by.filter(ab::article_id.ne(all(&published_articles))),
-    )
-    .execute(db)?;
-    println!("Delete {} junk articles-by in {:?}.", n, start.elapsed());
-
-    let start = Instant::now();
-    let n = diesel::delete(
-        a::articles.filter(a::id.ne(all(&published_articles))),
-    )
-    .execute(db)?;
+    do_clear("junk articles", || {
+        diesel::delete(a::articles.filter(a::id.ne(all(&published_articles))))
+            .execute(db)
+    })?;
     println!(
-        "Delete {} junk articles in {:?} ({} remains).",
-        n,
+        "Article-related cleanups in {:.0?} ({} remains).",
         start.elapsed(),
         published_articles.len(),
     );
+
+    do_clear("junk refkeys", || {
+        diesel::delete(
+            r::refkeys
+                .filter(
+                    r::id.ne(all(er::episode_refkeys.select(er::refkey_id))),
+                )
+                .filter(
+                    r::id.ne(all(ar::article_refkeys.select(ar::refkey_id))),
+                ),
+        )
+        .execute(db)
+    })?;
+
     Ok(())
 }
 
