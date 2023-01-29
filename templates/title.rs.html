@@ -1,9 +1,9 @@
+@use super::{artmisc_html, epmisc_html, page_html};
 @use crate::models::{IssueRef, Title};
 @use crate::server::{Paginator, FullArticle, FullEpisode};
-@use super::{artmisc, epmisc, page};
 
 @(title: &Title, pages: Option<&Paginator>, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[FullEpisode])
-@:page(&title.title, &format!("De gånger serien {} publicerats i svenska Fantomentidningen.", title.title), {
+@:page_html(&title.title, &format!("De gånger serien {} publicerats i svenska Fantomentidningen.", title.title), {
   <p>Här listas de gånger serien <strong>@title.title</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
 	title="Sök &quot;@title.title&quot; i Seriewikin">Seriewikin</a>,
@@ -31,7 +31,7 @@
     <h2>Artiklar</h2>
     @for (article, pubs) in articles {
     <div class="article">
-      @:artmisc(article)
+      @:artmisc_html(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
@@ -43,7 +43,7 @@
     @for fe in episodes {
     <section class="episode @fe.bestclass()">
       <h3>@if let Some(ref h) = fe.episode.episode {@h} else {@title.title}</h3>
-      @:epmisc(fe)
+      @:epmisc_html(fe)
     </section>
     }
   </section>

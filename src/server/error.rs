@@ -1,4 +1,4 @@
-use crate::templates::{self, RenderError, RenderRucte};
+use crate::templates::{error_html, notfound_html, RenderError, RenderRucte};
 use deadpool_diesel::PoolError;
 use log::error;
 use warp::http::response::Builder;
@@ -39,7 +39,7 @@ impl Reply for ViewError {
                 let code = StatusCode::NOT_FOUND;
                 Builder::new()
                     .status(code)
-                    .html(|o| templates::notfound(o, code))
+                    .html(|o| notfound_html(o, code))
                     .unwrap()
             }
             ViewError::ServiceUnavailable => error_response(
@@ -68,7 +68,7 @@ impl Reply for ViewError {
 fn error_response(code: StatusCode, message: &str, detail: &str) -> Response {
     Builder::new()
         .status(code)
-        .html(|o| templates::error(o, code, message, detail))
+        .html(|o| error_html(o, code, message, detail))
         .unwrap()
 }
 

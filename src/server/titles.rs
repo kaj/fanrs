@@ -11,7 +11,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates;
+use crate::templates::{self, title_html, titles_html};
 use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::SmallInt;
@@ -59,7 +59,7 @@ async fn list_titles(db: PgPool) -> Result<Response> {
             )
         })
         .collect::<Vec<_>>();
-    Ok(Builder::new().html(|o| templates::titles(o, &all))?)
+    Ok(Builder::new().html(|o| titles_html(o, &all))?)
 }
 
 #[derive(Deserialize)]
@@ -132,7 +132,7 @@ async fn one_title(
     }
 
     Ok(Builder::new().html(|o| {
-        templates::title(o, &title, pages.as_ref(), &articles, &episodes)
+        title_html(o, &title, pages.as_ref(), &articles, &episodes)
     })?)
 }
 

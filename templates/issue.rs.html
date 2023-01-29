@@ -1,9 +1,9 @@
+@use super::{artmisc_html, epmisc_html, page_html};
 @use crate::models::{IssueRef};
 @use crate::server::{IssueDetails, PublishedContent::{EpisodePart, Text}, YearLinks};
-@use super::{artmisc, epmisc, page};
 
 @(year_links: &YearLinks, issue: &IssueDetails, pubyear: &[IssueRef])
-@:page(&format!("Fantomen {}/{}", issue.issue.number_str, issue.issue.year), &issue.description(), {
+@:page_html(&format!("Fantomen {}/{}", issue.issue.number_str, issue.issue.year), &issue.description(), {
   <p>
   @if let Some(ref pages) = issue.issue.pages {<span>@pages sidor.</span>}
   @if let Some(ref price) = issue.issue.price {<span>Pris @price.</span>}
@@ -32,10 +32,10 @@
 	EpisodePart{title, episode, part, best_plac, label} => {
 	@if !label.is_empty() {<p class="info label">@label:</p> }
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>
-	@:epmisc(episode)
+	@:epmisc_html(episode)
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @issue.issue.year.</p>}
 	}
-	Text(article) => {@:artmisc(article)}
+	Text(article) => {@:artmisc_html(article)}
 	}
       </section>
       }

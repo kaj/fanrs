@@ -1,9 +1,9 @@
+@use super::{artmisc_html, epmisc_html, page_html, searchbox_html};
 @use crate::models::{Creator, RefKey, Title};
 @use crate::server::search::{Hit, SearchQuery};
-@use super::{artmisc, epmisc, page, searchbox};
 
 @(q: &SearchQuery, titles: &[Title], creators: &[Creator], refkeys: &[RefKey], hits: &[Hit])
-@:page("Sök", "Här kan du söka i allt data som finns i Fantomenindexet.", {@:searchbox(q)}, {
+@:page_html("Sök", "Här kan du söka i allt data som finns i Fantomenindexet.", {@:searchbox_html(q)}, {
   @if !titles.is_empty() {
   <section class="searchresults tags titles">
     <h2>Serier</h2>
@@ -44,12 +44,12 @@
       @if let Hit::Episode{ title, fe } = hit {
         <section class="episode @fe.bestclass()">
           <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
-          @:epmisc(fe)
+          @:epmisc_html(fe)
         </section>
       }
       @if let Hit::Article{ article, published } = hit {
         <section class="article">
-          @:artmisc(article)
+          @:artmisc_html(article)
           @if let Some((last_pub, pubs)) = published.split_last()
           {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
         </section>

@@ -1,15 +1,15 @@
+@use super::{artmisc_html, epmisc_html, page_html};
 @use crate::models::{IssueRef, RefKey, Title};
 @use crate::server::{FullArticle, FullEpisode};
-@use super::{artmisc, epmisc, page};
 
 @(refkey: &RefKey, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[(Title, FullEpisode)])
-@:page(&refkey.name(), &format!("Om {} i den svenska Fantomentidnigen.", &refkey.name()), {}, {
+@:page_html(&refkey.name(), &format!("Om {} i den svenska Fantomentidnigen.", &refkey.name()), {}, {
   @if !articles.is_empty() {
   <section class="articles">
     <h2>Artiklar</h2>
     @for (article, pubs) in articles {
     <div class="article">
-      @:artmisc(article)
+      @:artmisc_html(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </div>
@@ -22,7 +22,7 @@
     @for (title, fe) in episodes {
     <section class="episode @fe.bestclass()">
       <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
-      @:epmisc(fe)
+      @:epmisc_html(fe)
     </section>
     }
   </section>

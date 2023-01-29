@@ -1,8 +1,8 @@
-@use super::page;
+@use super::page_html;
 @use warp::http::status::StatusCode;
 
 @(code: StatusCode, message: &str, detail: &str)
-@:page(message, "(Tekniskt fel.)", {}, {
+@:page_html(message, "(Tekniskt fel.)", {}, {
   <section>
     <h2 lang="en">@code</h2>
     <p class="article">@Html(detail)</p>

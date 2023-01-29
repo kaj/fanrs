@@ -1,9 +1,9 @@
-@use crate::models::{IssueRef, Title};
-@use super::page;
+@use super::page_html;
 @use super::statics::sortable_js;
+@use crate::models::{IssueRef, Title};
 
 @(titles: &[(Title, i64, IssueRef, IssueRef)])
-@:page("Serier i Fantomentidningen", "Återkommade och engångs serier som publicerats i den svenska Fantomentidningen.", {
+@:page_html("Serier i Fantomentidningen", "Återkommade och engångs serier som publicerats i den svenska Fantomentidningen.", {
   <p>Antal episoder syftar på separata episoder. Om ett äventyr är
     publicerat i flera delar eller repriserat flera gånger så är det
     fortfarande ett äventyr.

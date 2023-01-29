@@ -1,8 +1,8 @@
+@use super::{artmisc_html, epmisc_html, page_html};
 @use crate::server::{IssueDetails, PublishedContent::{EpisodePart, Text}, YearLinks};
-@use super::{artmisc, epmisc, page};
 
 @(year: u16, year_links: &YearLinks, issues: &[IssueDetails])
-@:page(&format!("Årgång {}", year), &format!("Den svenska Fantomentidningen, årgång {}.", year), {
+@:page_html(&format!("Årgång {}", year), &format!("Den svenska Fantomentidningen, årgång {}.", year), {
   <p>Se även @year_links.</p>
 }, {
   @for IssueDetails{ issue, cover_by, contents } in issues {
@@ -29,10 +29,10 @@
 	EpisodePart{title, episode, part, best_plac, label} => {
 	@if !label.is_empty() {<p class="info label">@label:</p> }
 	<h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref e) = episode.episode.episode {: @e} @part</h3>
-	@:epmisc(episode)
+	@:epmisc_html(episode)
 	@if let Some(plac) = best_plac { <p class="info best best@plac">Nummer @plac i omröstningen om bästa äventyr @year.</p>}
 	}
-	Text(article) => {@:artmisc(article)}
+	Text(article) => {@:artmisc_html(article)}
 	}
       </section>
       }

@@ -6,7 +6,7 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, RenderRucte, ToHtml};
+use crate::templates::{year_summary_html, RenderRucte, ToHtml};
 use diesel::prelude::*;
 use diesel::QueryDsl;
 use std::io::{self, Write};
@@ -29,7 +29,7 @@ pub async fn year_summary(year: u16, db: PgPool) -> Result<impl Reply> {
 
     let years = YearLinks::load(year, &db)?;
     Ok(Builder::new()
-        .html(|o| templates::year_summary(o, year, &years, &issues))?)
+        .html(|o| year_summary_html(o, year, &years, &issues))?)
 }
 
 fn load_summary(

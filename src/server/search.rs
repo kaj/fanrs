@@ -14,7 +14,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, RenderRucte};
+use crate::templates::{search_html, RenderRucte};
 use diesel::dsl::{any, max, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Text;
@@ -33,7 +33,7 @@ pub async fn search(
     let query = SearchQuery::load(query, &db)?;
     let (titles, creators, refkeys, episodes) = query.do_search(&db)?;
     Ok(Response::builder().html(|o| {
-        templates::search(o, &query, &titles, &creators, &refkeys, &episodes)
+        search_html(o, &query, &titles, &creators, &refkeys, &episodes)
     })?)
 }
 

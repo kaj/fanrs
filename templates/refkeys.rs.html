@@ -1,9 +1,9 @@
-@use crate::models::{IssueRef, RefKey};
-@use super::page;
+@use super::page_html;
 @use super::statics::sortable_js;
+@use crate::models::{IssueRef, RefKey};
 
 @(titles: &[(RefKey, i64, Option<IssueRef>, Option<IssueRef>)])
-@:page("Personer, platser och företeelser", "Personer, platser och företeelser i Fantomens värld enligt den svenska Fantomentidningen.",{
+@:page_html("Personer, platser och företeelser", "Personer, platser och företeelser i Fantomens värld enligt den svenska Fantomentidningen.",{
   <p>Antal episoder syftar på separata episoder. Om ett äventyr är
     publicerat i flera delar eller repriserat flera gånger så är det
     fortfarande ett äventyr.

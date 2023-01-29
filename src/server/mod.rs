@@ -30,7 +30,9 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, Html, RenderRucte, ToHtml};
+use crate::templates::{
+    frontpage_html, issue_html, year_html, Html, RenderRucte, ToHtml,
+};
 use crate::DbOpt;
 use chrono::{Duration, Utc};
 use diesel::dsl::{not, sql};
@@ -203,9 +205,7 @@ async fn frontpage(pool: PgPool) -> Result<impl Reply> {
     let creators = Creator::cloud(num, &db)?;
 
     Ok(Builder::new().html(|o| {
-        templates::frontpage(
-            o, n, &all_fa, &years, &titles, &refkeys, &creators,
-        )
+        frontpage_html(o, n, &all_fa, &years, &titles, &refkeys, &creators)
     })?)
 }
 
@@ -395,8 +395,7 @@ async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
 
     let details = IssueDetails::load_full(issue, &db)?;
     let years = YearLinks::load(year, &db)?.link_current();
-    Ok(Builder::new()
-        .html(|o| templates::issue(o, &years, &details, &pubyear))?)
+    Ok(Builder::new().html(|o| issue_html(o, &years, &details, &pubyear))?)
 }
 
 async fn list_year(year: u16, db: PgPool) -> Result<impl Reply> {
@@ -413,7 +412,7 @@ async fn list_year(year: u16, db: PgPool) -> Result<impl Reply> {
         .map(|issue| IssueDetails::load_full(issue, &db))
         .collect::<Result<Vec<_>, _>>()?;
     let years = YearLinks::load(year, &db)?;
-    Ok(Builder::new().html(|o| templates::year(o, year, &years, &issues))?)
+    Ok(Builder::new().html(|o| year_html(o, year, &years, &issues))?)
 }
 
 pub struct IssueDetails {

@@ -1,9 +1,9 @@
+@use super::page_html;
 @use crate::models::{Creator, Issue};
 @use crate::server::{ContentSummary, YearLinks};
-@use super::page;
 
 @(year: u16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<ContentSummary>)])
-@:page(&format!("Årgång {}", year), &format!("Översikt över Fantomentidningar publicerade år {}.", year), {
+@:page_html(&format!("Årgång {}", year), &format!("Översikt över Fantomentidningar publicerade år {}.", year), {
   <p>Se även @year_links.</p>
 }, {
   <div class="yearsummary">

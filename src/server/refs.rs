@@ -12,7 +12,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, RenderRucte};
+use crate::templates::{refkey_html, refkeys_html, RenderRucte};
 use diesel::dsl::{count_star, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::{Integer, SmallInt};
@@ -77,7 +77,7 @@ async fn list_refs(db: PgPool) -> Result<ByteResponse> {
             )
         })
         .collect::<Vec<_>>();
-    Ok(Response::builder().html(|o| templates::refkeys(o, &all))?)
+    Ok(Response::builder().html(|o| refkeys_html(o, &all))?)
 }
 
 async fn one_fa(slug: String, db: PgPool) -> Result<ByteResponse> {
@@ -178,7 +178,6 @@ async fn one_ref_impl(
         episodes.push((t, e));
     }
 
-    Ok(Response::builder().html(|o| {
-        templates::refkey(o, &refkey.refkey, &articles, &episodes)
-    })?)
+    Ok(Response::builder()
+        .html(|o| refkey_html(o, &refkey.refkey, &articles, &episodes))?)
 }

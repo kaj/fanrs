@@ -1,9 +1,9 @@
+@use super::{artmisc_html, epmisc_html, page_html};
 @use crate::models::{Creator, IssueRef, Title};
 @use crate::server::{CoverSet, FullArticle, FullEpisode, OtherContribs};
-@use super::{artmisc, epmisc, page};
 
 @(creator: &Creator, about: &[(FullArticle, Vec<IssueRef>)], covers: &CoverSet, episodes: &[(Title, FullEpisode)], articles_by: &[(FullArticle, Vec<IssueRef>)], other: &OtherContribs)
-@:page(&creator.name, &format!("Index över hur {} medverkat i den svenska Fantomentidningen", creator.name), {
+@:page_html(&creator.name, &format!("Index över hur {} medverkat i den svenska Fantomentidningen", creator.name), {
   <p>Här listas vad <strong>@creator.name</strong>
     (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@creator.name&amp;go=go"
 	title="Sök &quot;@creator.name&quot; i Seriewikin">Seriewikin</a>,
@@ -16,7 +16,7 @@
     <h2>Artiklar</h2>
     @for (article, pubs) in about {
     <section class="article">
-      @:artmisc(article)
+      @:artmisc_html(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </section>
@@ -55,7 +55,7 @@
     @for (title, fe) in episodes {
     <section class="episode @fe.bestclass()">
       <h3><a href="/titles/@title.slug">@title.title</a>@if let Some(ref h) = fe.episode.episode {: @h}</h3>
-      @:epmisc(fe)
+      @:epmisc_html(fe)
     </section>
     }
   </section>
@@ -65,7 +65,7 @@
     <h2>Artiklar</h2>
     @for (article, pubs) in articles_by {
     <section class="article">
-      @:artmisc(article)
+      @:artmisc_html(article)
       @if let Some((last_pub, pubs)) = pubs.split_last()
       {<p class="info pub">Publicerad i: @for p in pubs {@p, }@last_pub.</p>}
     </section>

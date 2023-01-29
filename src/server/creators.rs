@@ -19,7 +19,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates::{self, RenderRucte};
+use crate::templates::{creator_html, creators_html, RenderRucte};
 use diesel::dsl::{any, min};
 use diesel::prelude::*;
 use warp::filters::BoxedFilter;
@@ -48,7 +48,7 @@ async fn list_creators(db: PgPool) -> Result<Response> {
             cc::latest_issue,
         ))
         .load::<CreatorContributions>(&db)?;
-    Ok(Builder::new().html(|o| templates::creators(o, &all))?)
+    Ok(Builder::new().html(|o| creators_html(o, &all))?)
 }
 
 async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
@@ -138,7 +138,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
     let others = OtherContribs::for_creator(&creator, &db)?;
 
     Ok(Builder::new().html(|o| {
-        templates::creator(
+        creator_html(
             o,
             &creator,
             &about,
