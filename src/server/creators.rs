@@ -73,8 +73,8 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
             .first::<String>(&db)
             .optional()?
             .ok_or(ViewError::NotFound)?;
-        log::debug!("Found replacement: {:?}", found);
-        return redirect(&format!("/who/{}", found));
+        log::debug!("Found replacement: {found:?}");
+        return redirect(&format!("/who/{found}"));
     };
 
     let about_raw = a::articles

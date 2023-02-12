@@ -157,7 +157,7 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
             .select(count_star())
             .first::<i64>(&db)?;
         if issues > 0 {
-            return redirect(&format!("/{}", year));
+            return redirect(&format!("/{year}"));
         }
     }
     let target = slug.replace("weekdays-", "").replace("sundays-", "");
@@ -167,7 +167,7 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
         .select(count_star())
         .first::<i64>(&db)?;
     if n == 1 {
-        return redirect(&format!("/titles/{}", target));
+        return redirect(&format!("/titles/{target}"));
     }
     let target = t::titles
         .filter(
@@ -184,5 +184,5 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
         .first::<String>(&db)
         .optional()?
         .ok_or(ViewError::NotFound)?;
-    redirect(&format!("/titles/{}", target))
+    redirect(&format!("/titles/{target}"))
 }

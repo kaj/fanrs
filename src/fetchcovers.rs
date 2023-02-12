@@ -62,7 +62,7 @@ impl Args {
         };
         for (id, year, number_str) in query.load::<(i32, i16, String)>(&db)? {
             if self.no_op {
-                println!("Would load cover {:>2}/{}.", number_str, year);
+                println!("Would load cover {number_str:>2}/{year}.");
             } else {
                 load_cover(&mut client, &db, id, year, &number_str).await?;
             }
@@ -116,10 +116,7 @@ async fn load_cover(
             );
         }
         Err(err) => {
-            eprintln!(
-                "Failed to fetch cover for {}/{}: {}",
-                number_str, year, err,
-            );
+            eprintln!("Failed to fetch cover for {number_str}/{year}: {err}");
         }
     }
     Ok(())
@@ -164,7 +161,7 @@ impl WikiClient {
     ) -> Result<impl AsRef<[u8]>> {
         let url2 = select_href(
             &self
-                .get(&format!("/index.php/Fantomen_{}/{}", number_str, year))
+                .get(&format!("/index.php/Fantomen_{number_str}/{year}"))
                 .await?
                 .text()
                 .await?,
@@ -181,7 +178,7 @@ impl WikiClient {
     }
 
     async fn get(&mut self, url: &str) -> reqwest::Result<Response> {
-        let url = format!("https://www.phantomwiki.org{}", url);
+        let url = format!("https://www.phantomwiki.org{url}");
         self.client.get(&url).send().await?.error_for_status()
     }
 }

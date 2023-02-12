@@ -29,9 +29,9 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
     for (year, numbers) in &all {
         if year / 10 != decade {
             decade = year / 10;
-            println!("{}0", decade);
+            println!("{decade}0");
         }
-        print!("- {}: ", year);
+        print!("- {year}: ");
         let mut iter = numbers.iter().peekable();
         while let Some(n) = iter.next() {
             let mut end = n;
@@ -39,9 +39,9 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
                 end = iter.next().unwrap();
             }
             if end > n {
-                print!("{} - {}", n, end);
+                print!("{n} - {end}");
             } else {
-                print!("{}", n);
+                print!("{n}");
             }
             if iter.peek().is_some() {
                 print!(", ");

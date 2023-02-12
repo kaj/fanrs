@@ -60,11 +60,11 @@ impl Args {
 
 fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     do_load_year(base, year, db)
-        .with_context(|| format!("Failed to read data for {}", year))
+        .with_context(|| format!("Failed to read data for {year}"))
 }
 
 fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
-    match read_to_string(base.join(format!("{}.data", year))) {
+    match read_to_string(base.join(format!("{year}.data"))) {
         Ok(data) => {
             for elem in child_elems(Document::parse(&data)?.root_element()) {
                 match elem.tag_name().name() {
@@ -82,7 +82,7 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
             }
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("No data found for {}", year);
+            eprintln!("No data found for {year}");
         }
         Err(e) => {
             return Err(e.into());
@@ -104,7 +104,7 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
             .transpose()?,
         db,
     )?;
-    println!("Found issue {}", issue);
+    println!("Found issue {issue}");
     issue.clear(db)?;
 
     for (seqno, c) in child_elems(i).enumerate() {
@@ -233,7 +233,7 @@ fn register_serie(
             }
             "ref" => episode
                 .set_refs(&parse_refs(e)?, db)
-                .with_context(|| format!("Error while handling {:?}", e))?,
+                .with_context(|| format!("Error while handling {e:?}"))?,
             "prevpub" => match e
                 .first_element_child()
                 .map(|e| e.tag_name().name())
@@ -371,9 +371,9 @@ fn get_best_plac(e: Node) -> Result<Option<i16>> {
 fn get_creators(by: Node, db: &PgConnection) -> Result<Vec<Creator>> {
     let one_creator = |e: Node| -> Result<Creator> {
         let name =
-            e.text().ok_or_else(|| anyhow!("missing name in {:?}", e))?;
+            e.text().ok_or_else(|| anyhow!("missing name in {e:?}"))?;
         Creator::get_or_create(name, db)
-            .with_context(|| format!("Failed to create creator {:?}", name))
+            .with_context(|| format!("Failed to create creator {name:?}"))
     };
     let who = child_elems(by)
         .map(one_creator)
@@ -621,9 +621,9 @@ where
     e.attribute(name)
         .map(|s| s.parse())
         .transpose()
-        .with_context(|| format!("Bad attribute {:?}", name))
+        .with_context(|| format!("Bad attribute {name:?}"))
 }
 
 fn unexpected_element(e: &Node) -> anyhow::Error {
-    anyhow!("Unexpected element {:?}", e)
+    anyhow!("Unexpected element {e:?}")
 }

@@ -33,9 +33,9 @@ impl ToHtml for Paginator {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         fn one(out: &mut dyn Write, p: usize, pp: usize) -> io::Result<()> {
             if p == pp {
-                write!(out, "<b>{}</b>", p)?;
+                write!(out, "<b>{p}</b>")?;
             } else {
-                write!(out, "<a href='?p={}'>{}</a>", p, p)?;
+                write!(out, "<a href='?p={p}'>{p}</a>")?;
             }
             Ok(())
         }

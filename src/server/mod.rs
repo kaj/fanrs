@@ -492,7 +492,7 @@ impl IssueDetails {
                         classnames: "article",
                     });
                 }
-                row => panic!("Strange row: {:?}", row),
+                row => panic!("Strange row: {row:?}"),
             }
         }
         Ok(IssueDetails {
@@ -527,7 +527,7 @@ fn cover_by(
 
 fn redirect(url: &str) -> Result<Response> {
     use warp::http::header::LOCATION;
-    let msg = format!("Try {:?}", url);
+    let msg = format!("Try {url:?}");
     Builder::new()
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(LOCATION, url)
@@ -572,12 +572,12 @@ impl ToHtml for YearLinks {
         let one = |out: &mut dyn Write, y: u16| -> io::Result<()> {
             if y == shown {
                 if self.link_current {
-                    write!(out, "<a href='/{}'><b>{}</b></a>", y, y)?;
+                    write!(out, "<a href='/{y}'><b>{y}</b></a>")?;
                 } else {
-                    write!(out, "<b>{}</b>", y)?;
+                    write!(out, "<b>{y}</b>")?;
                 }
             } else {
-                write!(out, "<a href='/{}'>{}</a>", y, y)?;
+                write!(out, "<a href='/{y}'>{y}</a>")?;
             }
             Ok(())
         };

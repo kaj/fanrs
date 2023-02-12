@@ -122,10 +122,10 @@ impl fmt::Display for Issue {
         write!(out, "{}/{}", self.number_str, self.year)?;
         match (&self.pages, &self.price) {
             (Some(ref pages), Some(ref price)) => {
-                write!(out, " ({} sidor, pris {})", pages, price)
+                write!(out, " ({pages} sidor, pris {price})")
             }
-            (Some(ref pages), None) => write!(out, " ({} sidor)", pages),
-            (None, Some(ref price)) => write!(out, " (pris {})", price),
+            (Some(ref pages), None) => write!(out, " ({pages} sidor)"),
+            (None, Some(ref price)) => write!(out, " (pris {price})"),
             (None, None) => Ok(()),
         }
     }
@@ -159,9 +159,9 @@ impl IssueRef {
             number: Nr {
                 number,
                 nr_str: if double {
-                    format!("{}-{}", number, number + 1)
+                    format!("{number}-{}", number + 1)
                 } else {
-                    format!("{}", number)
+                    format!("{number}")
                 },
             },
         }

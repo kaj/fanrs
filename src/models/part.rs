@@ -147,7 +147,7 @@ impl ToHtml for Part {
         }
         write!(out, "<span class='part'>")?;
         if let Some(no) = self.no {
-            write!(out, "del {}", no)?;
+            write!(out, "del {no}")?;
             if self.name.is_some() {
                 write!(out, ": ")?;
             }

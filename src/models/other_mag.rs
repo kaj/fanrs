@@ -51,13 +51,13 @@ impl Display for OtherMag {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         self.name.fmt(out)?;
         if let Some(issue) = self.issue {
-            write!(out, " nr {}", issue)?;
+            write!(out, " nr {issue}")?;
             if let Some(i_of) = self.i_of {
-                write!(out, "/{}", i_of)?;
+                write!(out, "/{i_of}")?;
             }
         }
         if let Some(year) = self.year {
-            write!(out, " {}", year)?;
+            write!(out, " {year}")?;
         }
         Ok(())
     }

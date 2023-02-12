@@ -70,7 +70,7 @@ impl ToHtml for CreatorSet {
             ];
             for (code, desc) in &roles {
                 if let Some(creators) = self.0.get(code) {
-                    write!(out, "{} ", desc)?;
+                    write!(out, "{desc} ")?;
                     if let Some((last, rest)) = creators.split_last() {
                         if let Some((first, rest)) = rest.split_first() {
                             first.to_html(out)?;

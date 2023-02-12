@@ -163,7 +163,7 @@ impl SearchQuery {
         let sql_words = self
             .q
             .split_whitespace()
-            .map(|word| format!("%{}%", word))
+            .map(|word| format!("%{word}%"))
             .collect::<Vec<_>>();
 
         let mut creators = c::creators

@@ -2,7 +2,7 @@
 @use crate::server::{IssueDetails, PublishedContent::{EpisodePart, Text}, YearLinks};
 
 @(year: u16, year_links: &YearLinks, issues: &[IssueDetails])
-@:page_html(&format!("Årgång {}", year), &format!("Den svenska Fantomentidningen, årgång {}.", year), {
+@:page_html(&format!("Årgång {year}"), &format!("Den svenska Fantomentidningen, årgång {year}."), {
   <p>Se även @year_links.</p>
 }, {
   @for IssueDetails{ issue, cover_by, contents } in issues {

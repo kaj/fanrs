@@ -71,7 +71,7 @@ impl ContentSummary {
         match self {
             ContentSummary::Comic(_, plac) => {
                 if let Some(plac) = plac.filter(|p| *p <= 3) {
-                    format!("comic best{}", plac)
+                    format!("comic best{plac}")
                 } else {
                     "comic".into()
                 }

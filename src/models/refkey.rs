@@ -128,10 +128,10 @@ impl RefKey {
 
     pub fn url(&self) -> String {
         match self {
-            RefKey::Fa(slug) => format!("/fa/{}", slug),
-            RefKey::Key(_, slug) => format!("/what/{}", slug),
-            RefKey::Who(_, slug) => format!("/who/{}", slug),
-            RefKey::Title(_, slug) => format!("/titles/{}", slug),
+            RefKey::Fa(slug) => format!("/fa/{slug}"),
+            RefKey::Key(_, slug) => format!("/what/{slug}"),
+            RefKey::Who(_, slug) => format!("/who/{slug}"),
+            RefKey::Title(_, slug) => format!("/titles/{slug}"),
         }
     }
     pub fn slug(&self) -> &str {
@@ -151,7 +151,7 @@ impl RefKey {
                 "17j" => "Julie".into(),
                 "22h" => "Heloise".into(),
                 "22k" => "Kit".into(),
-                slug => format!("Den {}:e Fantomen", slug),
+                slug => format!("Den {slug}:e Fantomen"),
             },
             RefKey::Key(name, _) => name.clone(),
             RefKey::Who(name, _) => name.clone(),
@@ -228,7 +228,7 @@ impl Queryable<(SmallInt, Text, Text), Pg> for RefKey {
             (RefKey::FA_ID, _, s) => RefKey::Fa(s),
             (RefKey::WHO_ID, t, s) => RefKey::Who(t, s),
             (RefKey::TITLE_ID, t, s) => RefKey::Title(t, s),
-            (k, t, s) => panic!("Bad refkey kind {} ({:?}, {:?})", k, t, s),
+            (k, t, s) => panic!("Bad refkey kind {k} ({t:?}, {s:?})"),
         }
     }
 }

@@ -31,9 +31,9 @@ where
 impl Display for Price {
     fn fmt(&self, out: &mut Formatter) -> std::fmt::Result {
         match (self.price / 100, self.price % 100) {
-            (0, ore) => write!(out, "{} öre", ore),
-            (kr, 0) => write!(out, "{}:-", kr),
-            (kr, ore) => write!(out, "{}:{:02}", kr, ore),
+            (0, ore) => write!(out, "{ore} öre"),
+            (kr, 0) => write!(out, "{kr}:-"),
+            (kr, ore) => write!(out, "{kr}:{ore:02}"),
         }
     }
 }
