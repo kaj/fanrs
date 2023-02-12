@@ -6,7 +6,7 @@
   improved structure and time measurment of the cleanups.
 * Adopted to phantomwiki updates in fetch-covers.
 * Updated ructe to 0.16.1, clap to 4.0.32, env_logger to 0.10.0,
-  roxmltree to 0.17.0, and scraper to 0.14.0.
+  roxmltree to 0.18.0, and scraper to 0.14.0.
 * Some minor fixes (suggested by updated clippy).
 
 
