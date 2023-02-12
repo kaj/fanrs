@@ -1,6 +1,6 @@
 # Changes in fanrs
 
-## Unreleased
+## Release 0.11.4 (2023-02-12)
 
 * Fixed bug in detecting unused episode parts in read-files, and
   improved structure and time measurment of the cleanups.
