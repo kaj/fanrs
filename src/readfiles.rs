@@ -259,11 +259,9 @@ fn register_serie(
                 Some("magazine") => {
                     let om = OtherMag::get_or_create(
                         get_text_norm(e, "magazine").unwrap(),
-                        get_text(e, "issue")
-                            .map(|s| s.parse())
-                            .transpose()?,
-                        get_text(e, "of").map(|s| s.parse()).transpose()?,
-                        get_text(e, "year").map(|s| s.parse()).transpose()?,
+                        get_text(e, "issue").map(str::parse).transpose()?,
+                        get_text(e, "of").map(str::parse).transpose()?,
+                        get_text(e, "year").map(str::parse).transpose()?,
                         db,
                     )?;
                     diesel::update(e::episodes)
@@ -584,7 +582,7 @@ fn get_child<'a>(node: Node<'a, 'a>, name: &str) -> Option<Node<'a, 'a>> {
 fn child_elems<'a, 'b>(
     node: Node<'a, 'b>,
 ) -> impl Iterator<Item = Node<'a, 'b>> {
-    node.children().filter(|n| n.is_element())
+    node.children().filter(Node::is_element)
 }
 
 fn normalize_space(s: &str) -> String {
@@ -619,7 +617,7 @@ where
     <T as std::str::FromStr>::Err: 'static + Send + Sync + std::error::Error,
 {
     e.attribute(name)
-        .map(|s| s.parse())
+        .map(str::parse)
         .transpose()
         .with_context(|| format!("Bad attribute {name:?}"))
 }
