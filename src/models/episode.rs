@@ -98,9 +98,9 @@ impl Episode {
         refs: &[RefKey],
         db: &PgConnection,
     ) -> Result<(), Error> {
+        use crate::schema::episode_refkeys::dsl as er;
         for r in refs {
             let id = r.get_or_create_id(db)?;
-            use crate::schema::episode_refkeys::dsl as er;
             diesel::insert_into(er::episode_refkeys)
                 .values((er::episode_id.eq(self.id), er::refkey_id.eq(id)))
                 .on_conflict_do_nothing()

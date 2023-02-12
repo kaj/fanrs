@@ -35,8 +35,8 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 }
 
 async fn list_creators(db: PgPool) -> Result<Response> {
-    let db = db.get().await?;
     use crate::models::creator_contributions::creator_contributions::dsl as cc;
+    let db = db.get().await?;
     let all = cc::creator_contributions
         .select((
             (cc::id, cc::name, cc::slug),

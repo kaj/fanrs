@@ -74,11 +74,11 @@ fn goh() -> BoxedFilter<()> {
 
 impl Args {
     pub async fn run(&self) {
+        use warp::filters::query::query;
+        use warp::{path, path::end, path::param, path::tail};
         let pool = self.db.get_pool();
         let s = warp::any().map(move || pool.clone()).boxed();
         let s = move || s.clone();
-        use warp::filters::query::query;
-        use warp::{path, path::end, path::param, path::tail};
         let routes = warp::any()
             .and(path("s").and(tail()).and(goh()).then(static_file).map(wrap))
             .or(path("c")
