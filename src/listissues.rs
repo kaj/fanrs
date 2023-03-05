@@ -47,7 +47,7 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
                 print!(", ");
             }
         }
-        println!()
+        println!();
     }
     Ok(())
 }

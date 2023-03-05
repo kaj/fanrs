@@ -70,12 +70,14 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
                 match elem.tag_name().name() {
                     "info" => (), // ignore
                     "issue" => {
-                        register_issue(year, elem, db).with_context(|| {
-                            format!(
-                                "Error reading issue {}:",
-                                elem.attribute("nr").unwrap_or("?"),
-                            )
-                        })?
+                        register_issue(year, elem, db).with_context(
+                            || {
+                                format!(
+                                    "Error reading issue {}:",
+                                    elem.attribute("nr").unwrap_or("?"),
+                                )
+                            },
+                        )?;
                     }
                     _ => return Err(unexpected_element(&elem)),
                 }

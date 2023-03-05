@@ -75,7 +75,7 @@ impl PartsPublished {
         self.issues.last().map(|p| &p.0)
     }
     pub fn bestplac(&self) -> Option<i16> {
-        self.issues.iter().flat_map(|i| i.2).min()
+        self.issues.iter().filter_map(|i| i.2).min()
     }
 }
 

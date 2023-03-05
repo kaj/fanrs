@@ -96,7 +96,7 @@ async fn one_title(
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)?;
     let mut articles = Vec::with_capacity(articles_raw.len());
-    for article in articles_raw.into_iter() {
+    for article in articles_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
@@ -127,7 +127,7 @@ async fn one_title(
         .map_err(|()| ViewError::NotFound)?;
 
     let mut episodes = Vec::with_capacity(episodes_raw.len());
-    for episode in episodes_raw.into_iter() {
+    for episode in episodes_raw {
         episodes.push(FullEpisode::load_details(episode, &db)?);
     }
 

@@ -99,9 +99,7 @@ async fn one_ref_impl(
         .filter(r::slug.eq(slug.clone()))
         .first::<IdRefKey>(&db)
         .optional()?;
-    let refkey = if let Some(refkey) = refkey {
-        refkey
-    } else {
+    let Some(refkey) = refkey else {
         if kind == RefKey::FA_ID {
             // Some special cases
             if slug == "17.1" {
@@ -151,7 +149,7 @@ async fn one_ref_impl(
         .load::<Article>(&db)?;
 
     let mut articles = Vec::with_capacity(raw_articles.len());
-    for article in raw_articles.into_iter() {
+    for article in raw_articles {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
@@ -173,7 +171,7 @@ async fn one_ref_impl(
         .group_by((t::titles::all_columns(), e::episodes::all_columns()))
         .load::<(Title, Episode)>(&db)?;
     let mut episodes = Vec::with_capacity(raw_episodes.len());
-    for (t, ep) in raw_episodes.into_iter() {
+    for (t, ep) in raw_episodes {
         let e = FullEpisode::load_details(ep, &db)?;
         episodes.push((t, e));
     }

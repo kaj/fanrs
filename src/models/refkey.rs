@@ -136,10 +136,10 @@ impl RefKey {
     }
     pub fn slug(&self) -> &str {
         match self {
-            RefKey::Fa(slug) => slug,
-            RefKey::Key(_, slug) => slug,
-            RefKey::Who(_, slug) => slug,
-            RefKey::Title(_, slug) => slug,
+            RefKey::Fa(slug)
+            | RefKey::Key(_, slug)
+            | RefKey::Who(_, slug)
+            | RefKey::Title(_, slug) => slug,
         }
     }
 
@@ -153,9 +153,9 @@ impl RefKey {
                 "22k" => "Kit".into(),
                 slug => format!("Den {slug}:e Fantomen"),
             },
-            RefKey::Key(name, _) => name.clone(),
-            RefKey::Who(name, _) => name.clone(),
-            RefKey::Title(name, _) => name.clone(),
+            RefKey::Key(name, _)
+            | RefKey::Who(name, _)
+            | RefKey::Title(name, _) => name.clone(),
         }
     }
 
@@ -168,9 +168,9 @@ impl RefKey {
                 "22k" => "Kit".into(),
                 slug => slug.to_string(),
             },
-            RefKey::Key(name, _) => name.clone(),
-            RefKey::Who(name, _) => name.clone(),
-            RefKey::Title(name, _) => name.clone(),
+            RefKey::Key(name, _)
+            | RefKey::Who(name, _)
+            | RefKey::Title(name, _) => name.clone(),
         }
     }
     pub fn letter(&self) -> char {

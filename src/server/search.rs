@@ -119,7 +119,7 @@ pub struct SearchQuery {
 impl SearchQuery {
     pub fn empty() -> Self {
         SearchQuery {
-            q: "".into(),
+            q: String::new(),
             t: vec![],
             p: vec![],
             k: vec![],

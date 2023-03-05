@@ -457,7 +457,7 @@ impl IssueDetails {
                 String,
             )>(db)?;
         let mut contents = Vec::with_capacity(content_raw.len());
-        for row in content_raw.into_iter() {
+        for row in content_raw {
             match row {
                 (Some((t, mut e, part)), None, seqno, b, label) => {
                     let classnames = if e.teaser.is_none() || !part.is_first()

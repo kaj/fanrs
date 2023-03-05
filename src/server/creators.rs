@@ -57,9 +57,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .filter(c::slug.eq(slug.clone()))
         .first::<Creator>(&db)
         .optional()?;
-    let creator = if let Some(creator) = creator {
-        creator
-    } else {
+    let Some(creator) = creator else {
         let target = slug.replace(['_', '-'], "%").replace(".html", "");
         log::info!("Looking for creator fallback {:?} -> {:?}", slug, target);
         if target == "anderas%eriksson" || target == "andreas%erikssson" {
@@ -87,7 +85,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)?;
     let mut about = Vec::with_capacity(about_raw.len());
-    for article in about_raw.into_iter() {
+    for article in about_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
@@ -111,7 +109,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .group_by(e_t_columns)
         .load::<(Title, Episode)>(&db)?;
     let mut main_episodes = Vec::with_capacity(main_episodes_raw.len());
-    for (t, ep) in main_episodes_raw.into_iter() {
+    for (t, ep) in main_episodes_raw {
         let e = FullEpisode::load_details(ep, &db)?;
         main_episodes.push((t, e));
     }
@@ -125,13 +123,13 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .group_by(a::articles::all_columns())
         .load::<Article>(&db)?;
     let mut articles_by = Vec::with_capacity(articles_by_raw.len());
-    for article in articles_by_raw.into_iter() {
+    for article in articles_by_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
             .load::<IssueRef>(&db)?;
-        articles_by.push((FullArticle::load(article, &db)?, published))
+        articles_by.push((FullArticle::load(article, &db)?, published));
     }
 
     let covers = CoverSet::by(&creator, &db)?;

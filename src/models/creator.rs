@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::io::{self, Write};
 
 /// In most cases, this struct will hold the id and name from
-/// creator_aliases together with the slug from creators.
+/// `creator_aliases` together with the slug from creators.
 #[derive(Debug, Queryable, Eq, PartialEq)]
 pub struct Creator {
     pub id: i32,

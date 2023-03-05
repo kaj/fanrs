@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Some clippy-suggested cleanups.
+
 
 ## Release 0.11.4 (2023-02-12)
 
