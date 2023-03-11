@@ -105,7 +105,8 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
             .and_then(|e| get_best_plac(e).transpose())
             .transpose()?,
         db,
-    )?;
+    )
+    .context("issue")?;
     println!("Found issue {issue}");
     issue.clear(db)?;
 
@@ -125,8 +126,12 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
                     }
                 }
             }
-            "text" => register_article(&issue, seqno, c, db)?,
-            "serie" => register_serie(&issue, seqno, c, db)?,
+            "text" => {
+                register_article(&issue, seqno, c, db).context("text")?
+            }
+            "serie" => {
+                register_serie(&issue, seqno, c, db).context("serie")?
+            }
             "skick" => (), // ignore
             _ => return Err(unexpected_element(&c)),
         }
@@ -236,47 +241,44 @@ fn register_serie(
             "ref" => episode
                 .set_refs(&parse_refs(e)?, db)
                 .with_context(|| format!("Error while handling {e:?}"))?,
-            "prevpub" => match e
-                .first_element_child()
-                .map(|e| e.tag_name().name())
-            {
-                Some("fa") => {
-                    let nr = get_text(e, "fa").unwrap().parse()?;
-                    let year = get_req_text(e, "year")?.parse()?;
-                    let issue = Issue::get_or_create_ref(year, nr, db)?;
-                    Part::prevpub(&episode, &issue, db)?;
+            "prevpub" => {
+                match e.first_element_child().map(|e| e.tag_name().name()) {
+                    Some("fa") => {
+                        let nr = parse_text(e, "fa")?.unwrap();
+                        let year = parse_req_text(e, "year")?;
+                        let issue = Issue::get_or_create_ref(year, nr, db)?;
+                        Part::prevpub(&episode, &issue, db)?;
+                    }
+                    Some("date") if e.attribute("role") == Some("orig") => {
+                        let date: NaiveDate = parse_text(e, "date")?.unwrap();
+                        diesel::update(e::episodes)
+                            .set((
+                                e::orig_date.eq(date),
+                                e::orig_to_date.eq(Option::<NaiveDate>::None),
+                                e::orig_sundays.eq(false),
+                            ))
+                            .filter(e::id.eq(episode.id))
+                            .execute(db)?;
+                    }
+                    Some("magazine") => {
+                        let om = OtherMag::get_or_create(
+                            get_text_norm(e, "magazine").unwrap(),
+                            parse_text(e, "issue")?,
+                            parse_text(e, "of")?,
+                            parse_text(e, "year")?,
+                            db,
+                        )?;
+                        diesel::update(e::episodes)
+                            .set(e::orig_mag.eq(om.id))
+                            .filter(e::id.eq(episode.id))
+                            .execute(db)?;
+                    }
+                    _other => return Err(anyhow!("Unknown prevpub {:?}", e)),
                 }
-                Some("date") if e.attribute("role") == Some("orig") => {
-                    let date: NaiveDate =
-                        get_text(e, "date").unwrap().parse()?;
-                    diesel::update(e::episodes)
-                        .set((
-                            e::orig_date.eq(date),
-                            e::orig_to_date.eq(Option::<NaiveDate>::None),
-                            e::orig_sundays.eq(false),
-                        ))
-                        .filter(e::id.eq(episode.id))
-                        .execute(db)?;
-                }
-                Some("magazine") => {
-                    let om = OtherMag::get_or_create(
-                        get_text_norm(e, "magazine").unwrap(),
-                        get_text(e, "issue").map(str::parse).transpose()?,
-                        get_text(e, "of").map(str::parse).transpose()?,
-                        get_text(e, "year").map(str::parse).transpose()?,
-                        db,
-                    )?;
-                    diesel::update(e::episodes)
-                        .set(e::orig_mag.eq(om.id))
-                        .filter(e::id.eq(episode.id))
-                        .execute(db)?;
-                }
-                _other => return Err(anyhow!("Unknown prevpub {:?}", e)),
-            },
+            }
             "daystrip" => {
-                if let Some(from) = get_text(e, "from") {
-                    let from: NaiveDate = from.parse()?;
-                    let to: NaiveDate = get_req_text(e, "to")?.parse()?;
+                if let Some(from) = parse_text::<NaiveDate>(e, "from")? {
+                    let to: NaiveDate = parse_req_text(e, "to")?;
                     let sun = e.attribute("d") == Some("sun");
                     diesel::update(e::episodes)
                         .set((
@@ -286,13 +288,10 @@ fn register_serie(
                         ))
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
-                } else if let Some(from) = get_text(e, "fromnr") {
-                    let to = get_req_text(e, "tonr")?;
+                } else if let Some(from) = parse_text::<i32>(e, "fromnr")? {
+                    let to: i32 = parse_req_text(e, "tonr")?;
                     diesel::update(e::episodes)
-                        .set((
-                            e::strip_from.eq(from.parse::<i32>()?),
-                            e::strip_to.eq(to.parse::<i32>()?),
-                        ))
+                        .set((e::strip_from.eq(from), e::strip_to.eq(to)))
                         .filter(e::id.eq(episode.id))
                         .execute(db)?;
                 } else {
@@ -352,6 +351,29 @@ fn test_parse_refs() -> Result<()> {
 
 fn get_req_text<'a>(e: Node<'a, 'a>, name: &str) -> Result<&'a str> {
     get_text(e, name).ok_or_else(|| anyhow!("{:?} missing child {}", e, name))
+}
+
+fn parse_text<T: FromStr>(e: Node, name: &str) -> Result<Option<T>>
+where
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    get_child(e, name)
+        .and_then(|e| e.text())
+        .map(|t| {
+            t.parse()
+                .map_err(|e| anyhow!("Bad {name:?} element: {t:?}: {e}"))
+        })
+        .transpose()
+}
+fn parse_req_text<T: FromStr>(e: Node, name: &str) -> Result<T>
+where
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    let t = get_child(e, name)
+        .and_then(|e| e.text())
+        .ok_or_else(|| anyhow!("{:?} missing text child {}", e, name))?;
+    t.parse()
+        .map_err(|e| anyhow!("Bad {name:?} element: {t:?}: {e}"))
 }
 
 fn get_text<'a>(e: Node<'a, 'a>, name: &str) -> Option<&'a str> {

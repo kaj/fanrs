@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Improved diagnostics on parse errors in read-files.
 * Some clippy-suggested cleanups.
 
 
