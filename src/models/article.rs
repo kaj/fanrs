@@ -1,12 +1,12 @@
 use super::RefKey;
 use crate::schema::article_refkeys::dsl as ar;
-use crate::schema::articles::dsl as a;
+use crate::schema::articles::{self, dsl as a};
 use crate::schema::publications::dsl as p;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Selectable, PartialEq, Eq)]
 pub struct Article {
     pub id: i32,
     pub title: String,
@@ -15,17 +15,18 @@ pub struct Article {
 }
 
 impl Article {
-    pub fn get_or_create(
+    pub async fn get_or_create(
         title: &str,
         subtitle: Option<&str>,
         note: Option<&str>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Article, Error> {
         if let Some(article) = a::articles
             .filter(a::title.eq(title))
             .filter(a::subtitle.is_not_distinct_from(subtitle))
             .filter(a::note.is_not_distinct_from(note))
             .first::<Article>(db)
+            .await
             .optional()?
         {
             Ok(article)
@@ -36,22 +37,24 @@ impl Article {
                     a::subtitle.eq(subtitle),
                     a::note.eq(note),
                 ))
-                .get_result(db)?)
+                .get_result(db)
+                .await?)
         }
     }
 
     /// This article is published in a specific issue.
-    pub fn publish(
+    pub async fn publish(
         &self,
         issue: i32,
         seqno: i16,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         if let Some((id, old_seqno)) = p::publications
             .filter(p::issue_id.eq(issue))
             .filter(p::article_id.eq(self.id))
             .select((p::id, p::seqno))
             .first::<(i32, Option<i16>)>(db)
+            .await
             .optional()?
         {
             if old_seqno != Some(seqno) {
@@ -70,22 +73,24 @@ impl Article {
                     p::article_id.eq(self.id),
                     p::seqno.eq(seqno),
                 ))
-                .execute(db)?;
+                .execute(db)
+                .await?;
             Ok(())
         }
     }
 
-    pub fn set_refs(
+    pub async fn set_refs(
         &self,
         refs: &[RefKey],
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         for r in refs {
-            let id = r.get_or_create_id(db)?;
+            let id = r.get_or_create_id(db).await?;
             diesel::insert_into(ar::article_refkeys)
                 .values((ar::article_id.eq(self.id), ar::refkey_id.eq(id)))
                 .on_conflict_do_nothing()
-                .execute(db)?;
+                .execute(db)
+                .await?;
         }
         Ok(())
     }

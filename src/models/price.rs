@@ -1,29 +1,30 @@
+use diesel::backend::Backend;
+use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::pg::Pg;
 use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::Integer;
-use diesel::Queryable;
 use std::fmt::{Display, Formatter};
-use std::io::Write;
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, FromSqlRow, PartialEq, Eq)]
 pub struct Price {
     // Internal representation is a number of öre.
     price: i32,
 }
 
-impl Queryable<Integer, Pg> for Price {
-    type Row = i32;
-    fn build(price: i32) -> Price {
-        Price { price }
+impl FromSql<Integer, Pg> for Price {
+    fn from_sql(
+        bytes: <Pg as Backend>::RawValue<'_>,
+    ) -> deserialize::Result<Self> {
+        FromSql::<Integer, Pg>::from_sql(bytes).map(|price| Price { price })
     }
 }
 
-impl ToSql<Integer, Pg> for Price
-where
-    i32: ToSql<Integer, Pg>,
-{
-    fn to_sql<W: Write>(&self, out: &mut Output<W, Pg>) -> serialize::Result {
+impl ToSql<Integer, Pg> for Price {
+    fn to_sql<'a>(
+        &'a self,
+        out: &mut Output<'a, '_, Pg>,
+    ) -> serialize::Result {
         ToSql::<Integer, Pg>::to_sql(&self.price, out)
     }
 }

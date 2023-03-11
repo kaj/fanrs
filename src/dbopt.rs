@@ -1,8 +1,10 @@
-use deadpool_diesel::postgres::{Manager, Pool};
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel_async::pooled_connection::deadpool::{BuildError, Pool};
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::{AsyncConnection, AsyncPgConnection};
 
-pub type PgPool = Pool;
+/// An asynchronous postgres database connection pool.
+pub type PgPool = Pool<AsyncPgConnection>;
 
 #[derive(clap::Parser)]
 pub struct DbOpt {
@@ -13,12 +15,13 @@ pub struct DbOpt {
 
 impl DbOpt {
     /// Get a single database connection from the configured url.
-    pub fn get_db(&self) -> Result<PgConnection, ConnectionError> {
-        PgConnection::establish(&self.db_url)
+    pub async fn get_db(&self) -> Result<AsyncPgConnection, ConnectionError> {
+        AsyncPgConnection::establish(&self.db_url).await
     }
 
     /// Get a database connection pool from the configured url.
-    pub fn get_pool(&self) -> PgPool {
-        Pool::new(Manager::new(&self.db_url), 8)
+    pub fn get_pool(&self) -> Result<PgPool, BuildError> {
+        let config = AsyncDieselConnectionManager::new(&self.db_url);
+        PgPool::builder(config).build()
     }
 }

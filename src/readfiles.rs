@@ -4,8 +4,12 @@ use crate::models::{
 use crate::DbOpt;
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Datelike, Local, NaiveDate};
+use diesel::associations::HasTable;
+use diesel::pg::Pg;
 use diesel::prelude::*;
+use diesel::query_builder::{IntoUpdateTarget, QueryFragment, QueryId};
 use diesel::sql_query;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use roxmltree::{Document, Node};
 use slug::slugify;
 use std::fs::read_to_string;
@@ -33,44 +37,54 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn run(self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         if self.years.is_empty() && !self.all {
             bail!("No year specified for reading.");
         }
-        let db = self.db.get_db()?;
-        read_persondata(&self.basedir, &db)?;
+        let mut db = self.db.get_db().await?;
+        read_persondata(&self.basedir, &mut db).await?;
         if self.all {
             let current_year = Local::now().year() as i16;
             for year in 1950..=current_year {
-                load_year(&self.basedir, year, &db)?;
+                load_year(&self.basedir, year, &mut db).await?;
             }
         } else {
             for year in self.years {
-                load_year(&self.basedir, year as i16, &db)?;
+                load_year(&self.basedir, year as i16, &mut db).await?;
             }
         }
-        delete_unpublished(&db)?;
+        delete_unpublished(&mut db).await?;
         let start = Instant::now();
         sql_query("refresh materialized view creator_contributions;")
-            .execute(&db)?;
+            .execute(&mut db)
+            .await?;
         println!("Updated creators view in {:.3?}", start.elapsed());
         Ok(())
     }
 }
 
-fn load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
+async fn load_year(
+    base: &Path,
+    year: i16,
+    db: &mut AsyncPgConnection,
+) -> Result<()> {
     do_load_year(base, year, db)
+        .await
         .with_context(|| format!("Failed to read data for {year}"))
 }
 
-fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
+async fn do_load_year(
+    base: &Path,
+    year: i16,
+    db: &mut AsyncPgConnection,
+) -> Result<()> {
     match read_to_string(base.join(format!("{year}.data"))) {
         Ok(data) => {
             for elem in child_elems(Document::parse(&data)?.root_element()) {
                 match elem.tag_name().name() {
                     "info" => (), // ignore
                     "issue" => {
-                        register_issue(year, elem, db).with_context(
+                        register_issue(year, elem, db).await.with_context(
                             || {
                                 format!(
                                     "Error reading issue {}:",
@@ -93,7 +107,11 @@ fn do_load_year(base: &Path, year: i16, db: &PgConnection) -> Result<()> {
     Ok(())
 }
 
-fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
+async fn register_issue<'a>(
+    year: i16,
+    i: Node<'a, 'a>,
+    db: &mut AsyncPgConnection,
+) -> Result<()> {
     let nr =
         parse_attribute(i, "nr")?.ok_or_else(|| anyhow!("nr missing"))?;
     let issue = Issue::get_or_create(
@@ -106,32 +124,52 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
             .transpose()?,
         db,
     )
+    .await
     .context("issue")?;
     println!("Found issue {issue}");
-    issue.clear(db)?;
+    issue.clear(db).await?;
 
     for (seqno, c) in child_elems(i).enumerate() {
         match c.tag_name().name() {
             "omslag" => {
                 if let Some(by) = get_child(c, "by") {
-                    for creator in get_creators(by, db)? {
-                        use crate::schema::covers_by::dsl as cb;
-                        diesel::insert_into(cb::covers_by)
-                            .values((
-                                cb::issue_id.eq(issue.id),
-                                cb::creator_alias_id.eq(creator.id),
-                            ))
-                            .on_conflict_do_nothing()
-                            .execute(db)?;
+                    let creators = get_creators(by, db)
+                        .await?
+                        .into_iter()
+                        .map(|c| c.id)
+                        .collect::<Vec<_>>();
+                    use crate::schema::covers_by::dsl as cb;
+                    diesel::insert_into(cb::covers_by)
+                        .values(
+                            &creators
+                                .iter()
+                                .map(|c| {
+                                    (
+                                        cb::issue_id.eq(issue.id),
+                                        cb::creator_alias_id.eq(c),
+                                    )
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                        .on_conflict_do_nothing()
+                        .execute(db)
+                        .await?;
+                    let purged = diesel::delete(cb::covers_by)
+                        .filter(cb::issue_id.eq(issue.id))
+                        .filter(cb::creator_alias_id.ne_all(creators))
+                        .execute(db)
+                        .await?;
+                    if purged > 0 {
+                        println!("Removed {purged} bogus cover artists.");
                     }
                 }
             }
-            "text" => {
-                register_article(&issue, seqno, c, db).context("text")?
-            }
-            "serie" => {
-                register_serie(&issue, seqno, c, db).context("serie")?
-            }
+            "text" => register_article(&issue, seqno, c, db)
+                .await
+                .context("text")?,
+            "serie" => register_serie(&issue, seqno, c, db)
+                .await
+                .context("serie")?,
             "skick" => (), // ignore
             _ => return Err(unexpected_element(&c)),
         }
@@ -139,25 +177,26 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
     Ok(())
 }
 
-fn register_article(
+async fn register_article<'a>(
     issue: &Issue,
     seqno: usize,
-    c: Node,
-    db: &PgConnection,
+    c: Node<'a, 'a>,
+    db: &mut AsyncPgConnection,
 ) -> Result<()> {
     let article = Article::get_or_create(
         get_req_text(c, "title")?,
         get_text_norm(c, "subtitle").as_deref(),
         get_text_norm(c, "note").as_deref(),
         db,
-    )?;
-    article.publish(issue.id, seqno as i16, db)?;
+    )
+    .await?;
+    article.publish(issue.id, seqno as i16, db).await?;
     for e in child_elems(c) {
         match e.tag_name().name() {
             "title" | "subtitle" | "note" => (), // handled above
             "by" => {
                 let role = e.attribute("role").unwrap_or("by");
-                for by in get_creators(e, db)? {
+                for by in get_creators(e, db).await? {
                     use crate::schema::articles_by::dsl as ab;
                     diesel::insert_into(ab::articles_by)
                         .values((
@@ -166,32 +205,34 @@ fn register_article(
                             ab::role.eq(role),
                         ))
                         .on_conflict_do_nothing()
-                        .execute(db)?;
+                        .execute(db)
+                        .await?;
                 }
             }
-            "ref" => article.set_refs(&parse_refs(e)?, db)?,
+            "ref" => article.set_refs(&parse_refs(e)?, db).await?,
             _ => return Err(unexpected_element(&e)),
         }
     }
     Ok(())
 }
 
-fn register_serie(
+async fn register_serie<'a>(
     issue: &Issue,
     seqno: usize,
-    c: Node,
-    db: &PgConnection,
+    c: Node<'a, 'a>,
+    db: &mut AsyncPgConnection,
 ) -> Result<()> {
     use crate::schema::episodes::dsl as e;
     use crate::schema::episodes_by::dsl as eb;
     let episode = Episode::get_or_create(
-        &Title::get_or_create(get_req_text(c, "title")?, db)?,
+        &Title::get_or_create(get_req_text(c, "title")?, db).await?,
         get_episode_name(c).as_deref(),
         get_text_norm(c, "teaser").as_deref(),
         get_text_norm(c, "note").as_deref(),
         get_text_norm(c, "copyright").as_deref(),
         db,
-    )?;
+    )
+    .await?;
     let part = get_child(c, "part");
     let part = Part {
         no: part
@@ -207,7 +248,8 @@ fn register_serie(
         get_best_plac(c)?,
         &get_text_norm(c, "label").unwrap_or_default(),
         db,
-    )?;
+    )
+    .await?;
     for e in child_elems(c) {
         match e.tag_name().name() {
             "episode" if e.attribute("role") == Some("orig") => {
@@ -221,13 +263,14 @@ fn register_serie(
                 diesel::update(e::episodes)
                     .set((e::orig_lang.eq(lang), e::orig_episode.eq(orig)))
                     .filter(e::id.eq(episode.id))
-                    .execute(db)?;
+                    .execute(db)
+                    .await?;
             }
             "label" | "title" | "episode" | "teaser" | "part" | "note"
             | "copyright" | "best" => (), // handled above
             "by" => {
                 let role = e.attribute("role").unwrap_or("by");
-                for by in get_creators(e, db)? {
+                for by in get_creators(e, db).await? {
                     diesel::insert_into(eb::episodes_by)
                         .values((
                             eb::episode_id.eq(episode.id),
@@ -235,19 +278,22 @@ fn register_serie(
                             eb::role.eq(role),
                         ))
                         .on_conflict_do_nothing()
-                        .execute(db)?;
+                        .execute(db)
+                        .await?;
                 }
             }
             "ref" => episode
                 .set_refs(&parse_refs(e)?, db)
+                .await
                 .with_context(|| format!("Error while handling {e:?}"))?,
             "prevpub" => {
                 match e.first_element_child().map(|e| e.tag_name().name()) {
                     Some("fa") => {
                         let nr = parse_text(e, "fa")?.unwrap();
                         let year = parse_req_text(e, "year")?;
-                        let issue = Issue::get_or_create_ref(year, nr, db)?;
-                        Part::prevpub(&episode, &issue, db)?;
+                        let issue =
+                            Issue::get_or_create_ref(year, nr, db).await?;
+                        Part::prevpub(&episode, &issue, db).await?;
                     }
                     Some("date") if e.attribute("role") == Some("orig") => {
                         let date: NaiveDate = parse_text(e, "date")?.unwrap();
@@ -258,7 +304,8 @@ fn register_serie(
                                 e::orig_sundays.eq(false),
                             ))
                             .filter(e::id.eq(episode.id))
-                            .execute(db)?;
+                            .execute(db)
+                            .await?;
                     }
                     Some("magazine") => {
                         let om = OtherMag::get_or_create(
@@ -267,11 +314,13 @@ fn register_serie(
                             parse_text(e, "of")?,
                             parse_text(e, "year")?,
                             db,
-                        )?;
+                        )
+                        .await?;
                         diesel::update(e::episodes)
                             .set(e::orig_mag_id.eq(om.id))
                             .filter(e::id.eq(episode.id))
-                            .execute(db)?;
+                            .execute(db)
+                            .await?;
                     }
                     _other => return Err(anyhow!("Unknown prevpub {:?}", e)),
                 }
@@ -287,13 +336,15 @@ fn register_serie(
                             e::orig_sundays.eq(sun),
                         ))
                         .filter(e::id.eq(episode.id))
-                        .execute(db)?;
+                        .execute(db)
+                        .await?;
                 } else if let Some(from) = parse_text::<i32>(e, "fromnr")? {
                     let to: i32 = parse_req_text(e, "tonr")?;
                     diesel::update(e::episodes)
                         .set((e::strip_from.eq(from), e::strip_to.eq(to)))
                         .filter(e::id.eq(episode.id))
-                        .execute(db)?;
+                        .execute(db)
+                        .await?;
                 } else {
                     return Err(anyhow!("Unknown daystrip {:?}", e));
                 }
@@ -390,26 +441,37 @@ fn get_best_plac(e: Node) -> Result<Option<i16>> {
         .transpose()
 }
 
-fn get_creators(by: Node, db: &PgConnection) -> Result<Vec<Creator>> {
-    let one_creator = |e: Node| -> Result<Creator> {
+async fn get_creators<'a>(
+    by: Node<'a, 'a>,
+    db: &mut AsyncPgConnection,
+) -> Result<Vec<Creator>> {
+    async fn one_creator<'a>(
+        e: Node<'a, 'a>,
+        db: &mut AsyncPgConnection,
+    ) -> Result<Creator> {
         let name =
             e.text().ok_or_else(|| anyhow!("missing name in {e:?}"))?;
         Creator::get_or_create(name, db)
+            .await
             .with_context(|| format!("Failed to create creator {name:?}"))
-    };
-    let who = child_elems(by)
-        .map(one_creator)
-        .collect::<Result<Vec<_>>>()?;
+    }
+    let mut who = Vec::new();
+    for one in child_elems(by) {
+        who.push(one_creator(one, db).await?)
+    }
     if who.is_empty() {
         // No child elements, a single name directly in the by element
-        Ok(vec![one_creator(by)?])
+        Ok(vec![one_creator(by, db).await?])
     } else {
         // Child <who> elements, each containing a name.
         Ok(who)
     }
 }
 
-fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
+async fn read_persondata(
+    base: &Path,
+    db: &mut AsyncPgConnection,
+) -> Result<()> {
     use crate::schema::creator_aliases::dsl as ca;
     use crate::schema::creators::dsl as c;
     let buf = read_to_string(base.join("extra-people.data"))?;
@@ -426,44 +488,47 @@ fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
                     .filter(c::name.eq(name))
                     .filter(c::slug.eq(&slug))
                     .first::<Creator>(db)
-                    .optional()?
-                    .ok_or(0)
-                    .or_else(|_| {
-                        diesel::insert_into(c::creators)
-                            .values((c::name.eq(name), c::slug.eq(&slug)))
-                            .returning((c::id, c::name, c::slug))
-                            .get_result::<Creator>(db)
-                            .and_then(|c| {
-                                diesel::insert_into(ca::creator_aliases)
-                                    .values((
-                                        ca::creator_id.eq(c.id),
-                                        ca::name.eq(name),
-                                    ))
-                                    .execute(db)?;
-                                Ok(c)
-                            })
-                    })?;
+                    .await
+                    .optional()?;
+                let creator = if let Some(creator) = creator {
+                    creator
+                } else {
+                    let c = diesel::insert_into(c::creators)
+                        .values((c::name.eq(name), c::slug.eq(&slug)))
+                        .returning((c::id, c::name, c::slug))
+                        .get_result::<Creator>(db)
+                        .await?;
+                    diesel::insert_into(ca::creator_aliases)
+                        .values((ca::creator_id.eq(c.id), ca::name.eq(name)))
+                        .execute(db)
+                        .await?;
+                    c
+                };
 
                 for a in
                     e.children().filter(|a| a.tag_name().name() == "alias")
                 {
                     if let Some(alias) = a.text() {
-                        ca::creator_aliases
+                        match ca::creator_aliases
                             .select(ca::id)
                             .filter(ca::creator_id.eq(creator.id))
                             .filter(ca::name.eq(alias))
                             .first::<i32>(db)
+                            .await
                             .optional()?
-                            .ok_or(0)
-                            .or_else(|_| {
+                        {
+                            Some(_) => (),
+                            None => {
                                 diesel::insert_into(ca::creator_aliases)
                                     .values((
                                         ca::creator_id.eq(creator.id),
                                         ca::name.eq(alias),
                                     ))
-                                    .returning(ca::id)
-                                    .get_result(db)
-                            })?;
+                                    //.returning(ca::id)
+                                    .execute(db)
+                                    .await?;
+                            }
+                        }
                     }
                 }
             }
@@ -473,7 +538,7 @@ fn read_persondata(base: &Path, db: &PgConnection) -> Result<()> {
     Ok(())
 }
 
-fn delete_unpublished(db: &PgConnection) -> Result<()> {
+async fn delete_unpublished(db: &mut AsyncPgConnection) -> Result<()> {
     use crate::schema::article_refkeys::dsl as ar;
     use crate::schema::articles::dsl as a;
     use crate::schema::articles_by::dsl as ab;
@@ -484,114 +549,108 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
     use crate::schema::publications::dsl as p;
     use crate::schema::refkeys::dsl as r;
     use crate::schema::titles::dsl as t;
-    use diesel::dsl::{all, any};
 
-    fn do_clear<F: Fn() -> Result<usize, diesel::result::Error>>(
-        what: &'static str,
-        how: F,
-    ) -> Result<()> {
-        let start = Instant::now();
-        let n = how().context(what)?;
-        println!("Cleared {} {} in {:.0?}", n, what, start.elapsed());
-        Ok(())
-    }
-
-    do_clear("junk episode parts", || {
+    do_clear(db, "episode parts", {
         let published_parts = p::publications
             .select(p::episode_part)
             .filter(p::episode_part.is_not_null())
             .distinct();
-        diesel::delete(
-            // TODO: Check if .nullable() can be removed in diesel 2.0?
-            ep::episode_parts
-                .filter(ep::id.nullable().ne(all(published_parts))),
-        )
-        .execute(db)
-    })?;
+        ep::episode_parts.filter(ep::id.nullable().ne_all(published_parts))
+    })
+    .await?;
 
-    do_clear("junk episode refkeys", || {
-        diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(any(
-            e::episodes.select(e::id).filter(e::id.ne(all(
-                ep::episode_parts.select(ep::episode_id).distinct(),
-            ))),
-        ))))
-        .execute(db)
-    })?;
-
-    do_clear("junk episodes-by", || {
-        diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(any(
-            e::episodes.select(e::id).filter(e::id.ne(all(
-                ep::episode_parts.select(ep::episode_id).distinct(),
-            ))),
-        ))))
-        .execute(db)
-    })?;
-
-    do_clear("junk episodes", || {
-        diesel::delete(
-            e::episodes.filter(e::id.ne(all(
-                ep::episode_parts.select(ep::episode_id).distinct(),
-            ))),
-        )
-        .execute(db)
-    })?;
-
-    do_clear("junk titles", || {
-        diesel::delete(t::titles.filter(
-            t::id.ne(all(e::episodes.select(e::title_id).distinct())),
+    do_clear(db, "episode refkeys", {
+        er::episode_refkeys.filter(er::episode_id.eq_any(
+            e::episodes.select(e::id).filter(
+                e::id.ne_all(
+                    ep::episode_parts.select(ep::episode_id).distinct(),
+                ),
+            ),
         ))
-        .execute(db)
-    })?;
+    })
+    .await?;
+
+    do_clear(db, "episodes-by", {
+        eb::episodes_by.filter(eb::episode_id.eq_any(
+            e::episodes.select(e::id).filter(
+                e::id.ne_all(
+                    ep::episode_parts.select(ep::episode_id).distinct(),
+                ),
+            ),
+        ))
+    })
+    .await?;
+
+    do_clear(db, "episodes", {
+        e::episodes.filter(
+            e::id.ne_all(ep::episode_parts.select(ep::episode_id).distinct()),
+        )
+    })
+    .await?;
+
+    do_clear(db, "titles", {
+        t::titles
+            .filter(t::id.ne_all(e::episodes.select(e::title_id).distinct()))
+    })
+    .await?;
 
     let start = Instant::now();
     let published_articles = p::publications
         .filter(p::article_id.is_not_null())
         .select(p::article_id)
         .distinct()
-        .load::<Option<i32>>(db)?
+        .load::<Option<i32>>(db)
+        .await?
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
 
-    do_clear("junk article refkeys", || {
-        diesel::delete(
-            ar::article_refkeys
-                .filter(ar::article_id.ne(all(&published_articles))),
-        )
-        .execute(db)
-    })?;
+    do_clear(db, "article refkeys", {
+        ar::article_refkeys.filter(ar::article_id.ne_all(&published_articles))
+    })
+    .await?;
 
-    do_clear("junk articles-by", || {
-        diesel::delete(
-            ab::articles_by
-                .filter(ab::article_id.ne(all(&published_articles))),
-        )
-        .execute(db)
-    })?;
+    do_clear(db, "articles-by", {
+        ab::articles_by.filter(ab::article_id.ne_all(&published_articles))
+    })
+    .await?;
 
-    do_clear("junk articles", || {
-        diesel::delete(a::articles.filter(a::id.ne(all(&published_articles))))
-            .execute(db)
-    })?;
+    do_clear(db, "articles", {
+        a::articles.filter(a::id.ne_all(&published_articles))
+    })
+    .await?;
+
     println!(
         "Article-related cleanups in {:.0?} ({} remains).",
         start.elapsed(),
         published_articles.len(),
     );
 
-    do_clear("junk refkeys", || {
-        diesel::delete(
-            r::refkeys
-                .filter(
-                    r::id.ne(all(er::episode_refkeys.select(er::refkey_id))),
-                )
-                .filter(
-                    r::id.ne(all(ar::article_refkeys.select(ar::refkey_id))),
-                ),
-        )
-        .execute(db)
-    })?;
+    do_clear(db, "refkeys", {
+        r::refkeys
+            .filter(r::id.ne_all(er::episode_refkeys.select(er::refkey_id)))
+            .filter(r::id.ne_all(ar::article_refkeys.select(ar::refkey_id)))
+    })
+    .await?;
 
+    Ok(())
+}
+
+async fn do_clear<'a, T: 'a + IntoUpdateTarget>(
+    db: &'a mut AsyncPgConnection,
+    what: &'static str,
+    how: T,
+) -> Result<()>
+where
+    <T as IntoUpdateTarget>::WhereClause:
+        QueryFragment<Pg> + QueryId + Send + Sync,
+    <T as HasTable>::Table: QueryId + Send + Sync + 'static,
+    <<T as HasTable>::Table as QuerySource>::FromClause:
+        QueryFragment<Pg> + Send + Sync,
+{
+    let start = Instant::now();
+    let n = diesel::delete(how).execute(db).await.context(what)?;
+    println!("Cleared junk {} {} in {:.0?}", n, what, start.elapsed());
     Ok(())
 }
 

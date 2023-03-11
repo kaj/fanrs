@@ -20,8 +20,9 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{creator_html, creators_html, RenderRucte};
-use diesel::dsl::{any, min};
+use diesel::dsl::min;
 use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reply::Response;
@@ -36,7 +37,7 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 
 async fn list_creators(db: PgPool) -> Result<Response> {
     use crate::models::creator_contributions::creator_contributions::dsl as cc;
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let all = cc::creator_contributions
         .select((
             (cc::id, cc::name, cc::slug),
@@ -47,15 +48,17 @@ async fn list_creators(db: PgPool) -> Result<Response> {
             cc::first_issue,
             cc::latest_issue,
         ))
-        .load::<CreatorContributions>(&db)?;
+        .load::<CreatorContributions>(&mut db)
+        .await?;
     Ok(Builder::new().html(|o| creators_html(o, &all))?)
 }
 
 async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let creator = c::creators
         .filter(c::slug.eq(slug.clone()))
-        .first::<Creator>(&db)
+        .first::<Creator>(&mut db)
+        .await
         .optional()?;
     let Some(creator) = creator else {
         let target = slug.replace(['_', '-'], "%").replace(".html", "");
@@ -68,7 +71,8 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
             .filter(ca::name.ilike(target.clone()))
             .or_filter(c::slug.ilike(target))
             .select(c::slug)
-            .first::<String>(&db)
+            .first::<String>(&mut db)
+            .await
             .optional()?
             .ok_or(ViewError::NotFound)?;
         log::debug!("Found replacement: {found:?}");
@@ -83,34 +87,48 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)?;
+        .load::<Article>(&mut db)
+        .await?;
     let mut about = Vec::with_capacity(about_raw.len());
     for article in about_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)?;
-        about.push((FullArticle::load(article, &db)?, published));
+            .load::<IssueRef>(&mut db)
+            .await?;
+        about.push((FullArticle::load(article, &mut db).await?, published));
     }
 
-    let e_t_columns = (t::titles::all_columns(), e::episodes::all_columns());
     let main_episodes_raw = e::episodes
-        .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
         .inner_join(t::titles)
-        .filter(ca::creator_id.eq(creator.id))
-        .filter(eb::role.eq(any(CreatorSet::MAIN_ROLES)))
-        .select(e_t_columns)
-        .inner_join(
-            ep::episode_parts
-                .inner_join(p::publications.inner_join(i::issues)),
+        .select((Episode::as_select(), Title::as_select()))
+        .filter(
+            e::id.eq_any(
+                eb::episodes_by
+                    .select(eb::episode_id)
+                    .filter(
+                        eb::creator_alias_id.eq_any(
+                            ca::creator_aliases
+                                .select(ca::id)
+                                .filter(ca::creator_id.eq(creator.id)),
+                        ),
+                    )
+                    .filter(eb::role.eq_any(CreatorSet::MAIN_ROLES)),
+            ),
         )
-        .order(min(i::magic))
-        .group_by(e_t_columns)
-        .load::<(Title, Episode)>(&db)?;
+        .order(
+            i::issues
+                .left_join(p::publications.left_join(ep::episode_parts))
+                .select(min(i::magic))
+                .filter(ep::episode_id.eq(e::id))
+                .single_value(),
+        )
+        .load::<(Episode, Title)>(&mut db)
+        .await?;
     let mut main_episodes = Vec::with_capacity(main_episodes_raw.len());
-    for (t, ep) in main_episodes_raw {
-        let e = FullEpisode::load_details(ep, &db)?;
+    for (ep, t) in main_episodes_raw {
+        let e = FullEpisode::load_details(ep, &mut db).await?;
         main_episodes.push((t, e));
     }
 
@@ -121,19 +139,22 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)?;
+        .load::<Article>(&mut db)
+        .await?;
     let mut articles_by = Vec::with_capacity(articles_by_raw.len());
     for article in articles_by_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)?;
-        articles_by.push((FullArticle::load(article, &db)?, published));
+            .load::<IssueRef>(&mut db)
+            .await?;
+        articles_by
+            .push((FullArticle::load(article, &mut db).await?, published))
     }
 
-    let covers = CoverSet::by(&creator, &db)?;
-    let others = OtherContribs::for_creator(&creator, &db)?;
+    let covers = CoverSet::by(&creator, &mut db).await?;
+    let others = OtherContribs::for_creator(&creator, &mut db).await?;
 
     Ok(Builder::new().html(|o| {
         creator_html(
@@ -153,13 +174,17 @@ pub struct CoverSet {
     pub all: Vec<(IssueRef, Option<i16>)>,
 }
 impl CoverSet {
-    fn by(creator: &Creator, db: &PgConnection) -> Result<CoverSet, DbError> {
+    async fn by(
+        creator: &Creator,
+        db: &mut AsyncPgConnection,
+    ) -> Result<CoverSet, DbError> {
         let mut covers = i::issues
             .select(((i::year, (i::number, i::number_str)), i::cover_best))
             .inner_join(cb::covers_by.inner_join(ca::creator_aliases))
             .filter(ca::creator_id.eq(creator.id))
             .order((i::cover_best, i::year, i::number))
-            .load::<(IssueRef, Option<i16>)>(db)?;
+            .load::<(IssueRef, Option<i16>)>(db)
+            .await?;
 
         if covers.len() > 20 {
             let best = covers[0..15].to_vec();

@@ -1,4 +1,5 @@
 use super::{Creator, IssueRef};
+use diesel::Queryable;
 
 #[derive(Queryable)]
 pub struct CreatorContributions {
@@ -11,7 +12,7 @@ pub struct CreatorContributions {
     pub latest_issue: Option<IssueRef>,
 }
 
-table! {
+diesel::table! {
     /// This is a materialzied view, and apparently not included in
     /// diesel schema generation.
     creator_contributions (id) {

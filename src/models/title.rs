@@ -1,11 +1,11 @@
 use super::{Cloud, CloudItem};
 use crate::schema::episode_parts::dsl as ep;
 use crate::schema::episodes::dsl as e;
-use crate::schema::titles::dsl as t;
+use crate::schema::titles::{self, dsl as t};
 use crate::templates::ToHtml;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
@@ -13,7 +13,7 @@ use std::io::{self, Write};
 /// A title of a comic.
 ///
 /// May be recurring, such as "Fantomen" or "Spirit", or a one-shot.
-#[derive(Debug, Queryable, PartialEq, Eq)]
+#[derive(Debug, Queryable, Selectable, PartialEq, Eq)]
 pub struct Title {
     pub id: i32,
     pub title: String,
@@ -21,28 +21,30 @@ pub struct Title {
 }
 
 impl Title {
-    pub fn get_or_create(
+    pub async fn get_or_create(
         name: &str,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Title, Error> {
         if let Some(t) = t::titles
             .filter(t::title.eq(name))
             .first::<Title>(db)
+            .await
             .optional()?
         {
             Ok(t)
         } else {
             Ok(diesel::insert_into(t::titles)
                 .values((t::title.eq(name), t::slug.eq(&slugify(name))))
-                .get_result(db)?)
+                .get_result(db)
+                .await?)
         }
     }
 
-    pub fn from_slug(
+    pub async fn from_slug(
         slug: String,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Title, Error> {
-        t::titles.filter(t::slug.eq(slug)).first(db)
+        t::titles.filter(t::slug.eq(slug)).first(db).await
     }
 
     pub fn has_daystrip(&self) -> bool {
@@ -52,7 +54,10 @@ impl Title {
     pub fn has_sundays(&self) -> bool {
         SUNDAYS.binary_search(&self.slug.as_ref()).is_ok()
     }
-    pub fn cloud(num: i64, db: &PgConnection) -> Result<Cloud<Title>, Error> {
+    pub async fn cloud(
+        num: i64,
+        db: &mut AsyncPgConnection,
+    ) -> Result<Cloud<Title>, Error> {
         use diesel::dsl::sql;
         use diesel::sql_types::Integer;
         let c = sql::<Integer>("cast(count(*) as integer)");
@@ -62,7 +67,8 @@ impl Title {
             .group_by(t::titles::all_columns())
             .order(c.desc())
             .limit(num)
-            .load(db)?;
+            .load(db)
+            .await?;
         Ok(Cloud::from_ordered(titles))
     }
 }

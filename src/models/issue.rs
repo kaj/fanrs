@@ -1,9 +1,11 @@
 use super::price::Price;
 use crate::templates::ToHtml;
-use diesel::pg::{Pg, PgConnection};
+use diesel::deserialize::{self, FromSql};
+use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel::sql_types::{SmallInt, Text};
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::cmp::Ordering;
 use std::fmt;
 use std::io::{self, Write};
@@ -28,26 +30,26 @@ pub struct IssueRef {
 }
 
 impl Issue {
-    pub fn get_or_create_ref(
+    pub async fn get_or_create_ref(
         year: i16,
         number: Nr,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Issue, Error> {
-        match Issue::load(year, &number, db)? {
+        match Issue::load(year, &number, db).await? {
             Some(t) => Ok(t),
-            None => Issue::create(year, number, None, None, None, db),
+            None => Issue::create(year, number, None, None, None, db).await,
         }
     }
-    pub fn get_or_create(
+    pub async fn get_or_create(
         year: i16,
         number: Nr,
         pages: Option<i16>,
         price: Option<Price>,
         cover_best: Option<i16>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Issue, Error> {
         use crate::schema::issues::dsl;
-        if let Some(mut t) = Issue::load(year, &number, db)? {
+        if let Some(mut t) = Issue::load(year, &number, db).await? {
             if (t.cover_best != cover_best)
                 || (t.pages != pages)
                 || (t.price != price)
@@ -62,17 +64,18 @@ impl Issue {
                         dsl::pages.eq(pages),
                         dsl::price.eq(&t.price),
                     ))
-                    .execute(db)?;
+                    .execute(db)
+                    .await?;
             }
             Ok(t)
         } else {
-            Issue::create(year, number, pages, price, cover_best, db)
+            Issue::create(year, number, pages, price, cover_best, db).await
         }
     }
-    fn load(
+    async fn load(
         year: i16,
         number: &Nr,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Option<Issue>, Error> {
         use crate::schema::issues::dsl as i;
         i::issues
@@ -80,15 +83,16 @@ impl Issue {
             .filter(i::number.eq(number.number))
             .filter(i::number_str.eq(&number.nr_str))
             .first::<Issue>(db)
+            .await
             .optional()
     }
-    fn create(
+    async fn create(
         year: i16,
         number: Nr,
         pages: Option<i16>,
         price: Option<Price>,
         cover_best: Option<i16>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Issue, Error> {
         use crate::schema::issues::dsl as i;
         let magic = ((year - 1950) * 64 + number.number) * 2
@@ -104,11 +108,16 @@ impl Issue {
                 i::magic.eq(magic),
             ))
             .get_result(db)
+            .await
     }
-    pub fn clear(&self, db: &PgConnection) -> Result<(), Error> {
+    pub async fn clear(
+        &self,
+        db: &mut AsyncPgConnection,
+    ) -> Result<(), Error> {
         use crate::schema::publications::dsl as p;
         diesel::delete(p::publications.filter(p::issue_id.eq(self.id)))
-            .execute(db)?;
+            .execute(db)
+            .await?;
         Ok(())
     }
     /// Site-relative url to the cover image of this issue.
@@ -167,7 +176,10 @@ impl IssueRef {
         }
     }
 
-    pub fn load_id(&self, db: &PgConnection) -> Result<i32, Error> {
+    pub async fn load_id(
+        &self,
+        db: &mut AsyncPgConnection,
+    ) -> Result<i32, Error> {
         use crate::schema::issues::dsl as i;
         i::issues
             .select(i::id)
@@ -175,6 +187,7 @@ impl IssueRef {
             .filter(i::number.eq(self.number.number))
             .filter(i::number_str.eq(&self.number.nr_str))
             .first(db)
+            .await
     }
 
     pub fn sortno(&self) -> i16 {
@@ -187,23 +200,28 @@ impl IssueRef {
     }
 }
 
+impl FromSql<SmallInt, Pg> for IssueRef {
+    fn from_sql(
+        bytes: <Pg as diesel::backend::Backend>::RawValue<'_>,
+    ) -> diesel::deserialize::Result<Self> {
+        FromSql::<SmallInt, Pg>::from_sql(bytes).map(IssueRef::from_magic)
+    }
+}
+
 impl Queryable<SmallInt, Pg> for IssueRef {
     type Row = i16;
-    fn build(row: Self::Row) -> IssueRef {
-        IssueRef::from_magic(row)
+    fn build(row: Self::Row) -> deserialize::Result<IssueRef> {
+        Ok(IssueRef::from_magic(row))
     }
 }
 
 impl Queryable<(SmallInt, (SmallInt, Text)), Pg> for IssueRef {
     type Row = (i16, (i16, String));
-    fn build(row: Self::Row) -> IssueRef {
-        IssueRef {
+    fn build(row: Self::Row) -> deserialize::Result<IssueRef> {
+        Ok(IssueRef {
             year: row.0,
-            number: Nr {
-                number: (row.1).0,
-                nr_str: (row.1).1,
-            },
-        }
+            number: <Nr as Queryable<(SmallInt, Text), Pg>>::build(row.1)?,
+        })
     }
 }
 

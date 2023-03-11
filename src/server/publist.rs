@@ -10,9 +10,9 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
 use crate::templates::ToHtml;
-use diesel::dsl::{all, min};
-use diesel::pg::PgConnection;
+use diesel::dsl::min;
 use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 
@@ -22,16 +22,16 @@ pub struct PartsPublished {
 }
 
 impl PartsPublished {
-    pub fn for_episode(
+    pub async fn for_episode(
         episode: &Episode,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<PartsPublished, DbError> {
-        PartsPublished::for_episode_id(episode.id, db)
+        PartsPublished::for_episode_id(episode.id, db).await
     }
 
-    pub fn for_episode_id(
+    pub async fn for_episode_id(
         episode: i32,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<PartsPublished, DbError> {
         Ok(PartsPublished {
             issues: i::issues
@@ -43,15 +43,16 @@ impl PartsPublished {
                 ))
                 .filter(ep::episode_id.eq(episode))
                 .order((i::year, i::number))
-                .load::<PartInIssue>(db)?,
+                .load::<PartInIssue>(db)
+                .await?,
             others: false,
         })
     }
 
-    pub fn for_episode_except(
+    pub async fn for_episode_except(
         episode: &Episode,
         issue: &Issue,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<PartsPublished, DbError> {
         Ok(PartsPublished {
             issues: i::issues
@@ -64,7 +65,8 @@ impl PartsPublished {
                 .filter(ep::episode_id.eq(episode.id))
                 .filter(i::id.ne(issue.id))
                 .order((i::year, i::number))
-                .load::<PartInIssue>(db)?,
+                .load::<PartInIssue>(db)
+                .await?,
             others: true,
         })
     }
@@ -122,38 +124,46 @@ pub struct OtherContribs {
 }
 
 impl OtherContribs {
-    pub fn for_creator(
+    pub async fn for_creator(
         creator: &Creator,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<OtherContribs, DbError> {
-        let oe_columns = (t::titles::all_columns(), e::id, e::name);
-        let other_episodes = e::episodes
-            .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
-            .inner_join(t::titles)
+        let oe_columns = (Title::as_select(), e::id, e::name);
+        let other_episodes = eb::episodes_by
+            .select(eb::episode_id)
+            .inner_join(ca::creator_aliases)
             .filter(ca::creator_id.eq(creator.id))
-            .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
+            .filter(eb::role.ne_all(CreatorSet::MAIN_ROLES));
+
+        let other_episodes = e::episodes
+            .inner_join(t::titles)
+            .filter(e::id.eq_any(other_episodes))
             .select(oe_columns)
-            .inner_join(
-                ep::episode_parts
-                    .inner_join(p::publications.inner_join(i::issues)),
+            .order(
+                i::issues
+                    .left_join(p::publications.left_join(ep::episode_parts))
+                    .select(min(i::magic))
+                    .filter(ep::episode_id.eq(e::id))
+                    .single_value(),
             )
-            .order(min(i::magic))
-            .group_by(oe_columns)
-            .load::<(Title, i32, Option<String>)>(db)?;
+            .load::<(Title, i32, Option<String>)>(db)
+            .await?;
 
         let mut oe: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (title, episode_id, episode) in other_episodes {
-            let published = PartsPublished::for_episode_id(episode_id, db)?;
+            let published =
+                PartsPublished::for_episode_id(episode_id, db).await?;
             oe.entry(title).or_default().push((episode, published));
         }
 
         let o_roles = eb::episodes_by
             .inner_join(ca::creator_aliases)
             .filter(ca::creator_id.eq(creator.id))
-            .filter(eb::role.ne(all(CreatorSet::MAIN_ROLES)))
+            .filter(eb::role.ne_all(CreatorSet::MAIN_ROLES))
             .select(eb::role)
             .distinct()
-            .load::<String>(db)?
+            .load::<String>(db)
+            .await?
             .into_iter()
             .map(|r| match r.as_ref() {
                 "color" => "färgläggare",

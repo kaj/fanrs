@@ -13,10 +13,10 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{refkey_html, refkeys_html, RenderRucte};
-use diesel::dsl::{count_star, min, sql};
+use diesel::dsl::{count_star, max, min, sql};
 use diesel::prelude::*;
-use diesel::sql_types::{Integer, SmallInt};
-use diesel::QueryDsl;
+use diesel::sql_types::Integer;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::{self, Filter};
@@ -41,37 +41,58 @@ pub fn what_routes(s: PgFilter) -> BoxedFilter<(ByteResponse,)> {
     list.or(one).unify().map(wrap).boxed()
 }
 
-pub fn get_all_fa(db: &PgConnection) -> Result<Vec<RefKey>, DbError> {
+pub async fn get_all_fa(
+    db: &mut AsyncPgConnection,
+) -> Result<Vec<RefKey>, DbError> {
     Ok(r::refkeys
         .filter(r::kind.eq(RefKey::FA_ID))
         .order((sql::<Integer>("cast(substr(slug, 1, 2) as int)"), r::slug))
-        .load::<IdRefKey>(db)?
+        .load::<IdRefKey>(db)
+        .await?
         .into_iter()
         .map(|rk| rk.refkey)
         .collect())
 }
 
 async fn list_refs(db: PgPool) -> Result<ByteResponse> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let all = r::refkeys
         .filter(r::kind.eq(RefKey::KEY_ID))
-        .left_join(er::episode_refkeys.left_join(e::episodes.left_join(
-            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
-        )))
         .select((
-            r::refkeys::all_columns(),
-            sql("count(distinct episodes.id)"),
-            sql::<SmallInt>("min(magic)").nullable(),
-            sql::<SmallInt>("max(magic)").nullable(),
+            IdRefKey::as_select(),
+            er::episode_refkeys
+                .select(er::episode_id)
+                .distinct()
+                .filter(er::refkey_id.eq(r::id))
+                .count()
+                .single_value(),
+            i::issues
+                .left_join(p::publications.left_join(
+                    ep::episode_parts.left_join(
+                        e::episodes.left_join(er::episode_refkeys),
+                    ),
+                ))
+                .select(min(i::magic))
+                .filter(er::refkey_id.eq(r::id))
+                .single_value(),
+            i::issues
+                .left_join(p::publications.left_join(
+                    ep::episode_parts.left_join(
+                        e::episodes.left_join(er::episode_refkeys),
+                    ),
+                ))
+                .select(max(i::magic))
+                .filter(er::refkey_id.eq(r::id))
+                .single_value(),
         ))
-        .group_by(r::refkeys::all_columns())
         .order(r::title)
-        .load::<(IdRefKey, i64, Option<i16>, Option<i16>)>(&db)?
+        .load::<(IdRefKey, Option<i64>, Option<i16>, Option<i16>)>(&mut db)
+        .await?
         .into_iter()
         .map(|(refkey, c, first, last)| {
             (
                 refkey.refkey,
-                c,
+                c.unwrap_or(0),
                 first.map(IssueRef::from_magic),
                 last.map(IssueRef::from_magic),
             )
@@ -93,11 +114,12 @@ async fn one_ref_impl(
     slug: String,
     kind: i16,
 ) -> Result<ByteResponse> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let refkey = r::refkeys
         .filter(r::kind.eq(kind))
         .filter(r::slug.eq(slug.clone()))
-        .first::<IdRefKey>(&db)
+        .first::<IdRefKey>(&mut db)
+        .await
         .optional()?;
     let Some(refkey) = refkey else {
         if kind == RefKey::FA_ID {
@@ -127,7 +149,7 @@ async fn one_ref_impl(
                 .filter(r::kind.eq(kind))
                 .filter(r::slug.eq(target.clone()))
                 .select(count_star())
-                .first::<i64>(&db)?;
+                .first::<i64>(&mut db).await?;
             if n == 1 {
                 return redirect(&format!(
                     "/{}/{}",
@@ -140,13 +162,14 @@ async fn one_ref_impl(
     };
 
     let raw_articles = a::articles
-        .select(a::articles::all_columns())
+        .select(Article::as_select())
         .left_join(ar::article_refkeys.left_join(r::refkeys))
         .filter(ar::refkey_id.eq(refkey.id))
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)?;
+        .load::<Article>(&mut db)
+        .await?;
 
     let mut articles = Vec::with_capacity(raw_articles.len());
     for article in raw_articles {
@@ -154,25 +177,33 @@ async fn one_ref_impl(
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)?;
-        articles.push((FullArticle::load(article, &db)?, published));
+            .load::<IssueRef>(&mut db)
+            .await?;
+        articles
+            .push((FullArticle::load(article, &mut db).await?, published));
     }
-
     let raw_episodes = e::episodes
-        .left_join(er::episode_refkeys)
         .inner_join(t::titles)
-        .filter(er::refkey_id.eq(refkey.id))
-        .select((t::titles::all_columns(), e::episodes::all_columns()))
-        .inner_join(
-            ep::episode_parts
-                .inner_join(p::publications.inner_join(i::issues)),
+        .filter(
+            e::id.eq_any(
+                er::episode_refkeys
+                    .select(er::episode_id)
+                    .filter(er::refkey_id.eq(refkey.id)),
+            ),
         )
-        .order(min(i::magic))
-        .group_by((t::titles::all_columns(), e::episodes::all_columns()))
-        .load::<(Title, Episode)>(&db)?;
+        .select((Title::as_select(), Episode::as_select()))
+        .order(
+            i::issues
+                .left_join(p::publications.left_join(ep::episode_parts))
+                .select(min(i::magic))
+                .filter(ep::episode_id.eq(e::id))
+                .single_value(),
+        )
+        .load(&mut db)
+        .await?;
     let mut episodes = Vec::with_capacity(raw_episodes.len());
     for (t, ep) in raw_episodes {
-        let e = FullEpisode::load_details(ep, &db)?;
+        let e = FullEpisode::load_details(ep, &mut db).await?;
         episodes.push((t, e));
     }
 

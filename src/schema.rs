@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     article_refkeys (id) {
         id -> Int4,
         article_id -> Int4,
@@ -6,25 +8,28 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     articles (id) {
         id -> Int4,
+        #[max_length = 200]
         title -> Varchar,
+        #[max_length = 500]
         subtitle -> Nullable<Varchar>,
         note -> Nullable<Text>,
     }
 }
 
-table! {
+diesel::table! {
     articles_by (id) {
         id -> Int4,
         article_id -> Int4,
         creator_alias_id -> Int4,
+        #[max_length = 10]
         role -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     covers (id) {
         id -> Int4,
         issue -> Int4,
@@ -33,7 +38,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     covers_by (id) {
         id -> Int4,
         issue_id -> Int4,
@@ -41,32 +46,36 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     creator_aliases (id) {
         id -> Int4,
         creator_id -> Int4,
+        #[max_length = 200]
         name -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     creators (id) {
         id -> Int4,
+        #[max_length = 200]
         name -> Varchar,
+        #[max_length = 200]
         slug -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     episode_parts (id) {
         id -> Int4,
         episode_id -> Int4,
         part_no -> Nullable<Int2>,
+        #[max_length = 200]
         part_name -> Nullable<Varchar>,
     }
 }
 
-table! {
+diesel::table! {
     episode_refkeys (id) {
         id -> Int4,
         episode_id -> Int4,
@@ -74,7 +83,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     episodes (id) {
         id -> Int4,
         title_id -> Int4,
@@ -93,20 +102,22 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     episodes_by (id) {
         id -> Int4,
         episode_id -> Int4,
         creator_alias_id -> Int4,
+        #[max_length = 10]
         role -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     issues (id) {
         id -> Int4,
         year -> Int2,
         number -> Int2,
+        #[max_length = 6]
         number_str -> Varchar,
         pages -> Nullable<Int2>,
         price -> Nullable<Int4>,
@@ -115,7 +126,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     other_mags (id) {
         id -> Int4,
         name -> Varchar,
@@ -125,7 +136,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     publications (id) {
         id -> Int4,
         issue_id -> Int4,
@@ -137,16 +148,17 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     refkeys (id) {
         id -> Int4,
         kind -> Int2,
         title -> Varchar,
+        #[max_length = 100]
         slug -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     titles (id) {
         id -> Int4,
         title -> Varchar,
@@ -154,26 +166,26 @@ table! {
     }
 }
 
-joinable!(article_refkeys -> articles (article_id));
-joinable!(article_refkeys -> refkeys (refkey_id));
-joinable!(articles_by -> articles (article_id));
-joinable!(articles_by -> creator_aliases (creator_alias_id));
-joinable!(covers -> issues (issue));
-joinable!(covers_by -> creator_aliases (creator_alias_id));
-joinable!(covers_by -> issues (issue_id));
-joinable!(creator_aliases -> creators (creator_id));
-joinable!(episode_parts -> episodes (episode_id));
-joinable!(episode_refkeys -> episodes (episode_id));
-joinable!(episode_refkeys -> refkeys (refkey_id));
-joinable!(episodes -> other_mags (orig_mag_id));
-joinable!(episodes -> titles (title_id));
-joinable!(episodes_by -> creator_aliases (creator_alias_id));
-joinable!(episodes_by -> episodes (episode_id));
-joinable!(publications -> articles (article_id));
-joinable!(publications -> episode_parts (episode_part));
-joinable!(publications -> issues (issue_id));
+diesel::joinable!(article_refkeys -> articles (article_id));
+diesel::joinable!(article_refkeys -> refkeys (refkey_id));
+diesel::joinable!(articles_by -> articles (article_id));
+diesel::joinable!(articles_by -> creator_aliases (creator_alias_id));
+diesel::joinable!(covers -> issues (issue));
+diesel::joinable!(covers_by -> creator_aliases (creator_alias_id));
+diesel::joinable!(covers_by -> issues (issue_id));
+diesel::joinable!(creator_aliases -> creators (creator_id));
+diesel::joinable!(episode_parts -> episodes (episode_id));
+diesel::joinable!(episode_refkeys -> episodes (episode_id));
+diesel::joinable!(episode_refkeys -> refkeys (refkey_id));
+diesel::joinable!(episodes -> other_mags (orig_mag_id));
+diesel::joinable!(episodes -> titles (title_id));
+diesel::joinable!(episodes_by -> creator_aliases (creator_alias_id));
+diesel::joinable!(episodes_by -> episodes (episode_id));
+diesel::joinable!(publications -> articles (article_id));
+diesel::joinable!(publications -> episode_parts (episode_part));
+diesel::joinable!(publications -> issues (issue_id));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     article_refkeys,
     articles,
     articles_by,

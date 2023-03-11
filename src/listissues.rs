@@ -2,11 +2,11 @@ use crate::models::Nr;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use anyhow::Result;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::collections::BTreeMap;
 
-pub fn list_issues(db: &PgConnection) -> Result<()> {
+pub async fn list_issues(db: &mut AsyncPgConnection) -> Result<()> {
     let mut all = BTreeMap::<i16, Vec<Nr>>::new();
     for (year, number) in i::issues
         .select((i::year, (i::number, i::number_str)))
@@ -14,7 +14,8 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
         .filter(p::seqno.is_not_null())
         .group_by((i::year, (i::number, i::number_str)))
         .order((i::year, i::number))
-        .load(db)?
+        .load(db)
+        .await?
     {
         all.entry(year).or_default().push(number);
     }
@@ -35,7 +36,7 @@ pub fn list_issues(db: &PgConnection) -> Result<()> {
         let mut iter = numbers.iter().peekable();
         while let Some(n) = iter.next() {
             let mut end = n;
-            while iter.peek().map(|n| n.first()) == Some(end.last() + 1) {
+            while iter.peek().map(|n| (*n).first()) == Some(end.last() + 1) {
                 end = iter.next().unwrap();
             }
             if end > n {
