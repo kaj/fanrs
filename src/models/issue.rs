@@ -107,7 +107,7 @@ impl Issue {
     }
     pub fn clear(&self, db: &PgConnection) -> Result<(), Error> {
         use crate::schema::publications::dsl as p;
-        diesel::delete(p::publications.filter(p::issue.eq(self.id)))
+        diesel::delete(p::publications.filter(p::issue_id.eq(self.id)))
             .execute(db)?;
         Ok(())
     }

@@ -44,12 +44,12 @@ fn load_summary(
         )
         .left_outer_join(a::articles)
         .select((
-            (t::slug, t::title, e::episode, (ep::part_no, ep::part_name))
+            (t::slug, t::title, e::name, (ep::part_no, ep::part_name))
                 .nullable(),
             (a::title, a::subtitle).nullable(),
             p::best_plac,
         ))
-        .filter(p::issue.eq(issue.id))
+        .filter(p::issue_id.eq(issue.id))
         .order(p::seqno)
         .load(db)?
         .into_iter()

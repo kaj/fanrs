@@ -119,7 +119,7 @@ fn register_issue(year: i16, i: Node, db: &PgConnection) -> Result<()> {
                         diesel::insert_into(cb::covers_by)
                             .values((
                                 cb::issue_id.eq(issue.id),
-                                cb::by_id.eq(creator.id),
+                                cb::creator_alias_id.eq(creator.id),
                             ))
                             .on_conflict_do_nothing()
                             .execute(db)?;
@@ -162,7 +162,7 @@ fn register_article(
                     diesel::insert_into(ab::articles_by)
                         .values((
                             ab::article_id.eq(article.id),
-                            ab::by_id.eq(by.id),
+                            ab::creator_alias_id.eq(by.id),
                             ab::role.eq(role),
                         ))
                         .on_conflict_do_nothing()
@@ -231,7 +231,7 @@ fn register_serie(
                     diesel::insert_into(eb::episodes_by)
                         .values((
                             eb::episode_id.eq(episode.id),
-                            eb::by_id.eq(by.id),
+                            eb::creator_alias_id.eq(by.id),
                             eb::role.eq(role),
                         ))
                         .on_conflict_do_nothing()
@@ -269,7 +269,7 @@ fn register_serie(
                             db,
                         )?;
                         diesel::update(e::episodes)
-                            .set(e::orig_mag.eq(om.id))
+                            .set(e::orig_mag_id.eq(om.id))
                             .filter(e::id.eq(episode.id))
                             .execute(db)?;
                     }
@@ -511,39 +511,35 @@ fn delete_unpublished(db: &PgConnection) -> Result<()> {
 
     do_clear("junk episode refkeys", || {
         diesel::delete(er::episode_refkeys.filter(er::episode_id.eq(any(
-            e::episodes.select(e::id).filter(
-                e::id.ne(all(
-                    ep::episode_parts.select(ep::episode).distinct(),
-                )),
-            ),
+            e::episodes.select(e::id).filter(e::id.ne(all(
+                ep::episode_parts.select(ep::episode_id).distinct(),
+            ))),
         ))))
         .execute(db)
     })?;
 
     do_clear("junk episodes-by", || {
         diesel::delete(eb::episodes_by.filter(eb::episode_id.eq(any(
-            e::episodes.select(e::id).filter(
-                e::id.ne(all(
-                    ep::episode_parts.select(ep::episode).distinct(),
-                )),
-            ),
+            e::episodes.select(e::id).filter(e::id.ne(all(
+                ep::episode_parts.select(ep::episode_id).distinct(),
+            ))),
         ))))
         .execute(db)
     })?;
 
     do_clear("junk episodes", || {
-        diesel::delete(e::episodes.filter(
-            e::id.ne(all(ep::episode_parts.select(ep::episode).distinct())),
-        ))
+        diesel::delete(
+            e::episodes.filter(e::id.ne(all(
+                ep::episode_parts.select(ep::episode_id).distinct(),
+            ))),
+        )
         .execute(db)
     })?;
 
     do_clear("junk titles", || {
-        diesel::delete(
-            t::titles.filter(
-                t::id.ne(all(e::episodes.select(e::title).distinct())),
-            ),
-        )
+        diesel::delete(t::titles.filter(
+            t::id.ne(all(e::episodes.select(e::title_id).distinct())),
+        ))
         .execute(db)
     })?;
 

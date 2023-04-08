@@ -45,8 +45,8 @@ impl Part {
         let mut existing = p::publications
             .select(count_star())
             .left_join(ep::episode_parts)
-            .filter(ep::episode.eq(episode.id))
-            .filter(p::issue.eq(issue.id))
+            .filter(ep::episode_id.eq(episode.id))
+            .filter(p::issue_id.eq(issue.id))
             .into_boxed();
         if part.is_part() {
             existing = existing
@@ -60,7 +60,7 @@ impl Part {
         }
         let part_id = Self::g_o_c_part_id(episode.id, part, db)?;
         if let Some((id, old_seqno, old_label)) = p::publications
-            .filter(p::issue.eq(issue.id))
+            .filter(p::issue_id.eq(issue.id))
             .filter(p::episode_part.eq(part_id))
             .select((p::id, p::seqno, p::label))
             .first::<(i32, Option<i16>, String)>(db)
@@ -83,7 +83,7 @@ impl Part {
         } else {
             diesel::insert_into(p::publications)
                 .values((
-                    p::issue.eq(issue.id),
+                    p::issue_id.eq(issue.id),
                     p::episode_part.eq(part_id),
                     p::seqno.eq(seqno),
                     p::best_plac.eq(best_plac),
@@ -101,14 +101,14 @@ impl Part {
         let existing = p::publications
             .select(count_star())
             .left_join(ep::episode_parts)
-            .filter(ep::episode.eq(episode.id))
-            .filter(p::issue.eq(issue.id));
+            .filter(ep::episode_id.eq(episode.id))
+            .filter(p::issue_id.eq(issue.id));
         if existing.first::<i64>(db)? > 0 {
             return Ok(());
         }
         let part_id = Self::g_o_c_part_id(episode.id, &Part::none(), db)?;
         diesel::insert_into(p::publications)
-            .values((p::issue.eq(issue.id), p::episode_part.eq(part_id)))
+            .values((p::issue_id.eq(issue.id), p::episode_part.eq(part_id)))
             .execute(db)?;
         Ok(())
     }
@@ -120,7 +120,7 @@ impl Part {
     ) -> Result<i32, Error> {
         if let Some(part_id) = ep::episode_parts
             .select(ep::id)
-            .filter(ep::episode.eq(episode_id))
+            .filter(ep::episode_id.eq(episode_id))
             .filter(ep::part_no.is_not_distinct_from(part.no))
             .filter(ep::part_name.is_not_distinct_from(part.name()))
             .first::<i32>(db)
@@ -130,7 +130,7 @@ impl Part {
         } else {
             Ok(diesel::insert_into(ep::episode_parts)
                 .values((
-                    ep::episode.eq(episode_id),
+                    ep::episode_id.eq(episode_id),
                     ep::part_no.eq(part.no),
                     ep::part_name.eq(part.name()),
                 ))

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
 * Some clippy-suggested cleanups.
 

@@ -37,16 +37,16 @@ impl Episode {
     ) -> Result<Episode, Error> {
         use crate::schema::episodes::dsl;
         dsl::episodes
-            .filter(dsl::title.eq(title.id))
-            .filter(dsl::episode.eq(name))
+            .filter(dsl::title_id.eq(title.id))
+            .filter(dsl::name.eq(name))
             .first::<Episode>(db)
             .optional()?
             .map(|episode| episode.set_details(teaser, note, copyright, db))
             .unwrap_or_else(|| {
                 diesel::insert_into(dsl::episodes)
                     .values((
-                        dsl::title.eq(title.id),
-                        dsl::episode.eq(name),
+                        dsl::title_id.eq(title.id),
+                        dsl::name.eq(name),
                         dsl::teaser.eq(teaser),
                         dsl::note.eq(note),
                         dsl::copyright.eq(copyright),

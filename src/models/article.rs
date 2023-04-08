@@ -48,7 +48,7 @@ impl Article {
         db: &PgConnection,
     ) -> Result<(), Error> {
         if let Some((id, old_seqno)) = p::publications
-            .filter(p::issue.eq(issue))
+            .filter(p::issue_id.eq(issue))
             .filter(p::article_id.eq(self.id))
             .select((p::id, p::seqno))
             .first::<(i32, Option<i16>)>(db)
@@ -66,7 +66,7 @@ impl Article {
         } else {
             diesel::insert_into(p::publications)
                 .values((
-                    p::issue.eq(issue),
+                    p::issue_id.eq(issue),
                     p::article_id.eq(self.id),
                     p::seqno.eq(seqno),
                 ))

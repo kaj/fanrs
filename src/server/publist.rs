@@ -41,7 +41,7 @@ impl PartsPublished {
                     (ep::part_no, ep::part_name),
                     p::best_plac,
                 ))
-                .filter(ep::episode.eq(episode))
+                .filter(ep::episode_id.eq(episode))
                 .order((i::year, i::number))
                 .load::<PartInIssue>(db)?,
             others: false,
@@ -61,7 +61,7 @@ impl PartsPublished {
                     (ep::part_no, ep::part_name),
                     p::best_plac,
                 ))
-                .filter(ep::episode.eq(episode.id))
+                .filter(ep::episode_id.eq(episode.id))
                 .filter(i::id.ne(issue.id))
                 .order((i::year, i::number))
                 .load::<PartInIssue>(db)?,
@@ -126,7 +126,7 @@ impl OtherContribs {
         creator: &Creator,
         db: &PgConnection,
     ) -> Result<OtherContribs, DbError> {
-        let oe_columns = (t::titles::all_columns(), e::id, e::episode);
+        let oe_columns = (t::titles::all_columns(), e::id, e::name);
         let other_episodes = e::episodes
             .inner_join(eb::episodes_by.inner_join(ca::creator_aliases))
             .inner_join(t::titles)

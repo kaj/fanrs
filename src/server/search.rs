@@ -198,7 +198,7 @@ impl SearchQuery {
             creators = creators.filter(ca::name.ilike(word));
             refkeys = refkeys.filter(r::title.ilike(word));
             episodes = episodes.filter(
-                e::episode
+                e::name
                     .ilike(word)
                     .or(e::orig_episode.ilike(word))
                     .or(e::teaser.ilike(word))
@@ -216,17 +216,17 @@ impl SearchQuery {
         for title in &self.t {
             creators = creators.filter(
                 ca::id.eq(any(eb::episodes_by
-                    .select(eb::by_id)
+                    .select(eb::creator_alias_id)
                     .inner_join(e::episodes)
-                    .filter(e::title.eq(title.id)))),
+                    .filter(e::title_id.eq(title.id)))),
             );
             refkeys = refkeys.filter(
                 r::id.eq(any(er::episode_refkeys
                     .select(er::refkey_id)
                     .inner_join(e::episodes)
-                    .filter(e::title.eq(title.id)))),
+                    .filter(e::title_id.eq(title.id)))),
             );
-            episodes = episodes.filter(e::title.eq(title.id));
+            episodes = episodes.filter(e::title_id.eq(title.id));
             articles = articles.filter(
                 a::id.eq(any(ar::article_refkeys
                     .select(ar::article_id)
@@ -238,7 +238,7 @@ impl SearchQuery {
         for creator in &self.p {
             titles = titles.filter(
                 t::id.eq(any(e::episodes
-                    .select(e::title)
+                    .select(e::title_id)
                     .inner_join(
                         eb::episodes_by.inner_join(ca::creator_aliases),
                     )
@@ -284,13 +284,13 @@ impl SearchQuery {
         for key in &self.k {
             titles = titles.filter(
                 t::id.eq(any(e::episodes
-                    .select(e::title)
+                    .select(e::title_id)
                     .inner_join(er::episode_refkeys)
                     .filter(er::refkey_id.eq(key.id)))),
             );
             creators = creators.filter(
                 ca::id.eq(any(eb::episodes_by
-                    .select(eb::by_id)
+                    .select(eb::creator_alias_id)
                     .inner_join(e::episodes.inner_join(er::episode_refkeys))
                     .filter(er::refkey_id.eq(key.id)))),
             );

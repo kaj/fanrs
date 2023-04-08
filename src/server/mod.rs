@@ -447,7 +447,7 @@ impl IssueDetails {
                 p::best_plac,
                 p::label,
             ))
-            .filter(p::issue.eq(issue.id))
+            .filter(p::issue_id.eq(issue.id))
             .order(p::seqno)
             .load::<(
                 Option<(Title, Episode, Part)>,

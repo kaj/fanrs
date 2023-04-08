@@ -106,7 +106,7 @@ async fn one_title(
     }
 
     let episodes = e::episodes
-        .filter(e::title.eq(title.id))
+        .filter(e::title_id.eq(title.id))
         .select(e::episodes::all_columns())
         .inner_join(
             ep::episode_parts
