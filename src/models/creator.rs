@@ -4,6 +4,7 @@ use crate::schema::creators::dsl as c;
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use slug::slugify;
 use std::cmp::Ordering;
 use std::io::{self, Write};
@@ -19,15 +20,16 @@ pub struct Creator {
 
 impl Creator {
     /// The id and name here is for an alias.
-    pub fn get_or_create(
+    pub async fn get_or_create(
         name: &str,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Creator, Error> {
         if let Some(t) = c::creators
             .inner_join(ca::creator_aliases)
             .select((ca::id, ca::name, c::slug))
             .filter(ca::name.eq(name))
             .first(db)
+            .await
             .optional()?
         {
             Ok(t)
@@ -35,36 +37,40 @@ impl Creator {
             let slug = slugify(name);
             let mut creator: Creator = diesel::insert_into(c::creators)
                 .values((c::name.eq(name), c::slug.eq(slug)))
-                .get_result(db)?;
+                .get_result(db)
+                .await?;
             creator.id = diesel::insert_into(ca::creator_aliases)
                 .values((ca::creator_id.eq(creator.id), ca::name.eq(name)))
                 .returning(ca::id)
-                .get_result(db)?;
+                .get_result(db)
+                .await?;
             Ok(creator)
         }
     }
 
     /// The id and name here is for the actual creator.
-    pub fn from_slug(
+    pub async fn from_slug(
         slug: &str,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Creator, Error> {
         c::creators
             .select((c::id, c::name, c::slug))
             .filter(c::slug.eq(slug))
             .first(db)
+            .await
     }
 
-    pub fn cloud(
+    pub async fn cloud(
         num: i64,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Cloud<Creator>, Error> {
         use crate::models::creator_contributions::creator_contributions::dsl as cc;
         let creators = cc::creator_contributions
             .select(((cc::id, cc::name, cc::slug), cc::score))
             .order_by(cc::score.desc())
             .limit(num)
-            .load(db)?;
+            .load(db)
+            .await?;
         Ok(Cloud::from_ordered(creators))
     }
 }

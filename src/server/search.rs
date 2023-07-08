@@ -4,6 +4,7 @@ use crate::models::{
 };
 use crate::schema::article_refkeys::dsl as ar;
 use crate::schema::articles::dsl as a;
+use crate::schema::articles_by::dsl as ab;
 use crate::schema::creator_aliases::dsl as ca;
 use crate::schema::creators::dsl as c;
 use crate::schema::episode_parts::dsl as ep;
@@ -15,10 +16,11 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{search_html, RenderRucte};
-use diesel::dsl::{any, max, sql};
+use diesel::dsl::{max, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Text;
 use diesel::PgTextExpressionMethods;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use warp::http::Response;
 use warp::reply::json;
@@ -29,9 +31,10 @@ pub async fn search(
     query: Vec<(String, String)>,
     db: PgPool,
 ) -> Result<impl Reply> {
-    let db = db.get().await?;
-    let query = SearchQuery::load(query, &db)?;
-    let (titles, creators, refkeys, episodes) = query.do_search(&db)?;
+    let mut db = db.get().await?;
+    let query = SearchQuery::load(query, &mut db).await?;
+    let (titles, creators, refkeys, episodes) =
+        query.do_search(&mut db).await?;
     Ok(Response::builder().html(|o| {
         search_html(o, &query, &titles, &creators, &refkeys, &episodes)
     })?)
@@ -41,14 +44,15 @@ pub async fn search_autocomplete(
     query: AcQuery,
     db: PgPool,
 ) -> Result<impl Reply> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let q = format!("%{}%", query.q);
     let mut titles = t::titles
         .select((t::title, t::slug))
         .filter(t::title.ilike(q.clone()))
         .order_by(t::title)
         .limit(8)
-        .load::<(String, String)>(&db)?
+        .load::<(String, String)>(&mut db)
+        .await?
         .into_iter()
         .map(|(t, s)| Completion::title(t, s))
         .collect::<Vec<_>>();
@@ -60,7 +64,8 @@ pub async fn search_autocomplete(
             .group_by(c::slug)
             .order(sql::<Text>("min(creator_aliases.name)"))
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load::<(String, String)>(&db)?
+            .load::<(String, String)>(&mut db)
+            .await?
             .into_iter()
             .map(|(t, s)| Completion::creator(t, s))
             .collect(),
@@ -69,10 +74,11 @@ pub async fn search_autocomplete(
         &mut r::refkeys
             .select((r::kind, r::title, r::slug))
             .filter(r::title.ilike(q))
-            .filter(r::kind.eq(any([RefKey::FA_ID, RefKey::KEY_ID].as_ref())))
+            .filter(r::kind.eq_any([RefKey::FA_ID, RefKey::KEY_ID].as_ref()))
             .order(r::title)
             .limit(std::cmp::max(2, 8 - titles.len() as i64))
-            .load::<(i16, String, String)>(&db)?
+            .load::<(i16, String, String)>(&mut db)
+            .await?
             .into_iter()
             .map(|(k, t, s)| Completion::refkey(k, t, s))
             .collect(),
@@ -125,18 +131,18 @@ impl SearchQuery {
             k: vec![],
         }
     }
-    fn load(
+    async fn load(
         query: Vec<(String, String)>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Self, diesel::result::Error> {
         let mut result = SearchQuery::empty();
         for (key, val) in query {
             match key.as_ref() {
                 "q" => result.q = val,
-                "t" => result.t.push(Title::from_slug(val, db)?),
-                "p" => result.p.push(Creator::from_slug(&val, db)?),
-                "k" => result.k.push(IdRefKey::key_from_slug(val, db)?),
-                "f" => result.k.push(IdRefKey::fa_from_slug(val, db)?),
+                "t" => result.t.push(Title::from_slug(val, db).await?),
+                "p" => result.p.push(Creator::from_slug(&val, db).await?),
+                "k" => result.k.push(IdRefKey::key_from_slug(val, db).await?),
+                "f" => result.k.push(IdRefKey::fa_from_slug(val, db).await?),
                 _ => (), // ignore unknown query parameters
             }
         }
@@ -148,9 +154,9 @@ impl SearchQuery {
             && self.p.is_empty()
             && self.k.is_empty()
     }
-    fn do_search(
+    async fn do_search(
         &self,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<
         (Vec<Title>, Vec<Creator>, Vec<RefKey>, Vec<Hit>),
         diesel::result::Error,
@@ -181,17 +187,11 @@ impl SearchQuery {
 
         let mut episodes = e::episodes
             .inner_join(t::titles)
-            .select((t::titles::all_columns(), e::episodes::all_columns()))
-            .inner_join(
-                ep::episode_parts
-                    .inner_join(p::publications.inner_join(i::issues)),
-            )
+            .select((Title::as_select(), Episode::as_select()))
             .into_boxed();
 
-        let mut articles = a::articles
-            .select(a::articles::all_columns())
-            .inner_join(p::publications.inner_join(i::issues))
-            .into_boxed();
+        let mut articles =
+            a::articles.select(Article::as_select()).into_boxed();
 
         for word in &sql_words {
             titles = titles.filter(t::title.ilike(word));
@@ -215,108 +215,116 @@ impl SearchQuery {
 
         for title in &self.t {
             creators = creators.filter(
-                ca::id.eq(any(eb::episodes_by
-                    .select(eb::creator_alias_id)
-                    .inner_join(e::episodes)
-                    .filter(e::title_id.eq(title.id)))),
+                ca::id.eq_any(
+                    eb::episodes_by
+                        .select(eb::creator_alias_id)
+                        .inner_join(e::episodes)
+                        .filter(e::title_id.eq(title.id)),
+                ),
             );
             refkeys = refkeys.filter(
-                r::id.eq(any(er::episode_refkeys
-                    .select(er::refkey_id)
-                    .inner_join(e::episodes)
-                    .filter(e::title_id.eq(title.id)))),
+                r::id.eq_any(
+                    er::episode_refkeys
+                        .select(er::refkey_id)
+                        .inner_join(e::episodes)
+                        .filter(e::title_id.eq(title.id)),
+                ),
             );
             episodes = episodes.filter(e::title_id.eq(title.id));
             articles = articles.filter(
-                a::id.eq(any(ar::article_refkeys
-                    .select(ar::article_id)
-                    .inner_join(r::refkeys)
-                    .filter(r::kind.eq(RefKey::TITLE_ID))
-                    .filter(r::slug.eq(&title.slug)))),
+                a::id.eq_any(
+                    ar::article_refkeys
+                        .select(ar::article_id)
+                        .inner_join(r::refkeys)
+                        .filter(r::kind.eq(RefKey::TITLE_ID))
+                        .filter(r::slug.eq(&title.slug)),
+                ),
             );
         }
         for creator in &self.p {
             titles = titles.filter(
-                t::id.eq(any(e::episodes
-                    .select(e::title_id)
-                    .inner_join(
-                        eb::episodes_by.inner_join(ca::creator_aliases),
-                    )
-                    .filter(ca::creator_id.eq(creator.id)))),
+                t::id.eq_any(
+                    e::episodes
+                        .select(e::title_id)
+                        .inner_join(
+                            eb::episodes_by.inner_join(ca::creator_aliases),
+                        )
+                        .filter(ca::creator_id.eq(creator.id)),
+                ),
             );
             refkeys = refkeys.filter(
-                r::id.eq(any(er::episode_refkeys
-                    .select(er::refkey_id)
-                    .inner_join(e::episodes.inner_join(
-                        eb::episodes_by.inner_join(ca::creator_aliases),
-                    ))
-                    .filter(ca::creator_id.eq(creator.id)))),
+                r::id.eq_any(
+                    er::episode_refkeys
+                        .select(er::refkey_id)
+                        .inner_join(e::episodes.inner_join(
+                            eb::episodes_by.inner_join(ca::creator_aliases),
+                        ))
+                        .filter(ca::creator_id.eq(creator.id)),
+                ),
             );
             episodes = episodes.filter(
-                e::id.eq(any(eb::episodes_by
-                    .select(eb::episode_id)
-                    .inner_join(ca::creator_aliases)
-                    .filter(ca::creator_id.eq(creator.id)))),
+                e::id.eq_any(
+                    eb::episodes_by
+                        .select(eb::episode_id)
+                        .inner_join(ca::creator_aliases)
+                        .filter(ca::creator_id.eq(creator.id)),
+                ),
             );
-            articles = articles.filter(a::id.eq(any(
-                // Can this be done as a union in diesel?
-                sql(&format!(
-                    "select article_id from articles_by \
-                     inner join creator_aliases ca on by_id=ca.id \
-                     where ca.creator_id={} \
-                     union \
-                     select article_id from article_refkeys ar \
-                     inner join refkeys r on r.id = ar.refkey_id \
-                     where slug='{}'",
-                    creator.id, creator.slug
-                )),
-                // ab::articles_by
-                //     .select(ab::article_id)
-                //     .inner_join(ca::creator_aliases)
-                //     .filter(ca::creator_id.eq(creator.id)),
-                // **union**
-                // ar::article_refkeys
-                //     .select(ar::article_id)
-                //     .inner_join(r::refkeys)
-                //     .filter(r::slug.eq(&creator.slug)),
-            )));
+            articles = articles.filter({
+                let by = ab::articles_by
+                    .select(ab::article_id)
+                    .inner_join(ca::creator_aliases)
+                    .filter(ca::creator_id.eq(creator.id));
+                let refs = ar::article_refkeys
+                    .select(ar::article_id)
+                    .inner_join(r::refkeys)
+                    .filter(r::slug.eq(&creator.slug));
+                a::id.eq_any(by).or(a::id.eq_any(refs))
+            });
         }
         for key in &self.k {
             titles = titles.filter(
-                t::id.eq(any(e::episodes
-                    .select(e::title_id)
-                    .inner_join(er::episode_refkeys)
-                    .filter(er::refkey_id.eq(key.id)))),
+                t::id.eq_any(
+                    e::episodes
+                        .select(e::title_id)
+                        .inner_join(er::episode_refkeys)
+                        .filter(er::refkey_id.eq(key.id)),
+                ),
             );
             creators = creators.filter(
-                ca::id.eq(any(eb::episodes_by
-                    .select(eb::creator_alias_id)
-                    .inner_join(e::episodes.inner_join(er::episode_refkeys))
-                    .filter(er::refkey_id.eq(key.id)))),
+                ca::id.eq_any(
+                    eb::episodes_by
+                        .select(eb::creator_alias_id)
+                        .inner_join(
+                            e::episodes.inner_join(er::episode_refkeys),
+                        )
+                        .filter(er::refkey_id.eq(key.id)),
+                ),
             );
             episodes = episodes.filter(
-                e::id.eq(any(er::episode_refkeys
-                    .select(er::episode_id)
-                    .filter(er::refkey_id.eq(key.id)))),
+                e::id.eq_any(
+                    er::episode_refkeys
+                        .select(er::episode_id)
+                        .filter(er::refkey_id.eq(key.id)),
+                ),
             );
             articles = articles.filter(
-                a::id.eq(any(ar::article_refkeys
-                    .select(ar::article_id)
-                    .filter(ar::refkey_id.eq(key.id)))),
+                a::id.eq_any(
+                    ar::article_refkeys
+                        .select(ar::article_id)
+                        .filter(ar::refkey_id.eq(key.id)),
+                ),
             );
         }
 
         let creators = if self.q.is_empty() {
             vec![]
         } else {
-            creators
-                .group_by(c::creators::all_columns())
-                .limit(max_hits)
-                .load(db)?
+            creators.limit(max_hits).load(db).await?
         };
 
         let titles = if self.t.is_empty() && !self.q.is_empty() {
-            titles.limit(max_hits).load::<Title>(db)?
+            titles.limit(max_hits).load::<Title>(db).await?
         } else {
             vec![]
         };
@@ -324,32 +332,47 @@ impl SearchQuery {
         let refkeys = if self.q.is_empty() {
             vec![]
         } else {
-            refkeys.limit(max_hits).load(db)?
+            refkeys.limit(max_hits).load(db).await?
         };
 
-        let mut episodes = episodes
-            .order(max(i::magic).desc())
-            .group_by((t::titles::all_columns(), e::episodes::all_columns()))
+        let episodes = episodes
+            .order(
+                i::issues
+                    .left_join(p::publications.left_join(ep::episode_parts))
+                    .select(max(i::magic))
+                    .filter(ep::episode_id.eq(e::id))
+                    .single_value()
+                    .desc(),
+            )
             .limit(max_hits)
-            .load::<(Title, Episode)>(db)?
-            .into_iter()
-            .map(|(title, ep)| Hit::episode(title, ep, db))
-            .collect::<Result<Vec<_>, _>>()?;
+            .load::<(Title, Episode)>(db)
+            .await?;
 
         let articles = articles
-            .order(max(i::magic).desc())
-            .group_by(a::articles::all_columns())
+            .order(
+                i::issues
+                    .left_join(p::publications)
+                    .select(max(i::magic))
+                    .filter(a::id.nullable().eq(p::article_id))
+                    .single_value()
+                    .desc()
+                    .nulls_last(),
+            )
             .limit(max_hits)
-            .load(db)?
-            .into_iter()
-            .map(|article| Hit::article(article, db))
-            .collect::<Result<Vec<_>, diesel::result::Error>>()?;
+            .load(db)
+            .await?;
 
-        episodes.extend(articles.into_iter());
-        episodes.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
-        episodes.truncate(max_hits as usize);
+        let mut hits = Vec::with_capacity(episodes.len() + articles.len());
+        for (title, ep) in episodes {
+            hits.push(Hit::episode(title, ep, db).await?);
+        }
+        for article in articles {
+            hits.push(Hit::article(article, db).await?);
+        }
+        hits.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
+        hits.truncate(max_hits as usize);
 
-        Ok((titles, creators, refkeys, episodes))
+        Ok((titles, creators, refkeys, hits))
     }
 }
 
@@ -366,26 +389,28 @@ pub enum Hit {
 }
 
 impl Hit {
-    fn episode(
+    async fn episode(
         title: Title,
         episode: Episode,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Hit, diesel::result::Error> {
         FullEpisode::load_details(episode, db)
+            .await
             .map(|fe| Hit::Episode { title, fe })
     }
 
-    fn article(
+    async fn article(
         article: Article,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Hit, diesel::result::Error> {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(db)?;
+            .load::<IssueRef>(db)
+            .await?;
         Ok(Hit::Article {
-            article: FullArticle::load(article, db)?,
+            article: FullArticle::load(article, db).await?,
             published,
         })
     }

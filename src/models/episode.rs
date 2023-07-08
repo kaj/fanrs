@@ -1,18 +1,19 @@
 use super::{OtherMag, RefKey, Title};
+use crate::schema::episodes;
 use crate::templates::ToHtml;
 use chrono::{Datelike, NaiveDate};
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::fmt;
 use std::io::{self, Write};
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Identifiable, Queryable, Selectable)]
 pub struct Episode {
     pub id: i32,
     #[allow(unused)]
     title_id: i32,
-    pub episode: Option<String>,
+    pub name: Option<String>,
     pub teaser: Option<String>,
     pub note: Option<String>,
     pub copyright: Option<String>,
@@ -20,29 +21,34 @@ pub struct Episode {
     orig_episode: Option<String>,
     orig_date: Option<NaiveDate>,
     orig_to_date: Option<NaiveDate>,
-    sun: bool,
+    orig_sundays: bool,
     orig_mag_id: Option<i32>,
     strip_from: Option<i32>,
     strip_to: Option<i32>,
 }
 
 impl Episode {
-    pub fn get_or_create(
+    pub async fn get_or_create(
         title: &Title,
         name: Option<&str>,
         teaser: Option<&str>,
         note: Option<&str>,
         copyright: Option<&str>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Episode, Error> {
         use crate::schema::episodes::dsl;
-        dsl::episodes
+        match dsl::episodes
+            .select(Episode::as_select())
             .filter(dsl::title_id.eq(title.id))
             .filter(dsl::name.eq(name))
             .first::<Episode>(db)
+            .await
             .optional()?
-            .map(|episode| episode.set_details(teaser, note, copyright, db))
-            .unwrap_or_else(|| {
+        {
+            Some(episode) => {
+                episode.set_details(teaser, note, copyright, db).await
+            }
+            None => {
                 diesel::insert_into(dsl::episodes)
                     .values((
                         dsl::title_id.eq(title.id),
@@ -52,60 +58,73 @@ impl Episode {
                         dsl::copyright.eq(copyright),
                     ))
                     .get_result(db)
-            })
+                    .await
+            }
+        }
     }
-    fn set_details(
+    async fn set_details(
         self,
         teaser: Option<&str>,
         note: Option<&str>,
         copyright: Option<&str>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Episode, Error> {
         use crate::schema::episodes::dsl;
         let q = diesel::update(dsl::episodes.filter(dsl::id.eq(self.id)));
         match (teaser, note, copyright) {
-            (Some(teaser), Some(note), Some(copyright)) => q
-                .set((
+            (Some(teaser), Some(note), Some(copyright)) => {
+                q.set((
                     dsl::teaser.eq(teaser),
                     dsl::note.eq(note),
                     dsl::copyright.eq(copyright),
                 ))
-                .get_result(db),
-            (Some(teaser), Some(note), None) => q
-                .set((dsl::teaser.eq(teaser), dsl::note.eq(note)))
-                .get_result(db),
-            (Some(teaser), None, Some(copyright)) => q
-                .set((dsl::teaser.eq(teaser), dsl::copyright.eq(copyright)))
-                .get_result(db),
-            (Some(teaser), None, None) => {
-                q.set(dsl::teaser.eq(teaser)).get_result(db)
+                .get_result(db)
+                .await
             }
-            (None, Some(note), Some(copyright)) => q
-                .set((dsl::note.eq(note), dsl::copyright.eq(copyright)))
-                .get_result(db),
+            (Some(teaser), Some(note), None) => {
+                q.set((dsl::teaser.eq(teaser), dsl::note.eq(note)))
+                    .get_result(db)
+                    .await
+            }
+            (Some(teaser), None, Some(copyright)) => {
+                q.set((dsl::teaser.eq(teaser), dsl::copyright.eq(copyright)))
+                    .get_result(db)
+                    .await
+            }
+            (Some(teaser), None, None) => {
+                q.set(dsl::teaser.eq(teaser)).get_result(db).await
+            }
+            (None, Some(note), Some(copyright)) => {
+                q.set((dsl::note.eq(note), dsl::copyright.eq(copyright)))
+                    .get_result(db)
+                    .await
+            }
             (None, Some(note), None) => {
-                q.set(dsl::note.eq(note)).get_result(db)
+                q.set(dsl::note.eq(note)).get_result(db).await
             }
             (None, None, Some(copyright)) => {
-                q.set(dsl::copyright.eq(copyright)).get_result(db)
+                q.set(dsl::copyright.eq(copyright)).get_result(db).await
             }
             (None, None, None) => Ok(self),
         }
     }
 
-    pub fn set_refs(
+    pub async fn set_refs(
         &self,
         refs: &[RefKey],
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         use crate::schema::episode_refkeys::dsl as er;
+        let mut values = Vec::with_capacity(refs.len());
         for r in refs {
-            let id = r.get_or_create_id(db)?;
-            diesel::insert_into(er::episode_refkeys)
-                .values((er::episode_id.eq(self.id), er::refkey_id.eq(id)))
-                .on_conflict_do_nothing()
-                .execute(db)?;
+            let id = r.get_or_create_id(db).await?;
+            values.push((er::episode_id.eq(self.id), er::refkey_id.eq(id)))
         }
+        diesel::insert_into(er::episode_refkeys)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(db)
+            .await?;
         Ok(())
     }
 
@@ -123,7 +142,7 @@ impl Episode {
         self.orig_date.map(|date| OrigDates {
             from: date,
             to: self.orig_to_date,
-            sun: self.sun,
+            sun: self.orig_sundays,
         })
     }
     pub fn strip_nrs(&self) -> Option<(i32, i32)> {
@@ -141,13 +160,15 @@ impl Episode {
             }
         }
     }
-    pub fn load_orig_mag(
+    pub async fn load_orig_mag(
         &self,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Option<OtherMag>, Error> {
-        self.orig_mag_id
-            .map(|id| OtherMag::get_by_id(id, db))
-            .transpose()
+        if let Some(id) = self.orig_mag_id {
+            Ok(Some(OtherMag::get_by_id(id, db).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

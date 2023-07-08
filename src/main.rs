@@ -1,6 +1,4 @@
 #![recursion_limit = "128"]
-#[macro_use]
-extern crate diesel;
 
 mod checkstrips;
 mod count_pages;
@@ -48,14 +46,15 @@ enum Fanrs {
 impl Fanrs {
     async fn run(self) -> Result<()> {
         match self {
-            Fanrs::ReadFiles(args) => args.run(),
-            Fanrs::ListIssues(db) => list_issues(&db.get_db()?),
-            Fanrs::RunServer(args) => {
-                args.run().await;
-                Ok(())
+            Fanrs::ReadFiles(args) => args.run().await,
+            Fanrs::ListIssues(db) => {
+                list_issues(&mut db.get_db().await?).await
             }
+            Fanrs::RunServer(args) => args.run().await,
             Fanrs::FetchCovers(args) => args.run().await,
-            Fanrs::CheckStrips(db) => check_strips(&db.get_db()?),
+            Fanrs::CheckStrips(db) => {
+                check_strips(&mut db.get_db().await?).await
+            }
             Fanrs::CountPages(args) => args.run(),
         }
     }

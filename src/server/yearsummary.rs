@@ -8,35 +8,35 @@ use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
 use crate::templates::{year_summary_html, RenderRucte, ToHtml};
 use diesel::prelude::*;
-use diesel::QueryDsl;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::io::{self, Write};
 use warp::http::response::Builder;
 use warp::{self, Reply};
 
 pub async fn year_summary(year: u16, db: PgPool) -> Result<impl Reply> {
-    let db = db.get().await?;
-    let issues: Vec<Issue> = i::issues
+    let mut db = db.get().await?;
+    let issues_in: Vec<Issue> = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load(&db)?;
-    if issues.is_empty() {
+        .load(&mut db)
+        .await?;
+    if issues_in.is_empty() {
         return Err(ViewError::NotFound);
     }
-    let issues = issues
-        .into_iter()
-        .map(|issue| load_summary(issue, &db))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let years = YearLinks::load(year, &db)?;
+    let mut issues = Vec::with_capacity(issues_in.len());
+    for issue in issues_in {
+        issues.push(load_summary(issue, &mut db).await?);
+    }
+    let years = YearLinks::load(year, &mut db).await?;
     Ok(Builder::new()
         .html(|o| year_summary_html(o, year, &years, &issues))?)
 }
 
-fn load_summary(
+async fn load_summary(
     issue: Issue,
-    db: &PgConnection,
+    db: &mut AsyncPgConnection,
 ) -> Result<(Issue, Vec<Creator>, Vec<ContentSummary>), DbError> {
-    let cover_by = super::cover_by(issue.id, db)?;
+    let cover_by = super::cover_by(issue.id, db).await?;
 
     let contents = p::publications
         .left_outer_join(
@@ -51,7 +51,8 @@ fn load_summary(
         ))
         .filter(p::issue_id.eq(issue.id))
         .order(p::seqno)
-        .load(db)?
+        .load(db)
+        .await?
         .into_iter()
         .map(|i| match i {
             (Some(c), None, plac) => ContentSummary::Comic(c, plac),

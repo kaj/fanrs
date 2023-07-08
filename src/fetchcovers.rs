@@ -4,9 +4,9 @@ use crate::schema::issues::dsl as i;
 use crate::DbOpt;
 use anyhow::{anyhow, Context, Result};
 use diesel::dsl::now;
-use diesel::pg::upsert::excluded;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::upsert::excluded;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use reqwest::{self, Client, Response};
 use scraper::{Html, Selector};
 use std::path::PathBuf;
@@ -40,14 +40,14 @@ enum SubCmd {
 
 impl Args {
     pub async fn run(self) -> Result<()> {
-        let db = self.db.get_db()?;
+        let db = self.db.get_db().await?;
         match self.subcmd {
             Some(SubCmd::LoadLocal(local)) => local.run(db).await,
             None => self.do_fetch(db).await,
         }
     }
 
-    async fn do_fetch(self, db: PgConnection) -> Result<()> {
+    async fn do_fetch(self, mut db: AsyncPgConnection) -> Result<()> {
         let mut client = WikiClient::new();
         let query = i::issues
             .select((i::id, i::year, i::number_str))
@@ -60,11 +60,14 @@ impl Args {
                 .order((i::year.desc(), i::number.desc()))
                 .into_boxed()
         };
-        for (id, year, number_str) in query.load::<(i32, i16, String)>(&db)? {
+        for (id, year, number_str) in
+            query.load::<(i32, i16, String)>(&mut db).await?
+        {
             if self.no_op {
                 println!("Would load cover {number_str:>2}/{year}.");
             } else {
-                load_cover(&mut client, &db, id, year, &number_str).await?;
+                load_cover(&mut client, &mut db, id, year, &number_str)
+                    .await?;
             }
         }
         Ok(())
@@ -81,7 +84,7 @@ struct LoadLocal {
 }
 
 impl LoadLocal {
-    async fn run(self, db: PgConnection) -> Result<()> {
+    async fn run(self, mut db: AsyncPgConnection) -> Result<()> {
         let data = read(self.path).await?;
         println!(
             "Got {} bytes for Fa {}/{}",
@@ -89,25 +92,25 @@ impl LoadLocal {
             self.issue.number,
             self.issue.year
         );
-        let id = self
-            .issue
-            .load_id(&db)
-            .with_context(|| format!("Failed to load {:?}", self.issue))?;
-        save_cover(id, &data, &db)?;
+        let id =
+            self.issue.load_id(&mut db).await.with_context(|| {
+                format!("Failed to load {:?}", self.issue)
+            })?;
+        save_cover(id, &data, &mut db).await?;
         Ok(())
     }
 }
 
 async fn load_cover(
     client: &mut WikiClient,
-    db: &PgConnection,
+    db: &mut AsyncPgConnection,
     id: i32,
     year: i16,
     number_str: &str,
 ) -> Result<()> {
     match client.fetchcover(year, number_str).await {
         Ok(imgdata) => {
-            save_cover(id, imgdata.as_ref(), db)?;
+            save_cover(id, imgdata.as_ref(), db).await?;
             eprintln!(
                 "Got {} bytes of image data for {}/{}",
                 imgdata.as_ref().len(),
@@ -122,7 +125,11 @@ async fn load_cover(
     Ok(())
 }
 
-fn save_cover(id: i32, imgdata: &[u8], db: &PgConnection) -> Result<()> {
+async fn save_cover(
+    id: i32,
+    imgdata: &[u8],
+    db: &mut AsyncPgConnection,
+) -> Result<()> {
     diesel::insert_into(c::covers)
         .values((
             c::issue.eq(id),
@@ -135,7 +142,8 @@ fn save_cover(id: i32, imgdata: &[u8], db: &PgConnection) -> Result<()> {
             c::image.eq(excluded(c::image)),
             c::fetch_time.eq(excluded(c::fetch_time)),
         ))
-        .execute(db)?;
+        .execute(db)
+        .await?;
     Ok(())
 }
 

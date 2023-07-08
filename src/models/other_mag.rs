@@ -1,6 +1,7 @@
 use crate::schema::other_mags::dsl as om;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 
 #[derive(Debug, Queryable, PartialOrd, Ord, PartialEq, Eq)]
 pub struct OtherMag {
@@ -12,16 +13,19 @@ pub struct OtherMag {
 }
 
 impl OtherMag {
-    pub fn get_by_id(id: i32, db: &PgConnection) -> Result<OtherMag, Error> {
-        om::other_mags.filter(om::id.eq(id)).first::<OtherMag>(db)
+    pub async fn get_by_id(
+        id: i32,
+        db: &mut AsyncPgConnection,
+    ) -> Result<OtherMag, Error> {
+        om::other_mags.filter(om::id.eq(id)).first(db).await
     }
 
-    pub fn get_or_create(
+    pub async fn get_or_create(
         name: String,
         issue: Option<i16>,
         i_of: Option<i16>,
         year: Option<i16>,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<OtherMag, Error> {
         if let Some(m) = om::other_mags
             .filter(om::name.eq(&name))
@@ -29,6 +33,7 @@ impl OtherMag {
             .filter(om::i_of.is_not_distinct_from(&i_of))
             .filter(om::year.is_not_distinct_from(&year))
             .first::<OtherMag>(db)
+            .await
             .optional()?
         {
             Ok(m)
@@ -41,6 +46,7 @@ impl OtherMag {
                     om::year.eq(year),
                 ))
                 .get_result(db)
+                .await
         }
     }
 }

@@ -3,9 +3,9 @@ use crate::schema::episode_parts::dsl as ep;
 use crate::schema::publications::dsl as p;
 use crate::templates::ToHtml;
 use diesel::dsl::count_star;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use log::warn;
 use std::io::{self, Write};
 
@@ -33,14 +33,14 @@ impl Part {
         self.name.as_deref()
     }
 
-    pub fn publish(
+    pub async fn publish(
         episode: &Episode,
         part: &Part,
         issue: &Issue,
         seqno: Option<i16>,
         best_plac: Option<i16>,
         label: &str,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let mut existing = p::publications
             .select(count_star())
@@ -53,17 +53,18 @@ impl Part {
                 .filter(ep::part_no.is_not_distinct_from(part.no))
                 .filter(ep::part_name.is_not_distinct_from(part.name()));
         }
-        match existing.first::<i64>(db)? {
+        match existing.first::<i64>(db).await? {
             0 => (),
             1 => return Ok(()),
             n => warn!("{} of {:?} in {}", n, episode, issue),
         }
-        let part_id = Self::g_o_c_part_id(episode.id, part, db)?;
+        let part_id = Self::g_o_c_part_id(episode.id, part, db).await?;
         if let Some((id, old_seqno, old_label)) = p::publications
             .filter(p::issue_id.eq(issue.id))
             .filter(p::episode_part.eq(part_id))
             .select((p::id, p::seqno, p::label))
             .first::<(i32, Option<i16>, String)>(db)
+            .await
             .optional()?
         {
             if seqno.is_some() && old_seqno != seqno {
@@ -78,7 +79,8 @@ impl Part {
                 diesel::update(p::publications)
                     .set(p::label.eq(label))
                     .filter(p::id.eq(id))
-                    .execute(db)?;
+                    .execute(db)
+                    .await?;
             }
         } else {
             diesel::insert_into(p::publications)
@@ -89,34 +91,37 @@ impl Part {
                     p::best_plac.eq(best_plac),
                     p::label.eq(label),
                 ))
-                .execute(db)?;
+                .execute(db)
+                .await?;
         }
         Ok(())
     }
-    pub fn prevpub(
+    pub async fn prevpub(
         episode: &Episode,
         issue: &Issue,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
         let existing = p::publications
             .select(count_star())
             .left_join(ep::episode_parts)
             .filter(ep::episode_id.eq(episode.id))
             .filter(p::issue_id.eq(issue.id));
-        if existing.first::<i64>(db)? > 0 {
+        if existing.first::<i64>(db).await? > 0 {
             return Ok(());
         }
-        let part_id = Self::g_o_c_part_id(episode.id, &Part::none(), db)?;
+        let part_id =
+            Self::g_o_c_part_id(episode.id, &Part::none(), db).await?;
         diesel::insert_into(p::publications)
             .values((p::issue_id.eq(issue.id), p::episode_part.eq(part_id)))
-            .execute(db)?;
+            .execute(db)
+            .await?;
         Ok(())
     }
 
-    fn g_o_c_part_id(
+    async fn g_o_c_part_id(
         episode_id: i32,
         part: &Part,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<i32, Error> {
         if let Some(part_id) = ep::episode_parts
             .select(ep::id)
@@ -124,6 +129,7 @@ impl Part {
             .filter(ep::part_no.is_not_distinct_from(part.no))
             .filter(ep::part_name.is_not_distinct_from(part.name()))
             .first::<i32>(db)
+            .await
             .optional()?
         {
             Ok(part_id)
@@ -135,7 +141,8 @@ impl Part {
                     ep::part_name.eq(part.name()),
                 ))
                 .returning(ep::id)
-                .get_result(db)?)
+                .get_result(db)
+                .await?)
         }
     }
 }

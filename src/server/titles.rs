@@ -12,9 +12,9 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, title_html, titles_html};
-use diesel::dsl::{count_star, min, sql};
+use diesel::dsl::{count_star, max, min};
 use diesel::prelude::*;
-use diesel::sql_types::SmallInt;
+use diesel_async::RunQueryDsl;
 use serde::Deserialize;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
@@ -35,28 +35,28 @@ pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
 }
 
 async fn list_titles(db: PgPool) -> Result<Response> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let all = t::titles
-        .left_join(e::episodes.left_join(
-            ep::episode_parts.left_join(p::publications.left_join(i::issues)),
-        ))
+        .inner_join(
+            e::episodes.inner_join(
+                ep::episode_parts
+                    .inner_join(p::publications.inner_join(i::issues)),
+            ),
+        )
+        .group_by(t::titles::all_columns())
         .select((
             t::titles::all_columns(),
-            sql("count(distinct episodes.id)"),
-            sql::<SmallInt>("min(magic)"),
-            sql::<SmallInt>("max(magic)"),
+            count_star(),
+            min(i::magic),
+            max(i::magic),
         ))
-        .group_by(t::titles::all_columns())
         .order(t::title)
-        .load(&db)?
+        .load::<(_, _, Option<IssueRef>, Option<IssueRef>)>(&mut db)
+        .await?
         .into_iter()
         .map(|(title, c, first, last)| {
-            (
-                title,
-                c,
-                IssueRef::from_magic(first),
-                IssueRef::from_magic(last),
-            )
+            // Inner joins, so first/last will not be null.
+            (title, c, first.unwrap(), last.unwrap())
         })
         .collect::<Vec<_>>();
     Ok(Builder::new().html(|o| titles_html(o, &all))?)
@@ -72,7 +72,7 @@ async fn one_title(
     slug: String,
     page: PageParam,
 ) -> Result<Response> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let (slug, strip) = if let Some(strip) = slug.strip_prefix("weekdays-") {
         (strip.to_string(), Some(false))
     } else if let Some(strip) = slug.strip_prefix("sundays-") {
@@ -82,7 +82,8 @@ async fn one_title(
     };
     let title = t::titles
         .filter(t::slug.eq(slug))
-        .first::<Title>(&db)
+        .first::<Title>(&mut db)
+        .await
         .optional()?
         .ok_or(ViewError::NotFound)?;
 
@@ -94,15 +95,18 @@ async fn one_title(
         .inner_join(p::publications.inner_join(i::issues))
         .order(min(i::magic))
         .group_by(a::articles::all_columns())
-        .load::<Article>(&db)?;
+        .load::<Article>(&mut db)
+        .await?;
     let mut articles = Vec::with_capacity(articles_raw.len());
     for article in articles_raw {
         let published = i::issues
             .inner_join(p::publications)
             .select((i::year, (i::number, i::number_str)))
             .filter(p::article_id.eq(article.id))
-            .load::<IssueRef>(&db)?;
-        articles.push((FullArticle::load(article, &db)?, published));
+            .load::<IssueRef>(&mut db)
+            .await?;
+        articles
+            .push((FullArticle::load(article, &mut db).await?, published));
     }
 
     let episodes = e::episodes
@@ -115,12 +119,20 @@ async fn one_title(
         .group_by(crate::schema::episodes::all_columns);
 
     let episodes = match strip {
-        Some(sun) => episodes
-            .filter(e::orig_sundays.eq(sun))
-            .filter(e::orig_date.is_not_null())
-            .order(e::orig_date)
-            .load::<Episode>(&db)?,
-        None => episodes.order(min(i::magic)).load::<Episode>(&db)?,
+        Some(sun) => {
+            episodes
+                .filter(e::orig_sundays.eq(sun))
+                .filter(e::orig_date.is_not_null())
+                .order(e::orig_date)
+                .load::<Episode>(&mut db)
+                .await?
+        }
+        None => {
+            episodes
+                .order(min(i::magic))
+                .load::<Episode>(&mut db)
+                .await?
+        }
     };
 
     let (episodes_raw, pages) = Paginator::if_needed(episodes, page.p)
@@ -128,7 +140,7 @@ async fn one_title(
 
     let mut episodes = Vec::with_capacity(episodes_raw.len());
     for episode in episodes_raw {
-        episodes.push(FullEpisode::load_details(episode, &db)?);
+        episodes.push(FullEpisode::load_details(episode, &mut db).await?);
     }
 
     Ok(Builder::new().html(|o| {
@@ -150,12 +162,13 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
     }
     let target = slug.replace('_', "-").replace(".html", "");
 
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     if let Ok(year) = target.parse::<i16>() {
         let issues = i::issues
             .filter(i::year.eq(year))
             .select(count_star())
-            .first::<i64>(&db)?;
+            .first::<i64>(&mut db)
+            .await?;
         if issues > 0 {
             return redirect(&format!("/{year}"));
         }
@@ -165,7 +178,8 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
     let n = t::titles
         .filter(t::slug.eq(target.clone()))
         .select(count_star())
-        .first::<i64>(&db)?;
+        .first::<i64>(&mut db)
+        .await?;
     if n == 1 {
         return redirect(&format!("/titles/{target}"));
     }
@@ -181,7 +195,8 @@ pub async fn oldslug(slug: String, db: PgPool) -> Result<impl Reply> {
             ),
         )
         .select(t::slug)
-        .first::<String>(&db)
+        .first::<String>(&mut db)
+        .await
         .optional()?
         .ok_or(ViewError::NotFound)?;
     redirect(&format!("/titles/{target}"))

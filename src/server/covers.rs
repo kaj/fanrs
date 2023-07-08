@@ -5,6 +5,7 @@ use crate::templates::statics::xcover_jpg;
 use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use diesel::OptionalExtension;
+use diesel_async::RunQueryDsl;
 use mime::IMAGE_JPEG;
 use std::str::FromStr;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
@@ -18,7 +19,8 @@ pub async fn cover_image(issue: CoverRef, db: PgPool) -> Result<impl Reply> {
         .select(c::image)
         .filter(i::year.eq(issue.year))
         .filter(i::number.eq(issue.number))
-        .first::<Vec<u8>>(&db.get().await?)
+        .first::<Vec<u8>>(&mut db.get().await?)
+        .await
         .optional()?;
 
     if let Some(data) = data {
@@ -61,12 +63,13 @@ pub async fn redirect_cover(
     issue: SIssue,
     db: PgPool,
 ) -> Result<impl Reply> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let exists = i::issues
         .filter(i::year.eq(year.0))
         .filter(i::number.eq(issue.0))
         .count()
-        .get_result::<i64>(&db)?;
+        .get_result::<i64>(&mut db)
+        .await?;
     if exists > 0 {
         redirect(&format!("/c/f{}-{}.jpg", year.0, issue.0))
     } else {

@@ -2,38 +2,37 @@ use crate::models::Title;
 use crate::schema::episodes::dsl as e;
 use crate::schema::titles::dsl as t;
 use anyhow::Result;
-use chrono::NaiveDate;
 use diesel::dsl::sql;
-use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::sql_types::Bool;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::fmt::{self, Display};
 
-pub fn check_strips(db: &PgConnection) -> Result<()> {
+pub async fn check_strips(db: &mut AsyncPgConnection) -> Result<()> {
     let data = t::titles
         .left_join(e::episodes)
         .select((
-            t::titles::all_columns(),
-            sql(
-                "max(case when orig_sundays then null else orig_to_date end)",
-            ),
-            sql(
-                "max(case when orig_sundays then orig_to_date else null end)",
+            Title::as_select(),
+            sql::<Bool>("bool_or(orig_to_date is not null and orig_sundays)"),
+            sql::<Bool>(
+                "bool_or(orig_to_date is not null and not orig_sundays)",
             ),
         ))
         .group_by(t::titles::all_columns())
-        .load::<(Title, Option<NaiveDate>, Option<NaiveDate>)>(db)?;
+        .load::<(Title, bool, bool)>(db)
+        .await?;
     for (title, daystrip, sundays) in data {
-        if title.has_daystrip() && daystrip.is_none() {
+        if title.has_daystrip() && !daystrip {
             return Err(Error::MissingDaystrips(title).into());
         }
-        if !title.has_daystrip() && daystrip.is_some() {
+        if !title.has_daystrip() && daystrip {
             return Err(Error::UnexpectedDaystrips(title).into());
         }
 
-        if title.has_sundays() && sundays.is_none() {
+        if title.has_sundays() && !sundays {
             return Err(Error::MissingSundays(title).into());
         }
-        if !title.has_sundays() && sundays.is_some() {
+        if !title.has_sundays() && sundays {
             return Err(Error::UnexpectedSundays(title).into());
         }
     }

@@ -34,14 +34,14 @@ use crate::templates::{
     frontpage_html, issue_html, year_html, Html, RenderRucte, ToHtml,
 };
 use crate::DbOpt;
+use anyhow::anyhow;
 use chrono::{Duration, Utc};
-use diesel::dsl::{not, sql};
-use diesel::pg::PgConnection;
+use diesel::dsl::{count_distinct, max, min, not};
 use diesel::prelude::*;
 use diesel::result::Error as DbError;
-use diesel::sql_types::SmallInt;
-use diesel::QueryDsl;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use lazy_static::lazy_static;
+use log::info;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
@@ -73,10 +73,10 @@ fn goh() -> BoxedFilter<()> {
 }
 
 impl Args {
-    pub async fn run(&self) {
+    pub async fn run(&self) -> anyhow::Result<()> {
         use warp::filters::query::query;
         use warp::{path, path::end, path::param, path::tail};
-        let pool = self.db.get_pool();
+        let pool = self.db.get_pool().unwrap();
         let s = warp::any().map(move || pool.clone()).boxed();
         let s = move || s.clone();
         let routes = warp::any()
@@ -147,7 +147,12 @@ impl Args {
                 .then(titles::oldslug)
                 .map(wrap))
             .recover(for_rejection);
-        warp::serve(routes).run(self.bind).await;
+        let (addr, work) = warp::serve(routes)
+            .try_bind_ephemeral(self.bind)
+            .map_err(|e| anyhow!("Failed to bind {}: {e}", self.bind))?;
+        info!("Running on http://{addr}/");
+        work.await;
+        Ok(())
     }
 }
 
@@ -185,24 +190,26 @@ async fn robots_txt() -> Result<impl Reply> {
 }
 
 async fn frontpage(pool: PgPool) -> Result<impl Reply> {
-    let db = pool.get().await?;
+    let mut db = pool.get().await?;
     let n = p::publications
-        .select(sql("count(distinct issue)"))
+        .select(count_distinct(p::issue_id))
         .filter(not(p::seqno.is_null()))
-        .first(&db)?;
+        .first(&mut db)
+        .await?;
 
     let years = i::issues
         .select(i::year)
         .distinct()
         .order(i::year)
-        .load(&db)?;
+        .load(&mut db)
+        .await?;
 
-    let all_fa = refs::get_all_fa(&db)?;
+    let all_fa = refs::get_all_fa(&mut db).await?;
 
     let num = 50;
-    let titles = Title::cloud(num, &db)?;
-    let refkeys = RefKey::cloud(num, &db)?;
-    let creators = Creator::cloud(num, &db)?;
+    let titles = Title::cloud(num, &mut db).await?;
+    let refkeys = RefKey::cloud(num, &mut db).await?;
+    let creators = Creator::cloud(num, &mut db).await?;
 
     Ok(Builder::new().html(|o| {
         frontpage_html(o, n, &all_fa, &years, &titles, &refkeys, &creators)
@@ -248,14 +255,14 @@ pub struct FullEpisode {
 }
 
 impl FullEpisode {
-    fn load_details(
+    async fn load_details(
         episode: Episode,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<FullEpisode, DbError> {
-        let refs = RefKeySet::for_episode(&episode, db)?;
-        let creators = CreatorSet::for_episode(&episode, db)?;
-        let published = PartsPublished::for_episode(&episode, db)?;
-        let orig_mag = episode.load_orig_mag(db)?;
+        let refs = RefKeySet::for_episode(&episode, db).await?;
+        let creators = CreatorSet::for_episode(&episode, db).await?;
+        let published = PartsPublished::for_episode(&episode, db).await?;
+        let orig_mag = episode.load_orig_mag(db).await?;
         Ok(FullEpisode {
             episode,
             refs,
@@ -265,16 +272,16 @@ impl FullEpisode {
         })
     }
 
-    fn in_issue(
+    async fn in_issue(
         episode: Episode,
         issue: &Issue,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<FullEpisode, DbError> {
-        let refs = RefKeySet::for_episode(&episode, db)?;
-        let creators = CreatorSet::for_episode(&episode, db)?;
+        let refs = RefKeySet::for_episode(&episode, db).await?;
+        let creators = CreatorSet::for_episode(&episode, db).await?;
         let published =
-            PartsPublished::for_episode_except(&episode, issue, db)?;
-        let orig_mag = episode.load_orig_mag(db)?;
+            PartsPublished::for_episode_except(&episode, issue, db).await?;
+        let orig_mag = episode.load_orig_mag(db).await?;
         Ok(FullEpisode {
             episode,
             refs,
@@ -304,12 +311,12 @@ pub struct FullArticle {
 }
 
 impl FullArticle {
-    fn load(
+    async fn load(
         article: Article,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<FullArticle, DbError> {
-        let refs = RefKeySet::for_article(&article, db)?;
-        let creators = CreatorSet::for_article(&article, db)?;
+        let refs = RefKeySet::for_article(&article, db).await?;
+        let creators = CreatorSet::for_article(&article, db).await?;
         Ok(FullArticle {
             article,
             refs,
@@ -379,11 +386,12 @@ fn text_to_fa_html_e() {
 }
 
 async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
-    let db = db.get().await?;
+    let mut db = db.get().await?;
     let issue: Issue = i::issues
         .filter(i::year.eq(year as i16))
         .filter(i::number.eq(i16::from(issue)))
-        .first(&db)
+        .first(&mut db)
+        .await
         .optional()?
         .ok_or(ViewError::NotFound)?;
 
@@ -391,27 +399,29 @@ async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
         .select((i::year, (i::number, i::number_str)))
         .filter(i::year.eq(issue.year))
         .order(i::number)
-        .load::<IssueRef>(&db)?;
+        .load::<IssueRef>(&mut db)
+        .await?;
 
-    let details = IssueDetails::load_full(issue, &db)?;
-    let years = YearLinks::load(year, &db)?.link_current();
+    let details = IssueDetails::load_full(issue, &mut db).await?;
+    let years = YearLinks::load(year, &mut db).await?.link_current();
     Ok(Builder::new().html(|o| issue_html(o, &years, &details, &pubyear))?)
 }
 
 async fn list_year(year: u16, db: PgPool) -> Result<impl Reply> {
-    let db = db.get().await?;
-    let issues = i::issues
+    let mut db = db.get().await?;
+    let issues_in = i::issues
         .filter(i::year.eq(year as i16))
         .order(i::number)
-        .load(&db)?;
-    if issues.is_empty() {
+        .load(&mut db)
+        .await?;
+    if issues_in.is_empty() {
         return Err(ViewError::NotFound);
     }
-    let issues = issues
-        .into_iter()
-        .map(|issue| IssueDetails::load_full(issue, &db))
-        .collect::<Result<Vec<_>, _>>()?;
-    let years = YearLinks::load(year, &db)?;
+    let mut issues = Vec::with_capacity(issues_in.len());
+    for issue in issues_in {
+        issues.push(IssueDetails::load_full(issue, &mut db).await?);
+    }
+    let years = YearLinks::load(year, &mut db).await?;
     Ok(Builder::new().html(|o| year_html(o, year, &years, &issues))?)
 }
 
@@ -422,11 +432,11 @@ pub struct IssueDetails {
 }
 
 impl IssueDetails {
-    fn load_full(
+    async fn load_full(
         issue: Issue,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<IssueDetails, DbError> {
-        let cover_by = cover_by(issue.id, db)?;
+        let cover_by = cover_by(issue.id, db).await?;
 
         let mut have_main = false;
         let content_raw = p::publications
@@ -455,7 +465,8 @@ impl IssueDetails {
                 Option<i16>,
                 Option<i16>,
                 String,
-            )>(db)?;
+            )>(db)
+            .await?;
         let mut contents = Vec::with_capacity(content_raw.len());
         for row in content_raw {
             match row {
@@ -472,7 +483,7 @@ impl IssueDetails {
                     };
                     let content = PublishedContent::EpisodePart {
                         title: t,
-                        episode: FullEpisode::in_issue(e, &issue, db)?,
+                        episode: FullEpisode::in_issue(e, &issue, db).await?,
                         part,
                         best_plac: b,
                         label,
@@ -485,9 +496,9 @@ impl IssueDetails {
                 }
                 (None, Some(a), seqno, None, _label) => {
                     contents.push(PublishedInfo {
-                        content: PublishedContent::Text(FullArticle::load(
-                            a, db,
-                        )?),
+                        content: PublishedContent::Text(
+                            FullArticle::load(a, db).await?,
+                        ),
                         seqno,
                         classnames: "article",
                     });
@@ -514,15 +525,16 @@ impl IssueDetails {
     }
 }
 
-fn cover_by(
+async fn cover_by(
     issue_id: i32,
-    db: &PgConnection,
+    db: &mut AsyncPgConnection,
 ) -> Result<Vec<Creator>, DbError> {
     c::creators
         .inner_join(ca::creator_aliases.inner_join(cb::covers_by))
         .select((c::id, ca::name, c::slug))
         .filter(cb::issue_id.eq(issue_id))
         .load(db)
+        .await
 }
 
 fn redirect(url: &str) -> Result<Response> {
@@ -543,14 +555,15 @@ pub struct YearLinks {
 }
 
 impl YearLinks {
-    fn load(year: u16, db: &PgConnection) -> Result<Self> {
+    async fn load(year: u16, db: &mut AsyncPgConnection) -> Result<Self> {
         let (first, last) = i::issues
-            .select((
-                sql::<SmallInt>("min(year)"),
-                sql::<SmallInt>("max(year)"),
-            ))
-            .first::<(i16, i16)>(db)?;
-        Ok(YearLinks::new(first as u16, year, last as u16))
+            .select((min(i::year), max(i::year)))
+            .first::<(Option<i16>, Option<i16>)>(db)
+            .await?;
+        let y = |y: Option<i16>| -> u16 {
+            y.and_then(|y| u16::try_from(y).ok()).unwrap_or(year)
+        };
+        Ok(YearLinks::new(y(first), year, y(last)))
     }
     fn new(first: u16, shown: u16, last: u16) -> Self {
         YearLinks {

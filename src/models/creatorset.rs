@@ -2,6 +2,7 @@ use super::{Article, Creator, Episode};
 use crate::templates::ToHtml;
 use diesel::prelude::*;
 use diesel::result::Error;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 
@@ -12,9 +13,9 @@ impl CreatorSet {
     pub const MAIN_ROLES: &'static [&'static str] =
         &["by", "bild", "text", "orig", "ink"];
 
-    pub fn for_episode(
+    pub async fn for_episode(
         episode: &Episode,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<CreatorSet, Error> {
         use crate::schema::creator_aliases::dsl as ca;
         use crate::schema::creators::dsl as c;
@@ -24,13 +25,14 @@ impl CreatorSet {
             .inner_join(ca::creator_aliases.inner_join(c::creators))
             .select((cp::role, c_columns))
             .filter(cp::episode_id.eq(episode.id))
-            .load::<(String, Creator)>(db)?;
+            .load::<(String, Creator)>(db)
+            .await?;
         Ok(CreatorSet::from_data(data))
     }
 
-    pub fn for_article(
+    pub async fn for_article(
         article: &Article,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<CreatorSet, Error> {
         use crate::schema::articles_by::dsl as ab;
         use crate::schema::creator_aliases::dsl as ca;
@@ -40,7 +42,8 @@ impl CreatorSet {
             .inner_join(ca::creator_aliases.inner_join(c::creators))
             .select((ab::role, c_columns))
             .filter(ab::article_id.eq(article.id))
-            .load::<(String, Creator)>(db)?;
+            .load::<(String, Creator)>(db)
+            .await?;
         Ok(CreatorSet::from_data(data))
     }
 

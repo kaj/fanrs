@@ -4,44 +4,48 @@ use crate::schema::episode_refkeys::dsl as er;
 use crate::schema::episodes::dsl as e;
 use crate::schema::refkeys::dsl as r;
 use crate::templates::ToHtml;
+use diesel::deserialize::{self, Queryable};
 use diesel::dsl::sql;
-use diesel::pg::{Pg, PgConnection};
+use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel::sql_types::{Integer, SmallInt, Text};
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use slug::slugify;
 use std::cmp::Ordering;
+use std::fmt;
 use std::io::{self, Write};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct IdRefKey {
     pub id: i32,
     pub refkey: RefKey,
 }
 
 impl IdRefKey {
-    pub fn key_from_slug(
+    pub async fn key_from_slug(
         slug: String,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Self, Error> {
-        IdRefKey::from_slug(slug, RefKey::KEY_ID, db)
+        IdRefKey::from_slug(slug, RefKey::KEY_ID, db).await
     }
-    pub fn fa_from_slug(
+    pub async fn fa_from_slug(
         slug: String,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Self, Error> {
-        IdRefKey::from_slug(slug, RefKey::FA_ID, db)
+        IdRefKey::from_slug(slug, RefKey::FA_ID, db).await
     }
-    fn from_slug(
+    async fn from_slug(
         slug: String,
         kind: i16,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Self, Error> {
         r::refkeys
             .select(r::refkeys::all_columns())
             .filter(r::kind.eq(kind))
             .filter(r::slug.eq(slug))
             .first(db)
+            .await
     }
     pub fn name(&self) -> String {
         self.refkey.name()
@@ -54,7 +58,7 @@ impl IdRefKey {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RefKey {
     /// slug
     Fa(String),
@@ -94,27 +98,32 @@ impl RefKey {
         RefKey::Title(name.into(), slugify(name))
     }
 
-    pub fn get_or_create_id(&self, db: &PgConnection) -> Result<i32, Error> {
+    pub async fn get_or_create_id(
+        &self,
+        db: &mut AsyncPgConnection,
+    ) -> Result<i32, Error> {
         let (kind, title, slug) = match self {
             RefKey::Fa(s) => (RefKey::FA_ID, self.name(), s.clone()),
             RefKey::Key(t, s) => (RefKey::KEY_ID, t.clone(), s.clone()),
             RefKey::Who(n, _s) => {
                 use super::Creator;
-                let alias = Creator::get_or_create(n, db)?;
-                let actual = Creator::from_slug(&alias.slug, db)?;
+                let alias = Creator::get_or_create(n, db).await?;
+                let actual = Creator::from_slug(&alias.slug, db).await?;
                 (RefKey::WHO_ID, actual.name, actual.slug)
             }
             RefKey::Title(n, s) => (RefKey::TITLE_ID, n.clone(), s.clone()),
         };
-        r::refkeys
+        match r::refkeys
             .select(r::id)
             .filter(r::kind.eq(kind))
             .filter(r::title.eq(&title))
             .filter(r::slug.eq(&slug))
             .first(db)
+            .await
             .optional()?
-            .ok_or(0)
-            .or_else(|_| {
+        {
+            Some(id) => Ok(id),
+            None => {
                 diesel::insert_into(r::refkeys)
                     .values((
                         r::kind.eq(kind),
@@ -123,7 +132,9 @@ impl RefKey {
                     ))
                     .returning(r::id)
                     .get_result::<i32>(db)
-            })
+                    .await
+            }
+        }
     }
 
     pub fn url(&self) -> String {
@@ -182,9 +193,9 @@ impl RefKey {
         }
     }
 
-    pub fn cloud(
+    pub async fn cloud(
         num: i64,
-        db: &PgConnection,
+        db: &mut AsyncPgConnection,
     ) -> Result<Cloud<RefKey>, Error> {
         let c = sql::<Integer>("cast(count(*) as integer)");
         let refkeys = r::refkeys
@@ -194,42 +205,66 @@ impl RefKey {
             .group_by(r::refkeys::all_columns())
             .order(c.desc())
             .limit(num)
-            .load(db)?;
+            .load(db)
+            .await?;
         Ok(Cloud::from_ordered(refkeys))
+    }
+}
+
+impl Selectable<Pg> for IdRefKey {
+    type SelectExpression = (r::id, r::kind, r::title, r::slug);
+
+    fn construct_selection() -> Self::SelectExpression {
+        (r::id, r::kind, r::title, r::slug)
     }
 }
 
 impl Queryable<schema::refkeys::SqlType, Pg> for IdRefKey {
     type Row = (i32, i16, String, String);
 
-    fn build(row: Self::Row) -> Self {
-        IdRefKey {
+    fn build(row: Self::Row) -> deserialize::Result<Self> {
+        Ok(IdRefKey {
             id: row.0,
             refkey: match (row.1, row.2, row.3) {
                 (RefKey::KEY_ID, t, s) => RefKey::Key(t, s),
                 (RefKey::FA_ID, _, s) => RefKey::Fa(s),
                 (RefKey::WHO_ID, t, s) => RefKey::Who(t, s),
                 (RefKey::TITLE_ID, t, s) => RefKey::Title(t, s),
+                // TODO: Return an error instead of panic!
                 (k, t, s) => panic!(
                     "Bad refkey #{} kind {} ({:?}, {:?})",
                     row.0, k, t, s,
                 ),
             },
-        }
+        })
     }
 }
 
 impl Queryable<(SmallInt, Text, Text), Pg> for RefKey {
     type Row = (i16, String, String);
 
-    fn build(row: Self::Row) -> Self {
-        match row {
+    fn build(row: Self::Row) -> deserialize::Result<Self> {
+        Ok(match row {
             (RefKey::KEY_ID, t, s) => RefKey::Key(t, s),
             (RefKey::FA_ID, _, s) => RefKey::Fa(s),
             (RefKey::WHO_ID, t, s) => RefKey::Who(t, s),
             (RefKey::TITLE_ID, t, s) => RefKey::Title(t, s),
-            (k, t, s) => panic!("Bad refkey kind {k} ({t:?}, {s:?})"),
-        }
+            (k, t, s) => return Err(Box::new(BadRefKey(k, t, s))),
+        })
+    }
+}
+
+struct BadRefKey(i16, String, String);
+impl std::error::Error for BadRefKey {}
+impl fmt::Display for BadRefKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(kind, t, s) = self;
+        write!(f, "Bad refkey kind {kind} ({t:?}, {s:?})")
+    }
+}
+impl fmt::Debug for BadRefKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }
 
