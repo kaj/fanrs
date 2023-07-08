@@ -2,10 +2,13 @@
 
 ## Unreleased
 
-* Update diesel to 2.1.0, use async-diesel instead of deadpool-diesel (PR #7).
+* Updated diesel to 2.1.0, use async-diesel instead of deadpool-diesel
+  (PR #7).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
+* Updated scraper to 0.17.1.
 * Some clippy-suggested cleanups.
+* Updated github workflow (and added a clippy job).
 
 
 ## Release 0.11.4 (2023-02-12)
