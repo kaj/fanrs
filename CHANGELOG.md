@@ -6,7 +6,7 @@
   (PR #7).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
-* Updated scraper to 0.17.1.
+* Updated to `scraper` 0.17.1 and `ructe` 0.17.0.
 * Some clippy-suggested cleanups.
 * Updated github workflow (and added a clippy job).
 
