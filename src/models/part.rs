@@ -27,7 +27,7 @@ impl Part {
         self.no.is_some() || self.name.is_some()
     }
     pub fn is_first(&self) -> bool {
-        self.no.map(|n| n == 1).unwrap_or(true)
+        self.no.map_or(true, |n| n == 1)
     }
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()

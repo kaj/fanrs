@@ -23,10 +23,9 @@ use warp::{self, reply::Response, Filter, Reply};
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::filters::query::query;
     use warp::path::{end, param};
-    let s = || s.clone();
-    let list = goh().and(end()).and(s()).then(list_titles);
+    let list = goh().and(end()).and(s.clone()).then(list_titles);
     let one = goh()
-        .and(s())
+        .and(s)
         .and(param())
         .and(end())
         .and(query())

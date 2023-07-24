@@ -297,8 +297,7 @@ impl FromStr for Nr {
     fn from_str(nr_str: &str) -> Result<Nr, Self::Err> {
         let number = nr_str
             .find('-')
-            .map(|p| &nr_str[0..p])
-            .unwrap_or(nr_str)
+            .map_or(nr_str, |p| &nr_str[0..p])
             .parse()
             .map_err(|_| ParseError::BadIssue)?;
         Ok(Nr {

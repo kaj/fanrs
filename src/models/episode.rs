@@ -118,7 +118,7 @@ impl Episode {
         let mut values = Vec::with_capacity(refs.len());
         for r in refs {
             let id = r.get_or_create_id(db).await?;
-            values.push((er::episode_id.eq(self.id), er::refkey_id.eq(id)))
+            values.push((er::episode_id.eq(self.id), er::refkey_id.eq(id)));
         }
         diesel::insert_into(er::episode_refkeys)
             .values(values)

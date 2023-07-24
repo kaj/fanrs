@@ -597,10 +597,7 @@ impl ToHtml for YearLinks {
         one(out, self.first)?;
         let mut skip = false;
         for y in self.first + 1..=self.last {
-            if y % 10 == 0
-                || (y as i16 - shown as i16).abs() < 3
-                || y == self.last
-            {
+            if y % 10 == 0 || y.abs_diff(shown) < 3 || y == self.last {
                 out.write_all(if skip { "… ".as_bytes() } else { b", " })?;
                 one(out, y)?;
                 skip = false;

@@ -133,12 +133,12 @@ async fn register_issue<'a>(
         match c.tag_name().name() {
             "omslag" => {
                 if let Some(by) = get_child(c, "by") {
+                    use crate::schema::covers_by::dsl as cb;
                     let creators = get_creators(by, db)
                         .await?
                         .into_iter()
                         .map(|c| c.id)
                         .collect::<Vec<_>>();
-                    use crate::schema::covers_by::dsl as cb;
                     diesel::insert_into(cb::covers_by)
                         .values(
                             &creators
@@ -457,13 +457,13 @@ async fn get_creators<'a>(
     }
     let mut who = Vec::new();
     for one in child_elems(by) {
-        who.push(one_creator(one, db).await?)
+        // Child <who> elements, each containing a name.
+        who.push(one_creator(one, db).await?);
     }
     if who.is_empty() {
         // No child elements, a single name directly in the by element
         Ok(vec![one_creator(by, db).await?])
     } else {
-        // Child <who> elements, each containing a name.
         Ok(who)
     }
 }
@@ -481,8 +481,7 @@ async fn read_persondata(
                 let name = get_req_text(e, "name")?;
                 let slug = e
                     .attribute("slug")
-                    .map(String::from)
-                    .unwrap_or_else(|| slugify(name));
+                    .map_or_else(|| slugify(name), String::from);
                 let creator = c::creators
                     .select((c::id, c::name, c::slug))
                     .filter(c::name.eq(name))

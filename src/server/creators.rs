@@ -150,7 +150,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
             .load::<IssueRef>(&mut db)
             .await?;
         articles_by
-            .push((FullArticle::load(article, &mut db).await?, published))
+            .push((FullArticle::load(article, &mut db).await?, published));
     }
 
     let covers = CoverSet::by(&creator, &mut db).await?;
