@@ -149,7 +149,8 @@ async fn one_ref_impl(
                 .filter(r::kind.eq(kind))
                 .filter(r::slug.eq(target.clone()))
                 .select(count_star())
-                .first::<i64>(&mut db).await?;
+                .first::<i64>(&mut db)
+                .await?;
             if n == 1 {
                 return redirect(&format!(
                     "/{}/{}",
