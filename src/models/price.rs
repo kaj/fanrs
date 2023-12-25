@@ -4,6 +4,7 @@ use diesel::pg::Pg;
 use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::Integer;
 use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
 use std::str::FromStr;
 
 #[derive(Debug, FromSqlRow, PartialEq, Eq)]
@@ -40,11 +41,34 @@ impl Display for Price {
 }
 
 impl FromStr for Price {
-    type Err = <f32 as FromStr>::Err;
+    type Err = BadPrice;
     fn from_str(input: &str) -> Result<Price, Self::Err> {
-        let sek: f32 = input.parse()?;
-        Ok(Price {
-            price: (sek * 100.0).round() as i32,
-        })
+        let (sek, dec) = input.split_once('.').unwrap_or((input, ""));
+        let sek = if sek.is_empty() {
+            0
+        } else {
+            sek.parse::<i32>()?.checked_mul(100).ok_or(BadPrice)?
+        };
+        let dec = match dec.len() {
+            0 => 0,
+            2 => dec.parse::<i32>()?,
+            _ => return Err(BadPrice),
+        };
+        let price = sek.checked_add(dec).ok_or(BadPrice)?;
+        Ok(Price { price })
+    }
+}
+
+#[derive(Debug)]
+pub struct BadPrice;
+impl std::error::Error for BadPrice {}
+impl Display for BadPrice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("bad price")
+    }
+}
+impl From<ParseIntError> for BadPrice {
+    fn from(_: ParseIntError) -> Self {
+        BadPrice
     }
 }
