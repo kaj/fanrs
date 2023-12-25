@@ -50,7 +50,7 @@ impl CreatorSet {
     fn from_data(data: Vec<(String, Creator)>) -> CreatorSet {
         let mut result: BTreeMap<String, Vec<Creator>> = BTreeMap::new();
         for (role, creator) in data {
-            result.entry(role).or_insert_with(Vec::new).push(creator);
+            result.entry(role).or_default().push(creator);
         }
         CreatorSet(result)
     }
@@ -61,30 +61,30 @@ impl ToHtml for CreatorSet {
         if !self.0.is_empty() {
             write!(out, "<p class='info creators'>")?;
             let roles = [
-                ("by".to_string(), "Av"),
-                ("text".to_string(), "Text:"),
-                ("bild".to_string(), "Bild:"),
-                ("ink".to_string(), "Tush:"),
-                ("color".to_string(), "Färgläggning:"),
-                ("orig".to_string(), "Efter en originalberättelse av:"),
-                ("redax".to_string(), "Redaktion:"),
-                ("xlat".to_string(), "Översättning:"),
-                ("textning".to_string(), "Textsättning:"),
+                ("by", "Av"),
+                ("text", "Text:"),
+                ("bild", "Bild:"),
+                ("ink", "Tush:"),
+                ("color", "Färgläggning:"),
+                ("orig", "Efter en originalberättelse av:"),
+                ("redax", "Redaktion:"),
+                ("xlat", "Översättning:"),
+                ("textning", "Textsättning:"),
             ];
-            for (code, desc) in &roles {
-                if let Some(creators) = self.0.get(code) {
+            for (code, desc) in roles {
+                if let Some((last, rest)) =
+                    self.0.get(code).and_then(|s| s.split_last())
+                {
                     write!(out, "{desc} ")?;
-                    if let Some((last, rest)) = creators.split_last() {
-                        if let Some((first, rest)) = rest.split_first() {
-                            first.to_html(out)?;
-                            for creator in rest {
-                                write!(out, ", ")?;
-                                creator.to_html(out)?;
-                            }
-                            write!(out, " och ")?;
+                    if let Some((first, rest)) = rest.split_first() {
+                        first.to_html(out)?;
+                        for creator in rest {
+                            write!(out, ", ")?;
+                            creator.to_html(out)?;
                         }
-                        last.to_html(out)?;
+                        write!(out, " och ")?;
                     }
+                    last.to_html(out)?;
                     write!(out, ". ")?;
                 }
             }
