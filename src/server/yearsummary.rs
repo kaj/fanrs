@@ -13,10 +13,10 @@ use std::io::{self, Write};
 use warp::http::response::Builder;
 use warp::{self, Reply};
 
-pub async fn year_summary(year: u16, db: PgPool) -> Result<impl Reply> {
+pub async fn year_summary(year: i16, db: PgPool) -> Result<impl Reply> {
     let mut db = db.get().await?;
     let issues_in: Vec<Issue> = i::issues
-        .filter(i::year.eq(year as i16))
+        .filter(i::year.eq(year))
         .order(i::number)
         .load(&mut db)
         .await?;

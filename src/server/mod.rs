@@ -385,10 +385,10 @@ fn text_to_fa_html_e() {
     )
 }
 
-async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
+async fn issue(year: i16, issue: u8, db: PgPool) -> Result<impl Reply> {
     let mut db = db.get().await?;
     let issue: Issue = i::issues
-        .filter(i::year.eq(year as i16))
+        .filter(i::year.eq(year))
         .filter(i::number.eq(i16::from(issue)))
         .first(&mut db)
         .await
@@ -407,10 +407,10 @@ async fn issue(year: u16, issue: u8, db: PgPool) -> Result<impl Reply> {
     Ok(Builder::new().html(|o| issue_html(o, &years, &details, &pubyear))?)
 }
 
-async fn list_year(year: u16, db: PgPool) -> Result<impl Reply> {
+async fn list_year(year: i16, db: PgPool) -> Result<impl Reply> {
     let mut db = db.get().await?;
     let issues_in = i::issues
-        .filter(i::year.eq(year as i16))
+        .filter(i::year.eq(year))
         .order(i::number)
         .load(&mut db)
         .await?;
@@ -548,24 +548,22 @@ fn redirect(url: &str) -> Result<Response> {
 }
 
 pub struct YearLinks {
-    first: u16,
-    shown: u16,
-    last: u16,
+    first: i16,
+    shown: i16,
+    last: i16,
     link_current: bool,
 }
 
 impl YearLinks {
-    async fn load(year: u16, db: &mut AsyncPgConnection) -> Result<Self> {
+    async fn load(year: i16, db: &mut AsyncPgConnection) -> Result<Self> {
         let (first, last) = i::issues
             .select((min(i::year), max(i::year)))
             .first::<(Option<i16>, Option<i16>)>(db)
             .await?;
-        let y = |y: Option<i16>| -> u16 {
-            y.and_then(|y| u16::try_from(y).ok()).unwrap_or(year)
-        };
+        let y = |y: Option<i16>| -> i16 { y.unwrap_or(year) };
         Ok(YearLinks::new(y(first), year, y(last)))
     }
-    fn new(first: u16, shown: u16, last: u16) -> Self {
+    fn new(first: i16, shown: i16, last: i16) -> Self {
         YearLinks {
             first,
             shown,
@@ -582,7 +580,7 @@ impl YearLinks {
 impl ToHtml for YearLinks {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         let shown = self.shown;
-        let one = |out: &mut dyn Write, y: u16| -> io::Result<()> {
+        let one = |out: &mut dyn Write, y: i16| -> io::Result<()> {
             if y == shown {
                 if self.link_current {
                     write!(out, "<a href='/{y}'><b>{y}</b></a>")?;

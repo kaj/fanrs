@@ -161,7 +161,7 @@ impl SearchQuery {
         (Vec<Title>, Vec<Creator>, Vec<RefKey>, Vec<Hit>),
         diesel::result::Error,
     > {
-        let max_hits = 25;
+        let max_hits = 25u8;
         if self.is_empty() {
             return Ok((vec![], vec![], vec![], vec![]));
         }
@@ -320,11 +320,11 @@ impl SearchQuery {
         let creators = if self.q.is_empty() {
             vec![]
         } else {
-            creators.limit(max_hits).load(db).await?
+            creators.limit(max_hits.into()).load(db).await?
         };
 
         let titles = if self.t.is_empty() && !self.q.is_empty() {
-            titles.limit(max_hits).load::<Title>(db).await?
+            titles.limit(max_hits.into()).load::<Title>(db).await?
         } else {
             vec![]
         };
@@ -332,7 +332,7 @@ impl SearchQuery {
         let refkeys = if self.q.is_empty() {
             vec![]
         } else {
-            refkeys.limit(max_hits).load(db).await?
+            refkeys.limit(max_hits.into()).load(db).await?
         };
 
         let episodes = episodes
@@ -344,7 +344,7 @@ impl SearchQuery {
                     .single_value()
                     .desc(),
             )
-            .limit(max_hits)
+            .limit(max_hits.into())
             .load::<(Title, Episode)>(db)
             .await?;
 
@@ -358,7 +358,7 @@ impl SearchQuery {
                     .desc()
                     .nulls_last(),
             )
-            .limit(max_hits)
+            .limit(max_hits.into())
             .load(db)
             .await?;
 
@@ -370,7 +370,7 @@ impl SearchQuery {
             hits.push(Hit::article(article, db).await?);
         }
         hits.sort_by(|a, b| b.lastpub().cmp(&a.lastpub()));
-        hits.truncate(max_hits as usize);
+        hits.truncate(max_hits.into());
 
         Ok((titles, creators, refkeys, hits))
     }

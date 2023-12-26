@@ -33,7 +33,7 @@ pub struct Args {
 
     /// Year(s) to read data for.
     #[arg(name = "year")]
-    years: Vec<u32>,
+    years: Vec<i16>,
 }
 
 impl Args {
@@ -44,13 +44,13 @@ impl Args {
         let mut db = self.db.get_db().await?;
         read_persondata(&self.basedir, &mut db).await?;
         if self.all {
-            let current_year = Local::now().year() as i16;
+            let current_year = i16::try_from(Local::now().year())?;
             for year in 1950..=current_year {
                 load_year(&self.basedir, year, &mut db).await?;
             }
         } else {
             for year in self.years {
-                load_year(&self.basedir, year as i16, &mut db).await?;
+                load_year(&self.basedir, year, &mut db).await?;
             }
         }
         delete_unpublished(&mut db).await?;
@@ -129,7 +129,7 @@ async fn register_issue<'a>(
     println!("Found issue {issue}");
     issue.clear(db).await?;
 
-    for (seqno, c) in child_elems(i).enumerate() {
+    for (c, seqno) in child_elems(i).zip(0i16..) {
         match c.tag_name().name() {
             "omslag" => {
                 if let Some(by) = get_child(c, "by") {
@@ -179,7 +179,7 @@ async fn register_issue<'a>(
 
 async fn register_article<'a>(
     issue: &Issue,
-    seqno: usize,
+    seqno: i16,
     c: Node<'a, 'a>,
     db: &mut AsyncPgConnection,
 ) -> Result<()> {
@@ -190,7 +190,7 @@ async fn register_article<'a>(
         db,
     )
     .await?;
-    article.publish(issue.id, seqno as i16, db).await?;
+    article.publish(issue.id, seqno, db).await?;
     for e in child_elems(c) {
         match e.tag_name().name() {
             "title" | "subtitle" | "note" => (), // handled above
@@ -218,7 +218,7 @@ async fn register_article<'a>(
 
 async fn register_serie<'a>(
     issue: &Issue,
-    seqno: usize,
+    seqno: i16,
     c: Node<'a, 'a>,
     db: &mut AsyncPgConnection,
 ) -> Result<()> {
@@ -244,7 +244,7 @@ async fn register_serie<'a>(
         &episode,
         &part,
         issue,
-        Some(seqno as i16),
+        Some(seqno),
         get_best_plac(c)?,
         &get_text_norm(c, "label").unwrap_or_default(),
         db,

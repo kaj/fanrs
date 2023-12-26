@@ -2,7 +2,7 @@
 @use crate::models::{Creator, Issue};
 @use crate::server::{ContentSummary, YearLinks};
 
-@(year: u16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<ContentSummary>)])
+@(year: i16, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<ContentSummary>)])
 @:page_html(&format!("Årgång {year}"), &format!("Översikt över Fantomentidningar publicerade år {year}."), {
   <p>Se även @year_links.</p>
 }, {

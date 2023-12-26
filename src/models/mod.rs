@@ -42,10 +42,11 @@ pub struct Cloud<T: CloudItem> {
 impl<T: CloudItem> Cloud<T> {
     fn from_ordered(data: Vec<(T, i32)>) -> Self {
         let num = data.len();
+        let w = |n| u8::try_from(17 * (num - n) / num / 2).unwrap_or(u8::MAX);
         let mut data = data
             .into_iter()
             .enumerate()
-            .map(|(n, (item, c))| (item, c, (17 * (num - n) / num / 2) as u8))
+            .map(|(n, (item, c))| (item, c, w(n)))
             .collect::<Vec<_>>();
         data.sort_by(|a, b| a.0.cmp(&b.0));
         Cloud { data }
