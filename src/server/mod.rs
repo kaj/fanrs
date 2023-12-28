@@ -40,12 +40,12 @@ use diesel::dsl::{count_distinct, max, min, not};
 use diesel::prelude::*;
 use diesel::result::Error as DbError;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use lazy_static::lazy_static;
 use log::info;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
 use std::net::SocketAddr;
+use std::sync::OnceLock;
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::response::Builder;
@@ -330,19 +330,21 @@ impl FullArticle {
 }
 
 fn text_to_fa_html(text: &str) -> Html<String> {
-    lazy_static! {
-        static ref FA: Regex =
-            Regex::new(r"\b[Ff]a (?P<ii>(?P<i>[1-9]\d?)(-[1-9]\d?)?)[ /](?P<y>(19|20)\d{2})\b")
-            .unwrap();
-        static ref URL: Regex =
-            Regex::new(r"\b(?P<p>https?)://(?P<l>[a-z0-9?%./=&;-]+)").unwrap();
-    }
+    static FA: OnceLock<Regex> = OnceLock::new();
+    static URL: OnceLock<Regex> = OnceLock::new();
+    let fa = FA.get_or_init(|| {
+        Regex::new(r"\b[Ff]a (?P<ii>(?P<i>[1-9]\d?)(-[1-9]\d?)?)[ /](?P<y>(19|20)\d{2})\b")
+            .unwrap()
+    });
+    let url = URL.get_or_init(|| {
+        Regex::new(r"\b(?P<p>https?)://(?P<l>[a-z0-9?%./=&;-]+)").unwrap()
+    });
     let html = text
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
-    let html = FA.replace_all(&html, "<a href='/$y/$i'>Fa $ii/$y</a>");
-    let html = URL.replace_all(&html, "<a href='$p://$l'>$l</a>");
+    let html = fa.replace_all(&html, "<a href='/$y/$i'>Fa $ii/$y</a>");
+    let html = url.replace_all(&html, "<a href='$p://$l'>$l</a>");
     Html(html.to_string())
 }
 
