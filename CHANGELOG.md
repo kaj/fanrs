@@ -9,6 +9,7 @@
 * Updated to `scraper` 0.18.1, `roxmltree` to 0.19.0, and `ructe` 0.17.0.
 * Some clippy-suggested cleanups.
 * Updated github workflow (and added a clippy job).
+* Prohibited unsafe code (there was none, so just to be sure).
 
 
 ## Release 0.11.4 (2023-02-12)

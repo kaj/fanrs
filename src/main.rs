@@ -1,4 +1,5 @@
 #![recursion_limit = "128"]
+#![forbid(unsafe_code)]
 
 mod checkstrips;
 mod count_pages;
