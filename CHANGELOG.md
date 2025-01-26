@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-* Updated diesel to 2.1.0, use async-diesel instead of deadpool-diesel
-  (PR #7).
+* Updated diesel to 2.2.6, use async-diesel instead of deadpool-diesel
+  (PR #7 and further changes).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
 * Updated to `scraper` 0.18.1, `roxmltree` to 0.19.0, and `ructe` 0.17.0.
