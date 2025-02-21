@@ -1,5 +1,5 @@
 use crate::models::Nr;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 #[derive(clap::Parser)]
 pub struct CountPages {

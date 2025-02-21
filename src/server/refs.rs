@@ -1,6 +1,6 @@
 use super::{
-    goh, redirect, wrap, DbError, FullArticle, FullEpisode, PgFilter, PgPool,
-    Result, ViewError,
+    DbError, FullArticle, FullEpisode, PgFilter, PgPool, Result, ViewError,
+    goh, redirect, wrap,
 };
 use crate::models::{Article, Episode, IdRefKey, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -12,7 +12,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates::{refkey_html, refkeys_html, RenderRucte};
+use crate::templates::{RenderRucte, refkey_html, refkeys_html};
 use diesel::dsl::{count_star, max, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Integer;

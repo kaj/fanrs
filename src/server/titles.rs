@@ -1,6 +1,6 @@
 use super::{
-    goh, redirect, wrap, FullArticle, FullEpisode, Paginator, PgFilter,
-    PgPool, RenderRucte, Result, ViewError,
+    FullArticle, FullEpisode, Paginator, PgFilter, PgPool, RenderRucte,
+    Result, ViewError, goh, redirect, wrap,
 };
 use crate::models::{Article, Episode, IssueRef, RefKey, Title};
 use crate::schema::article_refkeys::dsl as ar;
@@ -18,7 +18,7 @@ use diesel_async::RunQueryDsl;
 use serde::Deserialize;
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
-use warp::{self, reply::Response, Filter, Reply};
+use warp::{self, Filter, Reply, reply::Response};
 
 pub fn routes(s: PgFilter) -> BoxedFilter<(impl Reply,)> {
     use warp::filters::query::query;

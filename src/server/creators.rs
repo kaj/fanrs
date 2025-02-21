@@ -1,6 +1,6 @@
 use super::{
-    goh, redirect, wrap, DbError, FullArticle, FullEpisode, OtherContribs,
-    PgFilter, PgPool, Result, ViewError,
+    DbError, FullArticle, FullEpisode, OtherContribs, PgFilter, PgPool,
+    Result, ViewError, goh, redirect, wrap,
 };
 use crate::models::creator_contributions::CreatorContributions;
 use crate::models::{
@@ -19,7 +19,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
-use crate::templates::{creator_html, creators_html, RenderRucte};
+use crate::templates::{RenderRucte, creator_html, creators_html};
 use diesel::dsl::min;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};

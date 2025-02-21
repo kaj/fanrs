@@ -1,6 +1,6 @@
 use diesel::prelude::*;
-use diesel_async::pooled_connection::deadpool::{BuildError, Pool};
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::deadpool::{BuildError, Pool};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
 
 /// An asynchronous postgres database connection pool.

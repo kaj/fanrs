@@ -1,4 +1,4 @@
-use crate::templates::{error_html, notfound_html, RenderError, RenderRucte};
+use crate::templates::{RenderError, RenderRucte, error_html, notfound_html};
 use diesel_async::pooled_connection::deadpool::PoolError;
 use log::error;
 use warp::http::response::Builder;

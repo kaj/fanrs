@@ -130,11 +130,11 @@ impl fmt::Display for Issue {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         write!(out, "{}/{}", self.number_str, self.year)?;
         match (&self.pages, &self.price) {
-            (Some(ref pages), Some(ref price)) => {
+            (Some(pages), Some(price)) => {
                 write!(out, " ({pages} sidor, pris {price})")
             }
-            (Some(ref pages), None) => write!(out, " ({pages} sidor)"),
-            (None, Some(ref price)) => write!(out, " (pris {price})"),
+            (Some(pages), None) => write!(out, " ({pages} sidor)"),
+            (None, Some(price)) => write!(out, " (pris {price})"),
             (None, None) => Ok(()),
         }
     }

@@ -1,16 +1,16 @@
-use super::{redirect, PgPool, Result, ViewError};
+use super::{PgPool, Result, ViewError, redirect};
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
 use crate::templates::statics::xcover_jpg;
 use chrono::{Duration, Utc};
-use diesel::prelude::*;
 use diesel::OptionalExtension;
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use mime::IMAGE_JPEG;
 use std::str::FromStr;
+use warp::Reply;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::{Response, StatusCode};
-use warp::Reply;
 
 #[allow(clippy::needless_pass_by_value)]
 pub async fn cover_image(issue: CoverRef, db: PgPool) -> Result<impl Reply> {

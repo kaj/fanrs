@@ -10,12 +10,13 @@ mod yearsummary;
 
 use self::covers::{cover_image, redirect_cover};
 pub use self::creators::CoverSet;
-use self::error::{for_rejection, ViewError, ViewResult};
+use self::error::{ViewError, ViewResult, for_rejection};
 pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
 use self::search::{search, search_autocomplete};
 pub use yearsummary::ContentSummary;
 
+use crate::DbOpt;
 use crate::dbopt::PgPool;
 use crate::models::{
     Article, Creator, CreatorSet, Episode, Issue, IssueRef, OtherMag, Part,
@@ -31,9 +32,8 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
 use crate::templates::{
-    frontpage_html, issue_html, year_html, Html, RenderRucte, ToHtml,
+    Html, RenderRucte, ToHtml, frontpage_html, issue_html, year_html,
 };
-use crate::DbOpt;
 use anyhow::anyhow;
 use chrono::{Duration, Utc};
 use diesel::dsl::{count_distinct, max, min, not};

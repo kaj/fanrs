@@ -6,7 +6,7 @@ use crate::schema::episodes::dsl as e;
 use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
-use crate::templates::{year_summary_html, RenderRucte, ToHtml};
+use crate::templates::{RenderRucte, ToHtml, year_summary_html};
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::io::{self, Write};

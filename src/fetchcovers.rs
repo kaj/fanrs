@@ -1,8 +1,8 @@
+use crate::DbOpt;
 use crate::models::IssueRef;
 use crate::schema::covers::dsl as c;
 use crate::schema::issues::dsl as i;
-use crate::DbOpt;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use diesel::dsl::now;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
