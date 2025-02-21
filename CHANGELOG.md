@@ -6,7 +6,8 @@
   (PR #7 and further changes).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
-* Updated to `scraper` 0.22.0, `roxmltree` to 0.20.0, and `ructe` 0.17.0.
+* Updated to `reqwest` to 0.12.2, `scraper` 0.22.0, `roxmltree` to
+  0.20.0, `env_logger` to 0.11.6, and `ructe` 0.18.2.
 * Removed `lazy_static` dependency, as std handles that now.
 * Some clippy-suggested cleanups.
 * Updated github workflow (and added a clippy job).
