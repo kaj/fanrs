@@ -187,7 +187,7 @@ impl<'a> OrigEpisode<'a> {
     }
 }
 
-impl<'a> ToHtml for OrigEpisode<'a> {
+impl ToHtml for OrigEpisode<'_> {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         write!(out, "<q lang='{}'>", self.lang)?;
         self.episode.to_html(out)?;
@@ -233,7 +233,7 @@ impl ToHtml for OrigDates {
 
 struct SvDate<'a>(&'a NaiveDate);
 
-impl<'a> fmt::Display for SvDate<'a> {
+impl fmt::Display for SvDate<'_> {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         write!(
             out,

@@ -103,7 +103,7 @@ impl ToHtml for PartsPublished {
     }
 }
 
-impl<'a> ToHtml for SmallPartsPublished<'a> {
+impl ToHtml for SmallPartsPublished<'_> {
     fn to_html(&self, out: &mut dyn Write) -> io::Result<()> {
         if let Some((last, pubs)) = self.0.issues.split_last() {
             out.write_all(b"<small class='pub'>")?;
