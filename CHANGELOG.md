@@ -2,15 +2,15 @@
 
 ## Unreleased
 
-* Updated some frontpage links.
-* Updated diesel to 2.2.6, use async-diesel instead of deadpool-diesel
-  (PR #7 and further changes).
+* Updated some frontpage and other links.
+* Updated to `diesel` 2.2.7 and use `async-diesel` instead of
+  `deadpool-diesel` (PR #7 and further changes).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
-* Updated to `reqwest` to 0.12.2, `scraper` 0.22.0, `roxmltree` to
-  0.20.0, `env_logger` to 0.11.6, and `ructe` 0.18.2.
+* Updated to `reqwest` 0.12.2, `scraper` 0.22.0, `roxmltree` 0.20.0,
+  `env_logger` 0.11.6, and `ructe` 0.18.2.
 * Removed `lazy_static` dependency, as std handles that now.
-* Some clippy-suggested cleanups.
+* Updated to Rust edition 2024 and clippy-suggested cleanups.
 * Updated github workflow (and added a clippy job).
 * Prohibited unsafe code (there was none, so just to be sure).
 

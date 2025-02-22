@@ -29,6 +29,6 @@ warp = { version = "0.3.0", default-features = false }
 roxmltree = { version = "0.20.0", features = ["std"] }
 
 [dependencies.diesel]
-version = "2.2.6"
+version = "2.2.7"
 default-features = false # get rid of 32-column-tables support
 features = ["chrono", "postgres"]
