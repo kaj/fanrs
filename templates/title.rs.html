@@ -5,9 +5,9 @@
 @(title: &Title, pages: Option<&Paginator>, articles: &[(FullArticle, Vec<IssueRef>)], episodes: &[FullEpisode])
 @:page_html(&title.title, &format!("De gånger serien {} publicerats i svenska Fantomentidningen.", title.title), {
   <p>Här listas de gånger serien <strong>@title.title</strong>
-    (<a href="http://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
+    (<a href="https://seriewikin.serieframjandet.se/index.php/Special:Search?search=@title.title&amp;go=go"
 	title="Sök &quot;@title.title&quot; i Seriewikin">Seriewikin</a>,
-    <a href="http://sv.wikipedia.org/wiki/Special:Search?search=@title.title&amp;go=go"
+    <a href="https://sv.wikipedia.org/wiki/Special:Search?search=@title.title&amp;go=go"
        title="Sök &quot;@title.title&quot; i Svenska Wikipedia">wikipedia</a>)
     förekommer i mina indexerade fantomentidningar.</p>
 
