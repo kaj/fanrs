@@ -7,8 +7,9 @@
   `deadpool-diesel` (PR #7 and further changes).
 * Changed some db column names for consistency.
 * Improved diagnostics on parse errors in read-files.
-* Updated to `reqwest` 0.12.2, `scraper` 0.22.0, `roxmltree` 0.20.0,
-  `env_logger` 0.11.6, and `ructe` 0.18.2.
+* Updated to `reqwest` 0.12.2, `scraper` 0.23.1, `roxmltree` 0.20.0,
+  and `ructe` 0.18.2.
+* Now using `tracing` rather than `log`.
 * Removed `lazy_static` dependency, as std handles that now.
 * Updated to Rust edition 2024 and clippy-suggested cleanups.
 * Updated github workflow (and added a clippy job).
