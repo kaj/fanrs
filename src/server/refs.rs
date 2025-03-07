@@ -17,6 +17,7 @@ use diesel::dsl::{count_star, max, min, sql};
 use diesel::prelude::*;
 use diesel::sql_types::Integer;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use tracing::debug;
 use warp::filters::BoxedFilter;
 use warp::http::Response;
 use warp::{self, Filter};
@@ -144,7 +145,7 @@ async fn one_ref_impl(
         let target =
             slug.to_lowercase().replace('_', "-").replace(".html", "");
         if target != slug {
-            log::debug!("Trying refkey redirect {:?} -> {:?}", slug, target);
+            debug!("Trying refkey redirect {:?} -> {:?}", slug, target);
             let n = r::refkeys
                 .filter(r::kind.eq(kind))
                 .filter(r::slug.eq(target.clone()))

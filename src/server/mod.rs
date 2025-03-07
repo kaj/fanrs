@@ -40,12 +40,12 @@ use diesel::dsl::{count_distinct, max, min, not};
 use diesel::prelude::*;
 use diesel::result::Error as DbError;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use log::info;
 use mime::TEXT_PLAIN;
 use regex::Regex;
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::sync::OnceLock;
+use tracing::info;
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
 use warp::http::response::Builder;
@@ -178,7 +178,7 @@ async fn static_file(name: Tail) -> Result<impl Reply> {
             .header(EXPIRES, far_expires.to_rfc2822())
             .body(data.content))
     } else {
-        log::info!("Static file {:?} not found", name);
+        info!(?name, "Static file not found");
         Err(ViewError::NotFound)
     }
 }

@@ -6,8 +6,8 @@ use diesel::dsl::count_star;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use log::warn;
 use std::io::{self, Write};
+use tracing::warn;
 
 #[derive(Debug, Queryable)]
 pub struct Part {

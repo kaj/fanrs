@@ -5,6 +5,7 @@ use crate::schema::publications::dsl as p;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use tracing::warn;
 
 #[derive(Debug, Queryable, Selectable, PartialEq, Eq)]
 pub struct Article {
@@ -49,7 +50,7 @@ impl Article {
         seqno: i16,
         db: &mut AsyncPgConnection,
     ) -> Result<(), Error> {
-        if let Some((id, old_seqno)) = p::publications
+        if let Some((id, old)) = p::publications
             .filter(p::issue_id.eq(issue))
             .filter(p::article_id.eq(self.id))
             .select((p::id, p::seqno))
@@ -57,12 +58,9 @@ impl Article {
             .await
             .optional()?
         {
-            if old_seqno != Some(seqno) {
-                log::warn!(
-                    "TODO: Should update seqno for article #{} ({:?} != {})",
-                    id,
-                    old_seqno,
-                    seqno
+            if old != Some(seqno) {
+                warn!(
+                    "TODO: Update seqno for article #{id} ({old:?} != {seqno})",
                 );
             }
             Ok(())

@@ -15,6 +15,7 @@ use slug::slugify;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use tracing::{info, instrument};
 
 static XMLNS: &str = "http://www.w3.org/XML/1998/namespace";
 
@@ -126,7 +127,7 @@ async fn register_issue<'a>(
     )
     .await
     .context("issue")?;
-    println!("Found issue {issue}");
+    info!(%issue, "Found");
     issue.clear(db).await?;
 
     for (c, seqno) in child_elems(i).zip(0i16..) {
@@ -593,7 +594,6 @@ async fn delete_unpublished(db: &mut AsyncPgConnection) -> Result<()> {
     })
     .await?;
 
-    let start = Instant::now();
     let published_articles = p::publications
         .filter(p::article_id.is_not_null())
         .select(p::article_id)
@@ -619,12 +619,6 @@ async fn delete_unpublished(db: &mut AsyncPgConnection) -> Result<()> {
     })
     .await?;
 
-    println!(
-        "Article-related cleanups in {:.0?} ({} remains).",
-        start.elapsed(),
-        published_articles.len(),
-    );
-
     do_clear(db, "refkeys", {
         r::refkeys
             .filter(r::id.ne_all(er::episode_refkeys.select(er::refkey_id)))
@@ -635,6 +629,7 @@ async fn delete_unpublished(db: &mut AsyncPgConnection) -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip(db, how))]
 async fn do_clear<'a, T: 'a + IntoUpdateTarget>(
     db: &'a mut AsyncPgConnection,
     what: &'static str,
@@ -649,7 +644,8 @@ where
 {
     let start = Instant::now();
     let n = diesel::delete(how).execute(db).await.context(what)?;
-    println!("Cleared junk {} {} in {:.0?}", n, what, start.elapsed());
+    let elapsed = format!("{:.0?}", start.elapsed());
+    info!(%n, %elapsed, "Cleared");
     Ok(())
 }
 

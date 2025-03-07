@@ -1,6 +1,7 @@
 use crate::templates::{RenderError, RenderRucte, error_html, notfound_html};
 use diesel_async::pooled_connection::deadpool::PoolError;
-use log::error;
+use std::fmt;
+use tracing::error;
 use warp::http::response::Builder;
 use warp::http::status::StatusCode;
 use warp::reply::Response;
@@ -14,6 +15,17 @@ pub enum ViewError {
     ServiceUnavailable,
     /// 500
     Err(&'static str),
+}
+impl fmt::Display for ViewError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ViewError::NotFound => f.write_str("Not found"),
+            ViewError::ServiceUnavailable => {
+                f.write_str("Service unavailable")
+            }
+            ViewError::Err(msg) => f.write_str(msg),
+        }
+    }
 }
 
 pub trait ViewResult<T> {

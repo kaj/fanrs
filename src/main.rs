@@ -13,10 +13,12 @@ mod server;
 
 use crate::checkstrips::check_strips;
 use crate::listissues::list_issues;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use dbopt::DbOpt;
 use dotenv::dotenv;
+use std::process::ExitCode;
+use tracing::error;
 
 #[derive(clap::Parser)]
 #[structopt(about, author)]
@@ -62,14 +64,25 @@ impl Fanrs {
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
-async fn main() -> Result<()> {
-    match dotenv() {
-        Ok(_) => (),
-        Err(ref err) if err.not_found() => (),
-        Err(e) => return Err(e).context("Failed to read .env"),
+async fn main() -> ExitCode {
+    let dotenv_result = dotenv();
+    tracing_subscriber::fmt::init();
+
+    match dotenv_result {
+        Err(ref err) if !err.not_found() => {
+            error!(%err, "Failed to read .env");
+            return ExitCode::FAILURE;
+        }
+        _ => (),
     }
-    env_logger::init();
-    Fanrs::parse().run().await
+
+    match Fanrs::parse().run().await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            error!(%err, "Fatal error");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));

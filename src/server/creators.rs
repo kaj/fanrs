@@ -23,6 +23,7 @@ use crate::templates::{RenderRucte, creator_html, creators_html};
 use diesel::dsl::min;
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use tracing::{debug, info, instrument};
 use warp::filters::BoxedFilter;
 use warp::http::response::Builder;
 use warp::reply::Response;
@@ -53,6 +54,7 @@ async fn list_creators(db: PgPool) -> Result<Response> {
     Ok(Builder::new().html(|o| creators_html(o, &all))?)
 }
 
+#[instrument(skip(db), err)]
 async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
     let mut db = db.get().await?;
     let creator = c::creators
@@ -62,7 +64,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
         .optional()?;
     let Some(creator) = creator else {
         let target = slug.replace(['_', '-'], "%").replace(".html", "");
-        log::info!("Looking for creator fallback {:?} -> {:?}", slug, target);
+        info!("Looking for creator fallback {:?} -> {:?}", slug, target);
         if target == "anderas%eriksson" || target == "andreas%erikssson" {
             return redirect("/who/andreas-eriksson");
         }
@@ -75,7 +77,7 @@ async fn one_creator(db: PgPool, slug: String) -> Result<Response> {
             .await
             .optional()?
             .ok_or(ViewError::NotFound)?;
-        log::debug!("Found replacement: {found:?}");
+        debug!("Found replacement: {found:?}");
         return redirect(&format!("/who/{found}"));
     };
 

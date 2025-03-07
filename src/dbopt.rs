@@ -2,6 +2,8 @@ use diesel::prelude::*;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::pooled_connection::deadpool::{BuildError, Pool};
 use diesel_async::{AsyncConnection, AsyncPgConnection};
+use std::time::{Duration, Instant};
+use tracing::warn;
 
 /// An asynchronous postgres database connection pool.
 pub type PgPool = Pool<AsyncPgConnection>;
@@ -16,7 +18,13 @@ pub struct DbOpt {
 impl DbOpt {
     /// Get a single database connection from the configured url.
     pub async fn get_db(&self) -> Result<AsyncPgConnection, ConnectionError> {
-        AsyncPgConnection::establish(&self.db_url).await
+        let time = Instant::now();
+        let p = AsyncPgConnection::establish(&self.db_url).await;
+        let time = time.elapsed();
+        if time > Duration::from_millis(50) {
+            warn!("Got a db connection in {time:.1?}.  Why so long?");
+        }
+        p
     }
 
     /// Get a database connection pool from the configured url.

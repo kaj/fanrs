@@ -7,6 +7,7 @@ use diesel::result::Error;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::fmt;
 use std::io::{self, Write};
+use tracing::warn;
 
 #[derive(Debug, Identifiable, Queryable, Selectable)]
 pub struct Episode {
@@ -150,10 +151,8 @@ impl Episode {
             (Some(from), Some(to)) => Some((from, to)),
             (None, None) => None,
             (from, to) => {
-                log::warn!(
-                    "One-ended strips {:?} - {:?} in ep #{}",
-                    from,
-                    to,
+                warn!(
+                    "One-ended strips {from:?} - {to:?} in ep #{}",
                     self.id,
                 );
                 None
