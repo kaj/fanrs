@@ -79,7 +79,7 @@ async fn main() -> ExitCode {
     match Fanrs::parse().run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            error!(%err, "Fatal error");
+            error!(?err, "Fatal error");
             ExitCode::FAILURE
         }
     }
