@@ -21,6 +21,7 @@ pub struct Issue {
     pub price: Option<Price>,
     pub cover_best: Option<i16>,
     pub magic: i16,
+    pub ord: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,12 +38,15 @@ impl Issue {
     ) -> Result<Issue, Error> {
         match Issue::load(year, &number, db).await? {
             Some(t) => Ok(t),
-            None => Issue::create(year, number, None, None, None, db).await,
+            None => {
+                Issue::create(year, number, None, None, None, None, db).await
+            }
         }
     }
     pub async fn get_or_create(
         year: i16,
         number: Nr,
+        ord: Option<i32>,
         pages: Option<i16>,
         price: Option<Price>,
         cover_best: Option<i16>,
@@ -53,23 +57,27 @@ impl Issue {
             if (t.cover_best != cover_best)
                 || (t.pages != pages)
                 || (t.price != price)
+                || (t.ord != ord)
             {
                 t.cover_best = cover_best;
                 t.pages = pages;
                 t.price = price;
+                t.ord = ord;
                 diesel::update(dsl::issues)
                     .filter(dsl::id.eq(t.id))
                     .set((
                         dsl::cover_best.eq(cover_best),
                         dsl::pages.eq(pages),
                         dsl::price.eq(&t.price),
+                        dsl::ord.eq(t.ord),
                     ))
                     .execute(db)
                     .await?;
             }
             Ok(t)
         } else {
-            Issue::create(year, number, pages, price, cover_best, db).await
+            Issue::create(year, number, ord, pages, price, cover_best, db)
+                .await
         }
     }
     async fn load(
@@ -89,6 +97,7 @@ impl Issue {
     async fn create(
         year: i16,
         number: Nr,
+        ord: Option<i32>,
         pages: Option<i16>,
         price: Option<Price>,
         cover_best: Option<i16>,
@@ -106,6 +115,7 @@ impl Issue {
                 i::price.eq(price),
                 i::cover_best.eq(cover_best),
                 i::magic.eq(magic),
+                i::ord.eq(ord),
             ))
             .get_result(db)
             .await

@@ -191,6 +191,14 @@ async fn robots_txt() -> Result<impl Reply> {
 
 async fn frontpage(pool: PgPool) -> Result<impl Reply> {
     let mut db = pool.get().await?;
+
+    let (n, of_n): (i64, Option<i32>) = i::issues
+        .select((diesel::dsl::count(i::id), max(i::ord)))
+        .first(&mut db)
+        .await?;
+
+    let of_n = of_n.map(Into::into).unwrap_or(n);
+
     let n = p::publications
         .select(count_distinct(p::issue_id))
         .filter(not(p::seqno.is_null()))
@@ -212,7 +220,9 @@ async fn frontpage(pool: PgPool) -> Result<impl Reply> {
     let creators = Creator::cloud(num, &mut db).await?;
 
     Ok(Builder::new().html(|o| {
-        frontpage_html(o, n, &all_fa, &years, &titles, &refkeys, &creators)
+        frontpage_html(
+            o, n, of_n, &all_fa, &years, &titles, &refkeys, &creators,
+        )
     })?)
 }
 
