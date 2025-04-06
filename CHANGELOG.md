@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Keep track of ordinal issue numbers (PR #8).
 * Updated some frontpage and other links.
 * Updated to `diesel` 2.2.7 and use `async-diesel` instead of
   `deadpool-diesel` (PR #7 and further changes).
