@@ -118,6 +118,7 @@ async fn register_issue<'a>(
     let issue = Issue::get_or_create(
         year,
         nr,
+        parse_attribute(i, "ord")?,
         parse_attribute(i, "pages")?,
         parse_attribute(i, "price")?,
         get_child(i, "omslag")

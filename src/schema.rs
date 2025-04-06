@@ -123,6 +123,7 @@ diesel::table! {
         price -> Nullable<Int4>,
         cover_best -> Nullable<Int2>,
         magic -> Int2,
+        ord -> Nullable<Int4>,
     }
 }
 
