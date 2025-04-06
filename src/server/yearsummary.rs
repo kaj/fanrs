@@ -7,7 +7,7 @@ use crate::schema::issues::dsl as i;
 use crate::schema::publications::dsl as p;
 use crate::schema::titles::dsl as t;
 use crate::templates::{RenderRucte, ToHtml, year_summary_html};
-use diesel::prelude::*;
+use diesel::{dsl, prelude::*};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use std::io::{self, Write};
 use warp::http::response::Builder;
@@ -15,6 +15,14 @@ use warp::{self, Reply};
 
 pub async fn year_summary(year: i16, db: PgPool) -> Result<impl Reply> {
     let mut db = db.get().await?;
+
+    let (ord_min, ord_max): (Option<i32>, Option<i32>) = i::issues
+        .filter(i::year.eq(year))
+        .select((dsl::min(i::ord), dsl::max(i::ord)))
+        .first(&mut db)
+        .await?;
+    let ord = ord_min.and_then(|min| ord_max.map(|max| (min, max)));
+
     let issues_in: Vec<Issue> = i::issues
         .filter(i::year.eq(year))
         .order(i::number)
@@ -29,7 +37,7 @@ pub async fn year_summary(year: i16, db: PgPool) -> Result<impl Reply> {
     }
     let years = YearLinks::load(year, &mut db).await?;
     Ok(Builder::new()
-        .html(|o| year_summary_html(o, year, &years, &issues))?)
+        .html(|o| year_summary_html(o, year, ord, &years, &issues))?)
 }
 
 async fn load_summary(
