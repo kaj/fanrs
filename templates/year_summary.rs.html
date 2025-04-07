@@ -1,10 +1,11 @@
 @use super::page_html;
-@use crate::models::{Creator, Issue};
+@use crate::models::{Creator, Issue, YearNo};
 @use crate::server::{ContentSummary, YearLinks};
 
 @(year: i16, ord: Option<(i32, i32)>, year_links: &YearLinks, issues: &[(Issue, Vec<Creator>, Vec<ContentSummary>)])
 @:page_html(&format!("Årgång {year}"), &format!("Översikt över Fantomentidningar publicerade år {year}."), {
-  @if let Some((from, to)) = ord {<p>Nr @from - @to sedan starten.</p>}
+  <p>Fantomentidningens @YearNo::of(year) årgång.
+  @if let Some((from, to)) = ord {<span>Tidningar nr @from - @to sedan starten.</span>}</p>
   <p>Se även @year_links.</p>
 }, {
   <div class="yearsummary">

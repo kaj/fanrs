@@ -1,5 +1,6 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 use crate::templates::ToHtml;
+use std::fmt;
 use std::io::{self, Write};
 
 mod article;
@@ -63,6 +64,25 @@ impl<T: CloudItem> ToHtml for Cloud<T> {
             let (item, n, w) = last;
             item.write_item(out, *n, *w)?;
             write!(out, ".")?;
+        }
+        Ok(())
+    }
+}
+
+pub struct YearNo(i16);
+impl YearNo {
+    pub fn of(year: i16) -> Self {
+        Self(year + 1 - 1950)
+    }
+}
+impl fmt::Display for YearNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.0;
+        n.fmt(f)?;
+        if n == 1 || n == 2 || (n > 20 && (n % 10 == 1 || n % 10 == 2)) {
+            f.write_str(":a")?;
+        } else {
+            f.write_str(":e")?;
         }
         Ok(())
     }
