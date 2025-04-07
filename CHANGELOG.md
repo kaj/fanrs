@@ -1,6 +1,6 @@
 # Changes in fanrs
 
-## Unreleased
+## Release 0.12.0 (2025-04-07)
 
 * Keep track of ordinal issue numbers (PR #8).
 * Updated some frontpage and other links.
