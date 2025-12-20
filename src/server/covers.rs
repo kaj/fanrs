@@ -7,6 +7,7 @@ use diesel::OptionalExtension;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use mime::IMAGE_JPEG;
+use std::num::ParseIntError;
 use std::str::FromStr;
 use warp::Reply;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
@@ -90,25 +91,63 @@ impl FromStr for CYear {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct SIssue(i16);
 
 impl FromStr for SIssue {
-    type Err = u8;
+    type Err = SIssueError;
     /// expect sNN.jpg or sN-M.jpg where M = N + 1
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.starts_with('s') {
-            return Err(0);
-        }
+        let s = s.strip_prefix('s').ok_or(SIssueError::BadPrefix)?;
+        let s = s.strip_suffix(".jpg").ok_or(SIssueError::BadSuffix)?;
+
         if let Some(p) = s.find('-') {
-            if let Ok(n) = s[1..p].parse() {
-                if format!("s{}-{}.jpg", n, n + 1) == s {
-                    return Ok(SIssue(n));
-                }
+            let n = s[..p].parse()?;
+            let m = s[p + 1..].parse()?;
+            if m == n + 1 {
+                Ok(SIssue(n))
+            } else {
+                Err(SIssueError::Double(n, m))
             }
-            Err(4)
         } else {
-            let p = s.find(".jpg").ok_or(2)?;
-            Ok(SIssue(s[1..p].parse().map_err(|_| 3)?))
+            Ok(SIssue(s.parse()?))
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SIssueError {
+    #[error("Image name should start with 's'")]
+    BadPrefix,
+    #[error("Image name should end with '.jpg'")]
+    BadSuffix,
+    #[error("Bad image name: {0}")]
+    BadNr(#[from] ParseIntError),
+    #[error("Strange double nr {0}-{1}")]
+    Double(i16, i16),
+}
+
+#[cfg(test)]
+mod test {
+    use super::SIssue;
+
+    #[test]
+    fn simple() {
+        assert_eq!("s3.jpg".parse(), Ok(SIssue(3)));
+    }
+
+    #[test]
+    fn double() {
+        assert_eq!("s7-8.jpg".parse(), Ok(SIssue(7)));
+    }
+
+    #[test]
+    fn bad() {
+        for name in ["p3.jpg", "s3.jpeg", "s.jpg", "sOne.jpg", "s1-4.jpg"] {
+            assert!(
+                name.parse::<SIssue>().is_err(),
+                "Expected {name:?} to fail"
+            );
         }
     }
 }

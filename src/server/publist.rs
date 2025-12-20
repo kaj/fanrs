@@ -70,7 +70,7 @@ impl PartsPublished {
             others: true,
         })
     }
-    pub fn small(&self) -> SmallPartsPublished {
+    pub fn small(&self) -> SmallPartsPublished<'_> {
         SmallPartsPublished(self)
     }
     pub fn last(&self) -> Option<&IssueRef> {

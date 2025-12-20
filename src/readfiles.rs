@@ -358,12 +358,13 @@ async fn register_serie<'a>(
 }
 
 fn get_episode_name(c: Node) -> Option<String> {
-    if let Some(e) = get_child(c, "episode") {
-        if e.attribute("role").is_none() {
-            return e.text().map(normalize_space);
-        }
+    if let Some(e) = get_child(c, "episode")
+        && e.attribute("role").is_none()
+    {
+        e.text().map(normalize_space)
+    } else {
+        None
     }
-    None
 }
 
 fn parse_refs(parent: Node) -> Result<Vec<RefKey>> {

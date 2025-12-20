@@ -130,7 +130,7 @@ impl Episode {
     }
 
     /// Return original language and title, if known.
-    pub fn orig(&self) -> Option<OrigEpisode> {
+    pub fn orig(&self) -> Option<OrigEpisode<'_>> {
         if let (Some(lang), Some(episode)) =
             (&self.orig_lang, &self.orig_episode)
         {
