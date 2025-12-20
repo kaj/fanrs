@@ -20,7 +20,7 @@ mime = "0.3"
 regex = "1.5.4"
 reqwest = "0.12.2"
 roxmltree = { version = "0.21.1", features = ["std"] }
-scraper = "0.23.1"
+scraper = "0.25.0"
 serde = { version = "1.0.88", features = ["derive"] }
 slug = "0.1.4"
 thiserror = "2.0.17"

@@ -3,7 +3,7 @@
 ## Unreleased
 
 * Updated `diesel` to 2.3.5 and `diesel-async` to 0.7.4.
-* Updated `roxmltree` to 0.21.1.
+* Updated `roxmltree` to 0.21.1 and `scraper` to 0.25.0.
 
 
 ## Release 0.12.0 (2025-04-07)
