@@ -8,14 +8,14 @@ pub mod search;
 mod titles;
 mod yearsummary;
 
-use self::covers::{cover_image, redirect_cover};
 pub use self::creators::CoverSet;
-use self::error::{ViewError, ViewResult, for_rejection};
 pub use self::paginator::Paginator;
 pub use self::publist::{OtherContribs, PartsPublished};
-use self::search::{search, search_autocomplete};
-pub use yearsummary::ContentSummary;
+pub use self::yearsummary::ContentSummary;
 
+use self::covers::{cover_image, redirect_cover};
+use self::error::{ViewError, ViewResult, for_rejection};
+use self::search::{search, search_autocomplete};
 use crate::DbOpt;
 use crate::dbopt::PgPool;
 use crate::models::{
@@ -34,7 +34,7 @@ use crate::schema::titles::dsl as t;
 use crate::templates::{
     Html, RenderRucte, ToHtml, frontpage_html, issue_html, year_html,
 };
-use anyhow::anyhow;
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use diesel::dsl::{count, max, min, not};
 use diesel::prelude::*;
@@ -45,6 +45,7 @@ use regex::Regex;
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::sync::OnceLock;
+use tokio::net::TcpListener;
 use tracing::info;
 use warp::filters::BoxedFilter;
 use warp::http::header::{CONTENT_TYPE, EXPIRES};
@@ -147,11 +148,12 @@ impl Args {
                 .then(titles::oldslug)
                 .map(wrap))
             .recover(for_rejection);
-        let (addr, work) = warp::serve(routes)
-            .try_bind_ephemeral(self.bind)
-            .map_err(|e| anyhow!("Failed to bind {}: {e}", self.bind))?;
-        info!("Running on http://{addr}/");
-        work.await;
+
+        let acceptor = TcpListener::bind(self.bind).await?;
+        if let Ok(addr) = acceptor.local_addr() {
+            info!("Running on http://{addr}/");
+        }
+        warp::serve(routes).incoming(acceptor).run().await;
         Ok(())
     }
 }
@@ -169,14 +171,16 @@ fn wrap(result: Result<impl Reply>) -> Response {
 /// Create a response from the file data with a correct content type
 /// and a far expires header (or a 404 if the file does not exist).
 #[allow(clippy::needless_pass_by_value)]
-async fn static_file(name: Tail) -> Result<impl Reply> {
+async fn static_file(name: Tail) -> Result<Response> {
     use crate::templates::statics::StaticFile;
     if let Some(data) = StaticFile::get(name.as_str()) {
         let far_expires = Utc::now() + Duration::days(180);
-        Ok(Builder::new()
+        Builder::new()
             .header(CONTENT_TYPE, data.mime.as_ref())
             .header(EXPIRES, far_expires.to_rfc2822())
-            .body(data.content))
+            // TODO: Remove `bytes` dep when seanmonstar/warp#1144 is released.
+            .body(Bytes::from(data.content).into())
+            .ise()
     } else {
         info!(?name, "Static file not found");
         Err(ViewError::NotFound)
