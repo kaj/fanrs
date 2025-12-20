@@ -36,7 +36,7 @@ use crate::templates::{
 };
 use anyhow::anyhow;
 use chrono::{Duration, Utc};
-use diesel::dsl::{count_distinct, max, min, not};
+use diesel::dsl::{count, max, min, not};
 use diesel::prelude::*;
 use diesel::result::Error as DbError;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -200,7 +200,7 @@ async fn frontpage(pool: PgPool) -> Result<impl Reply> {
     let of_n = of_n.map(Into::into).unwrap_or(n);
 
     let n = p::publications
-        .select(count_distinct(p::issue_id))
+        .select(count(p::issue_id).aggregate_distinct())
         .filter(not(p::seqno.is_null()))
         .first(&mut db)
         .await?;

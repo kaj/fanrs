@@ -12,7 +12,7 @@ use crate::schema::publications::dsl as p;
 use crate::schema::refkeys::dsl as r;
 use crate::schema::titles::dsl as t;
 use crate::templates::{self, title_html, titles_html};
-use diesel::dsl::{count_distinct, count_star, max, min};
+use diesel::dsl::{count, count_star, max, min};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::Deserialize;
@@ -45,7 +45,7 @@ async fn list_titles(db: PgPool) -> Result<Response> {
         .group_by(t::titles::all_columns())
         .select((
             t::titles::all_columns(),
-            count_distinct(e::id),
+            count(e::id).aggregate_distinct(),
             min(i::magic),
             max(i::magic),
         ))

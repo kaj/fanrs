@@ -1,6 +1,6 @@
 [package]
 name = "fanrs"
-version = "0.12.0"
+version = "0.12.1-PRE"
 authors = ["Rasmus Kaj <rasmus@krats.se>"]
 description = "Manage and serve index of the Phantom comic books, fantomenindex.krats.se"
 edition = "2024"
@@ -14,7 +14,7 @@ ructe = { version = "0.18.2", features = ["sass", "warp03"] }
 anyhow = "1.0"
 chrono = "0.4.6"
 clap = { version = "4.0.32", features = ["derive", "env", "wrap_help"] }
-diesel-async = { version = "0.5.2", features = ["deadpool", "postgres"] }
+diesel-async = { version = "0.7.4", features = ["deadpool", "postgres"] }
 dotenv = "0.15.0"
 mime = "0.3"
 regex = "1.5.4"
@@ -29,6 +29,6 @@ tracing-subscriber = "0.3.19"
 warp = { version = "0.3.0", default-features = false }
 
 [dependencies.diesel]
-version = "2.2.7"
+version = "2.3.5"
 default-features = false # get rid of 32-column-tables support
 features = ["chrono", "postgres"]

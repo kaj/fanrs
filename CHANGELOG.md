@@ -1,5 +1,10 @@
 # Changes in fanrs
 
+## Unreleased
+
+* Updated `diesel` to 2.3.5 and `diesel-async` to 0.7.4.
+
+
 ## Release 0.12.0 (2025-04-07)
 
 * Keep track of ordinal issue numbers (PR #8).
