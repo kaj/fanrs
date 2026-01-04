@@ -19,7 +19,7 @@ diesel-async = { version = "0.7.4", features = ["deadpool", "postgres"] }
 dotenv = "0.15.0"
 mime = "0.3"
 regex = "1.5.4"
-reqwest = "0.12.2"
+reqwest = "0.13.1"
 roxmltree = { version = "0.21.1", features = ["std"] }
 scraper = "0.25.0"
 serde = { version = "1.0.88", features = ["derive"] }
